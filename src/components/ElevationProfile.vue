@@ -16,8 +16,8 @@ defineExpose({ canvas });
     <canvas
       id="elevation-canvas"
       ref="canvas"
-      @click="$emit('select', $event)"
       aria-label="Profil d’altitude du tracé"
+      @click="$emit('select', $event)"
     ></canvas>
     <div class="elevation-axis">
       <span>DÉPART</span

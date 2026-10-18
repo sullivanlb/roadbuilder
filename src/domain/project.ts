@@ -9,7 +9,7 @@ const LIMITS = {
 export const BARRIER_TYPES: readonly BarrierType[] = ['guardrail', 'tires', 'tecpro', 'wall'];
 export const BARRIER_SIDES: readonly BarrierSide[] = ['left', 'right'];
 const clamp = (value: number, min: number, max: number) => Math.min(max, Math.max(min, value));
-const clone = <T>(value: T): T => JSON.parse(JSON.stringify(value));
+const clone = <T>(value: T): T => JSON.parse(JSON.stringify(value)) as T;
 const distance = (a: Point, b: Point) => Math.hypot(a.x - b.x, a.y - b.y, a.z - b.z);
 const number = (v: unknown, min: number, max: number, label: string): number => {
   if (typeof v !== 'number' || !Number.isFinite(v) || v < min || v > max)

@@ -41,13 +41,13 @@ function key(value: string, extra: KeyboardEventInit = {}) {
 }
 async function saved(): Promise<Project> {
   await vi.advanceTimersByTimeAsync(350);
-  return JSON.parse(localStorage.getItem(STORAGE_KEY)!);
+  return JSON.parse(localStorage.getItem(STORAGE_KEY)!) as Project;
 }
 async function openFile(value: unknown, size?: number) {
   const text = typeof value === 'string' ? value : JSON.stringify(value);
   Object.defineProperty($('file-input'), 'files', {
     configurable: true,
-    value: [{ size: size ?? text.length, text: async () => text }],
+    value: [{ size: size ?? text.length, text: () => Promise.resolve(text) }],
   });
   $('file-input').dispatchEvent(new Event('change', { bubbles: true }));
   await flush();
@@ -151,7 +151,8 @@ beforeEach(() => {
   Object.defineProperty(HTMLCanvasElement.prototype, 'getContext', {
     configurable: true,
     value() {
-      return new Proxy({} as Record<string, unknown>, {
+      const state: Record<string, unknown> = {};
+      return new Proxy(state, {
         get(target, key: string) {
           if (key in target) return target[key];
           if (key === 'createLinearGradient' || key === 'createRadialGradient')
@@ -164,7 +165,7 @@ beforeEach(() => {
             drawCalls++;
           };
         },
-        set(target, key: string, value) {
+        set(target, key: string, value: unknown) {
           target[key] = value;
           return true;
         },
@@ -173,13 +174,13 @@ beforeEach(() => {
   });
   Object.defineProperty(HTMLDialogElement.prototype, 'showModal', {
     configurable: true,
-    value() {
+    value(this: HTMLDialogElement) {
       this.setAttribute('open', '');
     },
   });
   Object.defineProperty(HTMLDialogElement.prototype, 'close', {
     configurable: true,
-    value() {
+    value(this: HTMLDialogElement) {
       this.removeAttribute('open');
     },
   });
@@ -327,7 +328,8 @@ describe('interface Vue (DOM et canvas simulés)', () => {
     await vi.advanceTimersByTimeAsync(350);
     expect(localStorage.getItem(STORAGE_KEY)).toBe('{corrompu');
     await click('save-project');
-    expect(JSON.parse(await downloads[0].blob.text()).name).toBe('Mon nouveau tracé');
+    const savedProject = JSON.parse(await downloads[0].blob.text()) as Project;
+    expect(savedProject.name).toBe('Mon nouveau tracé');
   });
   it('exporte les deux formats via les dialogues et bloque une géométrie invalide', async () => {
     await mount();

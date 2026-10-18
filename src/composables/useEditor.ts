@@ -39,7 +39,8 @@ import type { TrackRenderer } from '../rendering/TrackRenderer';
 export const number = (value: number, digits = 0) =>
   value.toLocaleString('fr-FR', { minimumFractionDigits: digits, maximumFractionDigits: digits });
 export type Dialog = 'new' | 'export' | 'help' | null;
-export type NumericField = 'width' | 'shoulder' | 'terrainMargin' | 'x' | 'y' | 'z' | 'barrierOffset';
+export type NumericField =
+  'width' | 'shoulder' | 'terrainMargin' | 'x' | 'y' | 'z' | 'barrierOffset';
 const ranges: Record<NumericField, [number, number]> = {
   width: [4, 24],
   shoulder: [2, 20],

@@ -267,7 +267,8 @@ class TrackRenderer {
     ctx.beginPath();
     points.forEach((p, i) => {
       const s = this.screen(p);
-      i ? ctx.lineTo(s.x, s.y) : ctx.moveTo(s.x, s.y);
+      if (i === 0) ctx.moveTo(s.x, s.y);
+      else ctx.lineTo(s.x, s.y);
     });
     if (close) ctx.closePath();
   }
@@ -623,7 +624,8 @@ class TrackRenderer {
     ctx.beginPath();
     this.samples.forEach((p, i) => {
       const s = xy(p);
-      i ? ctx.lineTo(s.x, s.y) : ctx.moveTo(s.x, s.y);
+      if (i === 0) ctx.moveTo(s.x, s.y);
+      else ctx.lineTo(s.x, s.y);
     });
     ctx.strokeStyle = '#bddb86';
     ctx.lineWidth = 1.5;

@@ -198,10 +198,11 @@ export function useCanvas(
     endDrag();
   }
   watchEffect(() => {
-    e.project;
-    e.selected;
-    e.selectedBarrier;
-    e.barrierDraft;
+    // Touch every reactive input so any editor change re-syncs the renderer.
+    void e.project;
+    void e.selected;
+    void e.selectedBarrier;
+    void e.barrierDraft;
     e.syncRenderer();
   });
   onMounted(() => {

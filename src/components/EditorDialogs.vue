@@ -38,15 +38,15 @@ onBeforeUnmount(() => {
   <dialog
     id="new-dialog"
     ref="newDialog"
-    @cancel.prevent="e.openDialog(null)"
     aria-labelledby="new-title"
+    @cancel.prevent="e.openDialog(null)"
   >
     <div class="dialog-heading">
       <div>
         <span class="eyebrow">UNE NOUVELLE LIGNE DE DÉPART</span>
         <h2 id="new-title">Quel sera votre prochain tracé ?</h2>
       </div>
-      <button class="tool" data-close="new-dialog" @click="e.openDialog(null)" aria-label="Fermer">
+      <button class="tool" data-close="new-dialog" aria-label="Fermer" @click="e.openDialog(null)">
         <svg class="icon"><use href="#i-close" /></svg>
       </button>
     </div>
@@ -85,8 +85,8 @@ onBeforeUnmount(() => {
   <dialog
     id="export-dialog"
     ref="exportDialog"
-    @cancel.prevent="e.openDialog(null)"
     aria-labelledby="export-title"
+    @cancel.prevent="e.openDialog(null)"
   >
     <div class="dialog-heading">
       <div>
@@ -96,8 +96,8 @@ onBeforeUnmount(() => {
       <button
         class="tool"
         data-close="export-dialog"
-        @click="e.openDialog(null)"
         aria-label="Fermer"
+        @click="e.openDialog(null)"
       >
         <svg class="icon"><use href="#i-close" /></svg>
       </button>
@@ -113,12 +113,12 @@ onBeforeUnmount(() => {
     <fieldset class="export-formats">
       <legend>Format de l’export</legend>
       <label
-        ><input type="radio" name="export-format" v-model="e.exportFormat" value="ac" /><span
+        ><input v-model="e.exportFormat" type="radio" name="export-format" value="ac" /><span
           ><strong>Assetto Corsa <small>EXPÉRIMENTAL</small></strong
           ><span>Archive ZIP : modèle KN5, textures, surfaces, départ et stand.</span></span
         ></label
       ><label
-        ><input type="radio" name="export-format" v-model="e.exportFormat" value="obj" /><span
+        ><input v-model="e.exportFormat" type="radio" name="export-format" value="obj" /><span
           ><strong>Modèle 3D · OBJ</strong
           ><span>Géométrie et textures pour poursuivre le travail dans Blender.</span></span
         ></label
@@ -142,9 +142,9 @@ onBeforeUnmount(() => {
       <svg class="icon"><use href="#i-help" /></svg>
       <p v-if="e.project.barriers?.length">
         <strong>Pour essais libres en solo.</strong>Terrain complet inclus, avec une limite
-        extérieure visible dans l’éditeur. Un stand, sans trajectoire IA ; les barrières tracées sont
-        incluses avec collision. Le KN5 et le chronométrage doivent être vérifiés dans Assetto Corsa
-        ; les routes ouvertes sont prévues pour le roulage libre.
+        extérieure visible dans l’éditeur. Un stand, sans trajectoire IA ; les barrières tracées
+        sont incluses avec collision. Le KN5 et le chronométrage doivent être vérifiés dans Assetto
+        Corsa ; les routes ouvertes sont prévues pour le roulage libre.
       </p>
       <p v-else>
         <strong>Pour essais libres en solo.</strong>Terrain complet inclus, avec une limite
@@ -167,8 +167,8 @@ onBeforeUnmount(() => {
       ><button
         id="download-export"
         :disabled="e.exporting || e.issues.errors.length > 0"
-        @click="e.exportProject"
         class="button primary"
+        @click="e.exportProject"
       >
         <svg class="icon"><use href="#i-export" /></svg
         >{{ e.exporting ? 'Création du circuit…' : 'Télécharger le ZIP' }}
@@ -179,15 +179,15 @@ onBeforeUnmount(() => {
   <dialog
     id="help-dialog"
     ref="helpDialog"
-    @cancel.prevent="e.openDialog(null)"
     aria-labelledby="help-title"
+    @cancel.prevent="e.openDialog(null)"
   >
     <div class="dialog-heading">
       <div>
         <span class="eyebrow">PRENEZ LA CORDE</span>
         <h2 id="help-title">Les premiers tours de main.</h2>
       </div>
-      <button class="tool" data-close="help-dialog" @click="e.openDialog(null)" aria-label="Fermer">
+      <button class="tool" data-close="help-dialog" aria-label="Fermer" @click="e.openDialog(null)">
         <svg class="icon"><use href="#i-close" /></svg>
       </button>
     </div>

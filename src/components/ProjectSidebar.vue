@@ -92,10 +92,10 @@ function finishName() {
       class="project-name"
       maxlength="80"
       :value="nameDraft"
+      spellcheck="false"
       @focus="beginName"
       @input="inputName"
       @blur="finishName"
-      spellcheck="false"
     />
     <div
       id="save-status"
@@ -109,21 +109,21 @@ function finishName() {
     <section class="panel-section">
       <h2><span class="section-index">01</span> Le tracé</h2>
       <div class="segmented" aria-label="Type de tracé">
-        <button id="mode-closed" @click="e.setClosed(true)" :aria-pressed="e.project.closed">
+        <button id="mode-closed" :aria-pressed="e.project.closed" @click="e.setClosed(true)">
           <svg class="icon"><use href="#i-flag" /></svg>Circuit fermé
         </button>
-        <button id="mode-open" @click="e.setClosed(false)" :aria-pressed="!e.project.closed">
+        <button id="mode-open" :aria-pressed="!e.project.closed" @click="e.setClosed(false)">
           <svg class="icon"><use href="#i-route" /></svg>Route ouverte
         </button>
       </div>
-      <p class="field-note" id="mode-description">
+      <p id="mode-description" class="field-note">
         {{
           e.project.closed
             ? 'Une boucle continue. À vous de trouver la trajectoire idéale.'
             : 'Un départ, une arrivée. Imaginez une route qui donne envie de rouler.'
         }}
       </p>
-      <button id="reverse-track" @click="e.reverseTrack" class="text-button">
+      <button id="reverse-track" class="text-button" @click="e.reverseTrack">
         Inverser le sens <span>⇄</span>
       </button>
     </section>
@@ -137,8 +137,8 @@ function finishName() {
         ></label
       >
       <NumericInput
-        type="range"
         id="track-width"
+        type="range"
         :min="4"
         :max="24"
         :step="0.5"
@@ -153,8 +153,8 @@ function finishName() {
         ></label
       >
       <NumericInput
-        type="range"
         id="track-shoulder"
+        type="range"
         :min="2"
         :max="20"
         :step="0.5"
@@ -184,8 +184,8 @@ function finishName() {
         ></label
       >
       <NumericInput
-        type="range"
         id="terrain-margin"
+        type="range"
         :min="50"
         :max="500"
         :step="10"
@@ -202,41 +202,43 @@ function finishName() {
     <section class="panel-section barrier-section">
       <h2>
         <span class="section-index">04</span> Les barrières
-        <span id="barrier-count" v-if="barriers.length" class="point-badge"
-          >{{ String(barriers.length).padStart(2, '0') }} TRONÇON{{ barriers.length > 1 ? 'S' : '' }}</span
+        <span v-if="barriers.length" id="barrier-count" class="point-badge"
+          >{{ String(barriers.length).padStart(2, '0') }} TRONÇON{{
+            barriers.length > 1 ? 'S' : ''
+          }}</span
         >
       </h2>
       <div class="segmented" aria-label="Type de barrière">
         <button
           id="barrier-type-guardrail"
-          @click="e.setBarrierType('guardrail')"
           :aria-pressed="activeType === 'guardrail'"
+          @click="e.setBarrierType('guardrail')"
         >
           Glissière
         </button>
         <button
           id="barrier-type-tires"
-          @click="e.setBarrierType('tires')"
           :aria-pressed="activeType === 'tires'"
+          @click="e.setBarrierType('tires')"
         >
           Pneus
         </button>
         <button
           id="barrier-type-tecpro"
-          @click="e.setBarrierType('tecpro')"
           :aria-pressed="activeType === 'tecpro'"
+          @click="e.setBarrierType('tecpro')"
         >
           TecPro
         </button>
         <button
           id="barrier-type-wall"
-          @click="e.setBarrierType('wall')"
           :aria-pressed="activeType === 'wall'"
+          @click="e.setBarrierType('wall')"
         >
           Mur béton
         </button>
       </div>
-      <p class="field-note" id="barrier-type-note">{{ typeNote }}</p>
+      <p id="barrier-type-note" class="field-note">{{ typeNote }}</p>
       <button
         id="barrier-draw"
         class="button secondary small barrier-draw"
@@ -245,12 +247,12 @@ function finishName() {
       >
         <svg class="icon"><use href="#i-wall" /></svg>Tracer sur le plan <kbd>B</kbd>
       </button>
-      <p class="field-note" id="barrier-status">{{ barrierStatus }}</p>
-      <div id="barrier-frame" v-if="barriers.length" class="barrier-frame">
+      <p id="barrier-status" class="field-note">{{ barrierStatus }}</p>
+      <div v-if="barriers.length" id="barrier-frame" class="barrier-frame">
         <button
           v-for="(barrier, index) in barriers"
-          :key="index"
           :id="`barrier-row-${index}`"
+          :key="index"
           class="barrier-row"
           :class="{ active: index === e.selectedBarrier }"
           :title="rowLabel(barrier, index)"
@@ -260,14 +262,16 @@ function finishName() {
           >{{ rowLabel(barrier, index) }}
         </button>
       </div>
-      <div id="barrier-editor" v-if="selectedBarrier" class="barrier-editor">
+      <div v-if="selectedBarrier" id="barrier-editor" class="barrier-editor">
         <label class="range-label" for="barrier-offset"
           >Écartement du collider
-          <output id="barrier-offset-value">{{ number(selectedBarrier.offset, 1) }} m</output></label
+          <output id="barrier-offset-value"
+            >{{ number(selectedBarrier.offset, 1) }} m</output
+          ></label
         >
         <NumericInput
-          type="range"
           id="barrier-offset"
+          type="range"
           :min="0"
           :max="10"
           :step="0.5"
@@ -288,8 +292,10 @@ function finishName() {
           </button>
         </div>
       </div>
-      <p id="barrier-summary" class="field-note" v-else-if="barriers.length">{{ barrierSummary }}</p>
-      <p id="barrier-empty" class="field-note" v-else>
+      <p v-else-if="barriers.length" id="barrier-summary" class="field-note">
+        {{ barrierSummary }}
+      </p>
+      <p v-else id="barrier-empty" class="field-note">
         Aucune barrière pour l’instant. Le tracé se sécurise en deux clics : départ puis arrivée.
       </p>
     </section>
@@ -297,14 +303,14 @@ function finishName() {
     <section class="panel-section point-section">
       <h2>
         <span class="section-index">05</span> Le relief
-        <span id="point-badge" v-if="e.point" class="point-badge"
+        <span v-if="e.point" id="point-badge" class="point-badge"
           >POINT {{ String(e.selected + 1).padStart(2, '0') }}</span
         >
       </h2>
-      <div id="point-editor" v-if="e.point">
+      <div v-if="e.point" id="point-editor">
         <div
-          id="point-issues"
           v-if="e.selectedTightTurns.length"
+          id="point-issues"
           class="point-issues"
           role="status"
         >
@@ -325,8 +331,8 @@ function finishName() {
           >
         </div>
         <NumericInput
-          type="range"
           id="point-height"
+          type="range"
           :min="-100"
           :max="1000"
           :step="0.5"
@@ -361,29 +367,29 @@ function finishName() {
           <button
             id="point-previous"
             :disabled="e.selected <= 0"
-            @click="e.selectPoint(Math.max(0, e.selected - 1))"
             class="button quiet small"
             aria-label="Point précédent"
+            @click="e.selectPoint(Math.max(0, e.selected - 1))"
           >
             ←</button
           ><button
             id="point-next"
             :disabled="e.selected >= e.project.points.length - 1"
-            @click="e.selectPoint(Math.min(e.project.points.length - 1, e.selected + 1))"
             class="button quiet small"
             aria-label="Point suivant"
+            @click="e.selectPoint(Math.min(e.project.points.length - 1, e.selected + 1))"
           >
             →</button
           ><button
             id="delete-point"
-            @click="e.deletePoint()"
             class="button quiet small delete-point"
+            @click="e.deletePoint()"
           >
             <svg class="icon"><use href="#i-trash" /></svg>Supprimer
           </button>
         </div>
       </div>
-      <p id="point-empty" class="field-note" v-else>
+      <p v-else id="point-empty" class="field-note">
         Sélectionnez un point du tracé pour modifier sa position et son altitude.
       </p>
     </section>
@@ -397,7 +403,7 @@ function finishName() {
         Double-cliquez sur la route pour en ajouter un.
       </p>
     </div>
-    <button id="open-help" @click="e.openDialog('help')" class="help-button">
+    <button id="open-help" class="help-button" @click="e.openDialog('help')">
       <svg class="icon"><use href="#i-help" /></svg>Guide & raccourcis<span>?</span>
     </button>
   </aside>

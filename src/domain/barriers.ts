@@ -1,12 +1,4 @@
-import type {
-  Barrier,
-  BarrierSide,
-  BarrierType,
-  Mesh,
-  Point,
-  Project,
-  Sample,
-} from './types';
+import type { Barrier, BarrierSide, BarrierType, Mesh, Point, Project, Sample } from './types';
 import { BARRIER_MATERIALS, newMesh, addQuad } from './mesh';
 
 /**
@@ -211,12 +203,7 @@ function capQuad(
 ) {
   const a = Math.min(lateralA, lateralB),
     b = Math.max(lateralA, lateralB);
-  const positions = [
-      offset(p, a, low),
-      offset(p, b, low),
-      offset(p, b, high),
-      offset(p, a, high),
-    ],
+  const positions = [offset(p, a, low), offset(p, b, low), offset(p, b, high), offset(p, a, high)],
     uvs = edgeUvs(0, b - a, low, high);
   if (direction > 0) {
     positions.reverse();
@@ -289,8 +276,7 @@ function buildBarrierMeshes(project: Project, samples: Sample[]): Mesh[] {
       capQuad(mesh, first, latFirst, latFirst + sign * width, low, high, -1);
       capQuad(mesh, last, latLast, latLast + sign * width, low, high, 1);
     };
-    const faces = () =>
-      path.slice(1).map((b, i) => [path[i], b] as [Sample, Sample]);
+    const faces = () => path.slice(1).map((b, i) => [path[i], b] as [Sample, Sample]);
     switch (barrier.type) {
       case 'guardrail': {
         const sizes = BARRIER_SIZES.guardrail;
@@ -338,12 +324,7 @@ function buildBarrierMeshes(project: Project, samples: Sample[]): Mesh[] {
               sizes.radius,
             );
         caps(wall, -0.4, sizes.collider, sizes.capWidth);
-        caps(
-          deco,
-          -0.02,
-          -0.02 + sizes.courses * sizes.stack,
-          sizes.capWidth,
-        );
+        caps(deco, -0.02, -0.02 + sizes.courses * sizes.stack, sizes.capWidth);
         meshes.push(wall, deco);
         break;
       }
@@ -358,7 +339,16 @@ function buildBarrierMeshes(project: Project, samples: Sample[]): Mesh[] {
           wallQuad(wall, frame(a), frame(b), latA, latB, -0.4, sizes.collider, sign);
           const block = Math.floor(a.s / sizes.blockLength) % 2 ? white : red;
           wallQuad(block, frame(a), frame(b), latA, latB, 0, sizes.block, sign);
-          topQuad(block, frame(a), frame(b), latA, latB, latA + sign * sizes.width, latB + sign * sizes.width, sizes.block);
+          topQuad(
+            block,
+            frame(a),
+            frame(b),
+            latA,
+            latB,
+            latA + sign * sizes.width,
+            latB + sign * sizes.width,
+            sizes.block,
+          );
         }
         const firstBlock = Math.floor(first.s / sizes.blockLength) % 2 ? white : red;
         const lastBlock = Math.floor(last.s / sizes.blockLength) % 2 ? white : red;
@@ -382,15 +372,7 @@ function buildBarrierMeshes(project: Project, samples: Sample[]): Mesh[] {
           topQuad(mesh, fa, fb, latA, latB, backA, backB, sizes.collider);
           wallQuad(mesh, fa, fb, backA, backB, -0.4, sizes.collider, -sign);
         }
-        capQuad(
-          mesh,
-          first,
-          latFirst,
-          latFirst + sign * sizes.thickness,
-          -0.4,
-          sizes.collider,
-          -1,
-        );
+        capQuad(mesh, first, latFirst, latFirst + sign * sizes.thickness, -0.4, sizes.collider, -1);
         capQuad(mesh, last, latLast, latLast + sign * sizes.thickness, -0.4, sizes.collider, 1);
         meshes.push(mesh);
         break;
@@ -412,11 +394,7 @@ export function insertBarrierPoint(barriers: Barrier[], index: number): Barrier[
 }
 
 /** Suppression d'un point : un tronçon qui perd une ancre disparaît. */
-export function removeBarrierPoint(
-  barriers: Barrier[],
-  index: number,
-  closed: boolean,
-): Barrier[] {
+export function removeBarrierPoint(barriers: Barrier[], index: number, closed: boolean): Barrier[] {
   return barriers.flatMap((barrier): Barrier[] => {
     if (barrier.from === index || barrier.to === index) return [];
     const from = barrier.from > index ? barrier.from - 1 : barrier.from;
@@ -449,9 +427,4 @@ export function splitWrappingBarriers(barriers: Barrier[], count: number): Barri
   });
 }
 
-export {
-  BARRIER_SIZES,
-  BARRIER_TYPE_LABELS,
-  DEFAULT_BARRIER_OFFSET,
-  buildBarrierMeshes,
-};
+export { BARRIER_SIZES, BARRIER_TYPE_LABELS, DEFAULT_BARRIER_OFFSET, buildBarrierMeshes };

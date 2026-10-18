@@ -15,26 +15,26 @@ function openFile(event: Event) {
   <header class="topbar">
     <a
       class="brand"
-      @click.prevent="e.openDialog('new')"
       href="#"
       aria-label="Roadbuilder, accueil de l’éditeur"
+      @click.prevent="e.openDialog('new')"
       ><span class="brand-mark"><i></i><i></i><i></i></span
       ><span
         >ROAD<span class="brand-light">BUILDER</span><small>ASSETTO CORSA TRACK STUDIO</small></span
       ><span class="version">0.1</span></a
     >
     <nav class="file-actions" aria-label="Projet">
-      <button id="new-project" @click="e.openDialog('new')" class="button quiet">
+      <button id="new-project" class="button quiet" @click="e.openDialog('new')">
         <svg class="icon"><use href="#i-plus" /></svg><span>Nouveau</span>
       </button>
-      <button id="open-project" @click="fileInput?.click()" class="button quiet">
+      <button id="open-project" class="button quiet" @click="fileInput?.click()">
         <svg class="icon"><use href="#i-folder" /></svg><span>Ouvrir</span>
       </button>
-      <button id="save-project" @click="e.downloadProject()" class="button secondary">
+      <button id="save-project" class="button secondary" @click="e.downloadProject()">
         <svg class="icon"><use href="#i-save" /></svg><span>Enregistrer</span>
       </button>
       <span class="nav-divider"></span>
-      <button id="export-project" @click="e.openDialog('export')" class="button primary">
+      <button id="export-project" class="button primary" @click="e.openDialog('export')">
         <svg class="icon"><use href="#i-export" /></svg>Exporter<span class="desktop-only">
           le tracé</span
         >
@@ -42,9 +42,9 @@ function openFile(event: Event) {
     </nav>
   </header>
   <input
+    id="file-input"
     ref="fileInput"
     type="file"
-    id="file-input"
     accept=".json,.roadbuilder.json,application/json"
     hidden
     @change="openFile"

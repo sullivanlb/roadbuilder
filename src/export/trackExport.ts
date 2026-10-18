@@ -44,7 +44,7 @@ function encodeKn5(scene: Scene) {
     };
     writer.u32(Object.keys(properties).length);
     for (const [name, value] of Object.entries(properties))
-      writer.string(name).f32(value).floats(Array(9).fill(0));
+      writer.string(name).f32(value).floats(new Array<number>(9).fill(0));
     writer.u32(1).string('txDiffuse').u32(0).string(material.texture);
   }
   writer

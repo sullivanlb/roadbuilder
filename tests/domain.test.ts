@@ -266,7 +266,7 @@ describe('barrières', () => {
     offset: 1,
     ...over,
   });
-  const withBarriers = (barriers: Barrier[], template: 'club' | 'mountain' = 'club') => ({
+  const withBarriers = (barriers: unknown[], template: 'club' | 'mountain' = 'club') => ({
     ...createProject(template),
     barriers,
   });
@@ -282,17 +282,17 @@ describe('barrières', () => {
     expect(validateProject(createProject('club'))).not.toHaveProperty('barriers');
   });
 
-  it.each([
-    [region({ type: 'pneu' as never })],
-    [region({ side: 'middle' as never })],
-    [region({ from: 2, to: 2 })],
-    [region({ from: -1 })],
-    [{ ...region(), to: 9 }],
-    [region({ offset: 12 })],
-    [{ type: 'wall', side: 'left', from: 1, to: 2 } as unknown as Barrier],
-    [null as unknown as Barrier],
-    Array(LIMITS.barriers + 1).fill(region()),
-  ])('rejette un tronçon invalide', (barriers) => {
+  it.each<[unknown[]]>([
+    [[region({ type: 'pneu' as never })]],
+    [[region({ side: 'middle' as never })]],
+    [[region({ from: 2, to: 2 })]],
+    [[region({ from: -1 })]],
+    [[{ ...region(), to: 9 }]],
+    [[region({ offset: 12 })]],
+    [[{ type: 'wall', side: 'left', from: 1, to: 2 }]],
+    [[null]],
+    [Array<Barrier>(LIMITS.barriers + 1).fill(region())],
+  ])('rejette une liste de tronçons invalide', (barriers) => {
     expect(() => validateProject(withBarriers(barriers))).toThrow();
   });
 
@@ -302,9 +302,9 @@ describe('barrières', () => {
         withBarriers([region({ type: 'tires', side: 'left', from: 5, to: 2 })], 'mountain'),
       ),
     ).toThrow('sens du tracé');
-    expect(() =>
-      validateProject({ ...createProject('blank'), barriers: [region()] }),
-    ).toThrow('deux points');
+    expect(() => validateProject({ ...createProject('blank'), barriers: [region()] })).toThrow(
+      'deux points',
+    );
   });
 
   it('suit le sens du tracé et boucle avec le circuit fermé', () => {
@@ -434,7 +434,9 @@ describe('barrières', () => {
     expect(installation).toContain('Barrières : 4 tronçons avec collision');
     expect(installation).toContain('colliders simples');
     expect(installation).not.toContain('Pas de barrières, de ponts ou de décor');
-    const surfaces = Object.entries(ac.files).find(([p]) => p.endsWith('surfaces.ini'))![1] as string;
+    const surfaces = Object.entries(ac.files).find(([p]) =>
+      p.endsWith('surfaces.ini'),
+    )![1] as string;
     expect(surfaces).not.toContain('KEY=WALL');
     expect(
       (JSON.parse(ac.files['projet.roadbuilder.json'] as string) as { barriers: unknown[] })
