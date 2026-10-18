@@ -5,10 +5,11 @@ import type { ProjectStorage } from '../../domain/project/storage';
 import { ProjectHistory } from '../../domain/project/history';
 import { sampleTrack, trackIssues, trackStats } from '../../domain/track/geometry';
 import type { BarrierDraft, BarrierType, ExportFormat, Tool, ViewMode } from '../../domain/types';
+import type { ProjectField } from '../../domain/diagnostics';
 
 export type Dialog = 'new' | 'export' | 'help' | null;
-export type NumericField =
-  'width' | 'shoulder' | 'terrainMargin' | 'x' | 'y' | 'z' | 'barrierOffset';
+/** Numeric fields editable in the interface; the domain validates exactly this set. */
+export type NumericField = ProjectField;
 export type SaveState = 'saved' | 'pending' | 'unavailable' | 'recovery';
 export const NUMERIC_RANGES: Record<NumericField, [number, number]> = {
   width: [4, 24],

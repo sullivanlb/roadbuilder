@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import { LIMITS } from '../src/domain/project/limits';
 import { createProject } from '../src/domain/project/factory';
 import { validateProject } from '../src/domain/project/validation';
+import { ExportError, ProjectError } from '../src/domain/diagnostics';
 import {
   bounds,
   sampleAt,
@@ -29,6 +30,16 @@ import { persistProject, restoreProject, STORAGE_KEY } from '../src/domain/proje
 import type { Barrier } from '../src/domain/types';
 import baseline from './fixtures/legacy-baseline.json';
 import tightTurnFixture from './fixtures/tight-turn.roadbuilder.json';
+
+/** Runs a call expected to fail and returns whatever it threw. */
+function rejected(run: () => unknown): unknown {
+  try {
+    run();
+  } catch (error) {
+    return error;
+  }
+  throw new Error('expected the call to throw');
+}
 
 // These hashes were captured from the pre-migration HTML, before changing its algorithms.
 describe.each(['club', 'kart', 'mountain'] as const)('model compatibility %s', (template) => {
@@ -110,7 +121,9 @@ describe('validation and geometry', () => {
     expect(sampleTrack(project)).toEqual([]);
     expect(sampleAt([], 5)).toBeNull();
     expect(buildScene(project).meshes).toEqual([]);
-    expect(() => buildExport(project)).toThrow('2 points');
+    const failure = rejected(() => buildExport(project));
+    expect(failure).toBeInstanceOf(ExportError);
+    expect(failure).toMatchObject({ issues: { errors: [{ code: 'points-minimum', min: 2 }] } });
   });
   it('closes circuits and preserves the ends of open roads', () => {
     const closed = sampleTrack(createProject('club'));
@@ -131,9 +144,9 @@ describe('validation and geometry', () => {
       { x: -100, y: 0, z: 100 },
       { x: 100, y: 0, z: -100 },
     ];
-    expect(trackIssues(project).errors.join(' ')).toContain('se croise');
+    expect(trackIssues(project).errors.map((issue) => issue.code)).toContain('track-crossing');
     project.points[1] = { ...project.points[0] };
-    expect(trackIssues(project).errors.join(' ')).toContain('trop proches');
+    expect(trackIssues(project).errors.map((issue) => issue.code)).toContain('points-too-close');
   });
 });
 
@@ -217,14 +230,16 @@ describe('locating overly tight turns', () => {
       [2, 3],
       [3, 4],
     ]);
-    expect(issues.errors).toEqual(issues.tightTurns.map((turn) => turn.message));
-    expect(issues.errors[0]).toContain('points 3 et 4');
+    expect(issues.errors).toEqual(issues.tightTurns.map((turn) => turn.issue));
+    expect(issues.errors[0]).toEqual({ code: 'tight-turn', from: 2, to: 3 });
     const between = samples[issues.tightTurns[0].sampleIndex];
     expect(between.t).toBeGreaterThan(0);
     expect(between.t).toBeLessThan(1);
     expect(project.points).not.toContainEqual({ x: between.x, y: between.y, z: between.z });
     for (const format of ['ac', 'obj'] as const) {
-      expect(() => buildExport(project, format)).toThrow(issues.errors.join('\n'));
+      const failure = rejected(() => buildExport(project, format));
+      expect(failure).toBeInstanceOf(ExportError);
+      expect(failure).toMatchObject({ detail: { code: 'invalid-track' }, issues });
     }
   });
 
@@ -235,7 +250,7 @@ describe('locating overly tight turns', () => {
       (turn) => turn.segment === project.points.length - 1,
     )!;
     expect(closing.pointIndices).toEqual([6, 0]);
-    expect(closing.message).toContain('points 7 et 1');
+    expect(closing.issue).toEqual({ code: 'tight-turn', from: 6, to: 0 });
     project.closed = false;
     expect(trackIssues(project).tightTurns.some((turn) => turn.pointIndices.includes(0))).toBe(
       false,
@@ -306,14 +321,18 @@ describe('barriers', () => {
   });
 
   it('rejects a backwards segment on an open road and without a track', () => {
-    expect(() =>
+    const backwards = rejected(() =>
       validateProject(
         withBarriers([region({ type: 'tires', side: 'left', from: 5, to: 2 })], 'mountain'),
       ),
-    ).toThrow('sens du tracé');
-    expect(() => validateProject({ ...createProject('blank'), barriers: [region()] })).toThrow(
-      'deux points',
     );
+    expect(backwards).toBeInstanceOf(ProjectError);
+    expect(backwards).toMatchObject({ detail: { code: 'barrier-direction' } });
+    const withoutTrack = rejected(() =>
+      validateProject({ ...createProject('blank'), barriers: [region()] }),
+    );
+    expect(withoutTrack).toBeInstanceOf(ProjectError);
+    expect(withoutTrack).toMatchObject({ detail: { code: 'barriers-min-points' } });
   });
 
   it('follows the track direction and wraps around on a closed circuit', () => {

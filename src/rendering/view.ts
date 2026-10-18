@@ -6,9 +6,9 @@ import type {
   Project,
   Sample,
   Scene,
-  TightTurn,
   ViewMode,
 } from '../domain/types';
+import type { TightTurn } from '../domain/diagnostics';
 
 /** Plan or orbit camera shared by the drawing passes. */
 export interface Camera {

@@ -9,6 +9,7 @@ import { barrierPath } from '../src/domain/track/barriers';
 import { STORAGE_KEY } from '../src/domain/project/storage';
 import { TrackRenderer } from '../src/rendering/TrackRenderer';
 import type { Project } from '../src/domain/types';
+import { formatTrackIssue } from '../src/i18n/fr';
 import tightTurnFixture from './fixtures/tight-turn.roadbuilder.json';
 
 let app: VueApp | null;
@@ -378,7 +379,7 @@ describe('Vue interface (simulated DOM and canvas)', () => {
     expect(document.querySelectorAll('#export-issues [data-tight-turn]')).toHaveLength(2);
     const turn = renderer.tightTurns[0];
     for (const issue of renderer.tightTurns)
-      expect($('export-issues').textContent).toContain(issue.message);
+      expect($('export-issues').textContent).toContain(formatTrackIssue(issue.issue));
     (document.querySelector('[data-tight-turn="2"]') as HTMLButtonElement).click();
     await flush();
     expect($<HTMLDialogElement>('export-dialog').open).toBe(false);

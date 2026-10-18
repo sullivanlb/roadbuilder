@@ -2,14 +2,15 @@
 import { computed } from 'vue';
 import { useEditor, formatNumber } from '../composables/useEditor';
 import { useModalDialog } from '../composables/useModalDialog';
+import { formatTrackIssue } from '../i18n/fr';
 
 const props = defineProps<{ open: boolean }>();
 const e = useEditor();
 const dialog = useModalDialog(() => props.open);
 const errors = computed(() =>
-  e.issues.errors.map((message) => ({
-    message,
-    segment: e.issues.tightTurns.find((turn) => turn.message === message)?.segment,
+  e.issues.errors.map((issue) => ({
+    text: formatTrackIssue(issue),
+    segment: e.issues.tightTurns.find((turn) => turn.issue === issue)?.segment,
   })),
 );
 </script>
@@ -57,8 +58,8 @@ const errors = computed(() =>
       >
     </fieldset>
     <div id="export-issues" class="export-issues">
-      <p v-for="error in errors" :key="error.message" class="error">
-        {{ error.message }}
+      <p v-for="(error, index) in errors" :key="index" class="error">
+        {{ error.text }}
         <button
           v-if="error.segment !== undefined"
           class="button secondary small locate-turn"
@@ -68,7 +69,9 @@ const errors = computed(() =>
           Voir le virage
         </button>
       </p>
-      <p v-for="message in e.issues.warnings" :key="message" class="warning">{{ message }}</p>
+      <p v-for="(warning, index) in e.issues.warnings" :key="index" class="warning">
+        {{ formatTrackIssue(warning) }}
+      </p>
     </div>
     <div class="export-notice">
       <svg class="icon"><use href="#i-help" /></svg>

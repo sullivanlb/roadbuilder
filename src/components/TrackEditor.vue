@@ -1,11 +1,19 @@
 <script setup lang="ts">
 import { useEditor } from '../composables/useEditor';
-import { ref } from 'vue';
+import { computed, ref } from 'vue';
 import { useCanvas } from '../composables/useCanvas';
 import TrackTelemetry from './TrackTelemetry.vue';
 import ElevationProfile from './ElevationProfile.vue';
+import { formatTrackIssue } from '../i18n/fr';
 
 const e = useEditor();
+const issueTitle = computed(() =>
+  [...e.issues.errors, ...e.issues.warnings].map(formatTrackIssue).join('\n'),
+);
+const issueStatus = computed(() => {
+  const first = e.issues.errors[0] ?? e.issues.warnings[0];
+  return first ? formatTrackIssue(first) : '';
+});
 const canvas = ref<HTMLCanvasElement | null>(null);
 const profile = ref<InstanceType<typeof ElevationProfile> | null>(null);
 const {
@@ -167,13 +175,9 @@ const {
       <span
         id="validation-status"
         :class="{ invalid: e.issues.errors.length > 0 }"
-        :title="[...e.issues.errors, ...e.issues.warnings].join('\n')"
+        :title="issueTitle"
         ><span class="status-dot"></span
-        >{{
-          e.issues.errors[0] ||
-          e.issues.warnings[0] ||
-          'Géométrie prête · export en jeu expérimental'
-        }}</span
+        >{{ issueStatus || 'Géométrie prête · export en jeu expérimental' }}</span
       >
       <button
         v-if="e.issues.tightTurns.length"

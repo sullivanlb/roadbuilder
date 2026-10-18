@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { useEditor } from '../composables/useEditor';
 import NumericInput from './NumericInput.vue';
+import { formatTrackIssue } from '../i18n/fr';
 
 const e = useEditor();
 </script>
@@ -14,7 +15,9 @@ const e = useEditor();
     </h2>
     <div v-if="e.point" id="point-editor">
       <div v-if="e.selectedTightTurns.length" id="point-issues" class="point-issues" role="status">
-        <p v-for="turn in e.selectedTightTurns" :key="turn.segment">{{ turn.message }}</p>
+        <p v-for="turn in e.selectedTightTurns" :key="turn.segment">
+          {{ formatTrackIssue(turn.issue) }}
+        </p>
       </div>
       <div class="range-label">
         <label for="point-altitude">Altitude du point</label

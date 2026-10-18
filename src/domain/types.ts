@@ -45,19 +45,6 @@ export interface Sample extends Point {
   grade: number;
   curvature: number;
 }
-/** A failing portion of the interpolated curve, with zero-based control-point indices. */
-export interface TightTurn {
-  segment: number;
-  pointIndices: [number, number];
-  sampleIndex: number;
-  radius: number;
-  message: string;
-}
-export interface TrackIssues {
-  errors: string[];
-  warnings: string[];
-  tightTurns: TightTurn[];
-}
 export interface Bounds {
   minX: number;
   maxX: number;

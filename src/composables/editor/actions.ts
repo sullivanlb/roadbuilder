@@ -4,6 +4,8 @@ import { clamp } from '../../domain/math';
 import { LIMITS } from '../../domain/project/limits';
 import { createProject, slugify } from '../../domain/project/factory';
 import { validateProject } from '../../domain/project/validation';
+import { ExportError, ProjectError } from '../../domain/diagnostics';
+import { formatExportError, formatProjectError } from '../../i18n/fr';
 import {
   DEFAULT_BARRIER_OFFSET,
   insertBarrierPoint,
@@ -240,9 +242,11 @@ export function createActions(state: EditorState, session: EditorSession) {
     } catch (error) {
       if (session.isStale(edit)) return;
       session.toast(
-        error instanceof SyntaxError
-          ? 'Le fichier n’est pas un JSON valide. Votre projet actuel est conservé.'
-          : errorMessage(error),
+        error instanceof ProjectError
+          ? formatProjectError(error.detail)
+          : error instanceof SyntaxError
+            ? 'Le fichier n’est pas un JSON valide. Votre projet actuel est conservé.'
+            : errorMessage(error),
         true,
       );
     }
@@ -288,7 +292,12 @@ export function createActions(state: EditorState, session: EditorSession) {
           : 'Sources 3D téléchargées : OBJ, matériaux et textures.',
       );
     } catch (error) {
-      session.toast(`Export impossible : ${errorMessage(error)}`, true);
+      session.toast(
+        `Export impossible : ${
+          error instanceof ExportError ? formatExportError(error) : errorMessage(error)
+        }`,
+        true,
+      );
     } finally {
       state.exporting.value = false;
     }

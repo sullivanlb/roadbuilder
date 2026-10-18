@@ -1,4 +1,5 @@
 import type { ExportFiles, ExportFormat, Project } from '../domain/types';
+import { ExportError } from '../domain/diagnostics';
 import { slugify } from '../domain/project/factory';
 import { validateProject } from '../domain/project/validation';
 import { sampleTrack, trackStats, trackIssues } from '../domain/track/geometry';
@@ -17,7 +18,7 @@ export function buildExport(project: Project, format: ExportFormat = 'ac') {
   project = validateProject(project);
   const samples = sampleTrack(project),
     issues = trackIssues(project, samples);
-  if (issues.errors.length) throw new Error(issues.errors.join('\n'));
+  if (issues.errors.length) throw new ExportError({ code: 'invalid-track' }, issues);
   const scene = buildScene(project, samples),
     stats = trackStats(samples),
     slug = slugify(project.name),
@@ -28,10 +29,7 @@ export function buildExport(project: Project, format: ExportFormat = 'ac') {
     for (let i = 0; i < mesh.indices.length; i += 3) {
       const [a, b, c] = mesh.indices.slice(i, i + 3).map((index) => mesh.vertices[index].position);
       const areaY = (b[2] - a[2]) * (c[0] - a[0]) - (b[0] - a[0]) * (c[2] - a[2]);
-      if (areaY <= 1e-9)
-        throw new Error(
-          'Un bord de route ou de stand se replie dans un virage. Écartez les points, réduisez la largeur ou déplacez le début du tracé vers une ligne droite.',
-        );
+      if (areaY <= 1e-9) throw new ExportError({ code: 'folded-edge' });
     }
   }
   const files: ExportFiles = {};

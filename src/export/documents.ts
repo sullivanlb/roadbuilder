@@ -1,4 +1,6 @@
 import type { Project, Sample } from '../domain/types';
+import type { TrackIssue } from '../domain/diagnostics';
+import { formatTrackIssue } from '../i18n/fr';
 
 /** Assetto Corsa surfaces.ini: the four physical surfaces used by the meshes. */
 export function surfacesIni(): string {
@@ -63,7 +65,7 @@ interface InstallationTextOptions {
   project: Project;
   slug: string;
   barrierCount: number;
-  warnings: string[];
+  warnings: TrackIssue[];
 }
 
 /**
@@ -84,5 +86,5 @@ export function installationText({
     barrierCount
       ? 'Les barrières sont des colliders simples : vérifiez les impacts en jeu.\nLe relief du terrain est interpolé automatiquement.\n'
       : 'Pas de barrières, de ponts ou de décor ; le relief du terrain est interpolé automatiquement.\n'
-  }Les chevauchements de bords de route/accotements ne sont pas tous détectés.\nPour un circuit destiné à la compétition, vérifiez et complétez le modèle dans un outil 3D.\n\nLe fichier projet.roadbuilder.json permet de reprendre le travail dans l’éditeur.\n${warnings.length ? '\nAVERTISSEMENTS\n' + warnings.join('\n') : ''}\n`;
+  }Les chevauchements de bords de route/accotements ne sont pas tous détectés.\nPour un circuit destiné à la compétition, vérifiez et complétez le modèle dans un outil 3D.\n\nLe fichier projet.roadbuilder.json permet de reprendre le travail dans l’éditeur.\n${warnings.length ? '\nAVERTISSEMENTS\n' + warnings.map(formatTrackIssue).join('\n') : ''}\n`;
 }

@@ -6,9 +6,9 @@ import type {
   Project,
   Sample,
   Scene,
-  TightTurn,
   ViewMode,
 } from '../domain/types';
+import type { TightTurn } from '../domain/diagnostics';
 import { clamp } from '../domain/math';
 import { createProject } from '../domain/project/factory';
 import { bounds } from '../domain/track/geometry';

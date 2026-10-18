@@ -1,4 +1,5 @@
-import type { Point, PlanPoint, Project, Sample, Bounds, TightTurn, TrackIssues } from '../types';
+import type { Point, PlanPoint, Project, Sample, Bounds } from '../types';
+import type { TightTurn, TrackIssue, TrackIssues } from '../diagnostics';
 import { clamp, distance } from '../math';
 // Centripetal Catmull–Rom: stable bends even with unevenly spaced control points.
 function interpolate(p0: Point, p1: Point, p2: Point, p3: Point, t: number) {
@@ -168,31 +169,22 @@ function sampleAt(samples: Sample[], s: number): Sample | null {
 }
 
 function trackIssues(project: Project, samples = sampleTrack(project)): TrackIssues {
-  const errors: string[] = [],
-    warnings: string[] = [];
-  if (project.points.length < (project.closed ? 3 : 2))
-    errors.push(
-      project.closed
-        ? 'Ajoutez au moins 3 points pour fermer le circuit.'
-        : 'Ajoutez au moins 2 points pour créer une route.',
-    );
+  const errors: TrackIssue[] = [],
+    warnings: TrackIssue[] = [];
+  const minimum = project.closed ? 3 : 2;
+  if (project.points.length < minimum)
+    errors.push({ code: 'points-minimum', min: minimum, closed: project.closed });
   const stats = trackStats(samples);
-  if (samples.length > 1 && stats.length < 80)
-    errors.push('Le tracé doit mesurer au moins 80 m pour accueillir le départ.');
+  if (samples.length > 1 && stats.length < 80) errors.push({ code: 'track-too-short', min: 80 });
+  let tooClose = false;
   project.points.forEach((p, i) => {
     if ((i || project.closed) && project.points.length > 1) {
       const previous = project.points[(i + project.points.length - 1) % project.points.length];
-      if (
-        Math.hypot(p.x - previous.x, p.z - previous.z) < 2 &&
-        !errors.includes('Deux points consécutifs sont trop proches (minimum 2 m).')
-      )
-        errors.push('Deux points consécutifs sont trop proches (minimum 2 m).');
+      if (Math.hypot(p.x - previous.x, p.z - previous.z) < 2) tooClose = true;
     }
   });
-  if (stats.grade > 18)
-    warnings.push(
-      `Pente maximale de ${Math.round(stats.grade)} % : certaines voitures auront des difficultés.`,
-    );
+  if (tooClose) errors.push({ code: 'points-too-close', min: 2 });
+  if (stats.grade > 18) warnings.push({ code: 'steep-grade', grade: stats.grade });
   // Test the interpolated curve, not just its editable control points. Preserve
   // the existing threshold and retain the worst location on each failing segment
   // so the editor and export dialog can show the same diagnosis.
@@ -211,11 +203,11 @@ function trackIssues(project: Project, samples = sampleTrack(project)): TrackIss
       pointIndices: [segment, next],
       sampleIndex: i,
       radius,
-      message: `Virage trop serré entre les points ${segment + 1} et ${next + 1} pour cette largeur. Écartez les points du virage ou réduisez la largeur.`,
+      issue: { code: 'tight-turn', from: segment, to: next },
     });
   }
   const tightTurns = [...tightBySegment.values()];
-  errors.push(...tightTurns.map((turn) => turn.message));
+  errors.push(...tightTurns.map((turn) => turn.issue));
   // Detect non-neighboring centerline crossings (bridges are outside v1 scope).
   const stride = Math.max(1, Math.floor(samples.length / 350));
   const reduced = samples.filter((_, i) => i % stride === 0);
@@ -236,10 +228,7 @@ function trackIssues(project: Project, samples = sampleTrack(project)): TrackIss
       }
     }
   }
-  if (crossing)
-    errors.push(
-      'Le tracé se croise : déplacez les points concernés. Les ponts ne sont pas pris en charge.',
-    );
+  if (crossing) errors.push({ code: 'track-crossing' });
   return { errors, warnings, tightTurns };
 }
 export { sampleTrack, trackStats, bounds, sampleAt, trackIssues };
