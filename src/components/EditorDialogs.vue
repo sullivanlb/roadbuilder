@@ -140,7 +140,13 @@ onBeforeUnmount(() => {
     </div>
     <div class="export-notice">
       <svg class="icon"><use href="#i-help" /></svg>
-      <p>
+      <p v-if="e.project.barriers?.length">
+        <strong>Pour essais libres en solo.</strong>Terrain complet inclus, avec une limite
+        extérieure visible dans l’éditeur. Un stand, sans trajectoire IA ; les barrières tracées sont
+        incluses avec collision. Le KN5 et le chronométrage doivent être vérifiés dans Assetto Corsa
+        ; les routes ouvertes sont prévues pour le roulage libre.
+      </p>
+      <p v-else>
         <strong>Pour essais libres en solo.</strong>Terrain complet inclus, avec une limite
         extérieure visible dans l’éditeur. Un stand, sans trajectoire IA ni barrières. Le KN5 et le
         chronométrage doivent être vérifiés dans Assetto Corsa ; les routes ouvertes sont prévues
@@ -199,6 +205,11 @@ onBeforeUnmount(() => {
         » télécharge un projet JSON réutilisable avec « Ouvrir ».
       </li>
       <li>
+        <strong>Sécurisez les bords.</strong>Dans <em>Les barrières</em>, choisissez glissière,
+        pneus, TecPro ou mur béton, puis tracez en deux clics sur le plan : départ, puis arrivée.
+        Échap annule le tracé en cours.
+      </li>
+      <li>
         <strong>Passez au simulateur.</strong>Exportez le ZIP Assetto Corsa, installez le dossier du
         circuit et lancez des essais libres en solo. L’export en jeu est encore expérimental.
       </li>
@@ -206,6 +217,7 @@ onBeforeUnmount(() => {
     <div class="shortcuts">
       <span>Sélectionner <kbd>V</kbd></span
       ><span>Ajouter un point <kbd>A</kbd></span
+      ><span>Tracer une barrière <kbd>B</kbd></span
       ><span>Déplacer la vue <kbd>H</kbd></span
       ><span>Tout cadrer <kbd>F</kbd></span
       ><span>Annuler <kbd>Ctrl Z</kbd></span
@@ -215,7 +227,8 @@ onBeforeUnmount(() => {
     </div>
     <p class="dialog-note">
       Molette : zoom · Espace + glisser : déplacer la vue · Maj pendant un déplacement : grille de 5
-      m. Le premier point détermine la zone de départ. Maximum 160 points.
+      m. Le premier point détermine la zone de départ. Une barrière se trace du point de départ au
+      point d’arrivée, sur la rive cliquée. Maximum 160 points et 120 tronçons de barrière.
     </p>
     <p class="dialog-note">
       Roadbuilder est un outil indépendant, non affilié à Kunos Simulazioni. Aucune donnée n’est

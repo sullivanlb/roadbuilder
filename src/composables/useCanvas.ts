@@ -28,7 +28,7 @@ export function useCanvas(
       ? 'grabbing'
       : e.view === '3d' || space.value || e.tool === 'pan'
         ? 'grab'
-        : e.tool === 'add'
+        : e.tool === 'add' || e.tool === 'barrier'
           ? 'crosshair'
           : hover.value >= 0
             ? 'grab'
@@ -37,11 +37,15 @@ export function useCanvas(
   const hint = computed(() =>
     e.view === '3d'
       ? 'Glissez pour tourner · Molette pour zoomer · Retour au plan 2D pour modifier'
-      : e.tool === 'add'
-        ? 'Cliquez pour ajouter après le point sélectionné · Échap pour terminer'
-        : e.tool === 'pan'
-          ? 'Glissez pour déplacer le plan · Molette pour zoomer'
-          : 'Glissez un point · Molette pour zoomer · Espace + glisser pour naviguer',
+      : e.tool === 'barrier'
+        ? e.barrierDraft
+          ? 'Cliquez le point d’arrivée du tronçon · Échap annule le tracé'
+          : 'Cliquez le point de départ du tronçon · Échap quitte l’outil'
+        : e.tool === 'add'
+          ? 'Cliquez pour ajouter après le point sélectionné · Échap pour terminer'
+          : e.tool === 'pan'
+            ? 'Glissez pour déplacer le plan · Molette pour zoomer'
+            : 'Glissez un point · Molette pour zoomer · Espace + glisser pour naviguer',
   );
   function position(event: MouseEvent) {
     const rect = canvas.value!.getBoundingClientRect();
@@ -58,10 +62,17 @@ export function useCanvas(
     else if (space.value || event.button === 1 || e.tool === 'pan') {
       drag = { type: 'pan', ...pos, cameraX: renderer.camera.x, cameraZ: renderer.camera.z };
       event.preventDefault();
+    } else if (e.tool === 'barrier') {
+      const hit = renderer.hitRoadPoint(pos.x, pos.y);
+      if (hit) {
+        if (e.barrierDraft) e.completeBarrier(hit.index);
+        else e.beginBarrier(hit.index, hit.side);
+      }
     } else {
       const hit = renderer.hitPoint(pos.x, pos.y);
       if (hit >= 0 && e.tool !== 'add') {
         e.selectPoint(hit);
+        e.selectBarrier(-1);
         drag = {
           type: 'point',
           before: e.snapshot(),
@@ -71,7 +82,14 @@ export function useCanvas(
         };
       } else if (e.tool === 'add' || !e.project.points.length)
         e.addPoint(renderer.world(pos.x, pos.y));
-      else e.selectPoint(-1);
+      else {
+        const barrier = renderer.hitBarrier(pos.x, pos.y);
+        if (barrier >= 0) e.selectBarrier(barrier);
+        else {
+          e.selectPoint(-1);
+          e.selectBarrier(-1);
+        }
+      }
     }
     dragging.value = !!drag;
   }
@@ -79,6 +97,18 @@ export function useCanvas(
     if (!renderer) return;
     const pos = position(event);
     if (!drag) {
+      if (e.view === '2d' && e.tool === 'barrier') {
+        const hit = renderer.hitRoadPoint(pos.x, pos.y),
+          previous = renderer.barrierHover;
+        const unchanged =
+          (hit && previous && hit.index === previous.index && hit.side === previous.side) ||
+          (!hit && !previous);
+        if (!unchanged) {
+          renderer.barrierHover = hit;
+          renderer.requestDraw();
+        }
+        return;
+      }
       if (e.view === '2d' && e.tool === 'select') {
         hover.value = renderer.hitPoint(pos.x, pos.y);
         if (hover.value !== renderer.hover) {
@@ -170,6 +200,8 @@ export function useCanvas(
   watchEffect(() => {
     e.project;
     e.selected;
+    e.selectedBarrier;
+    e.barrierDraft;
     e.syncRenderer();
   });
   onMounted(() => {

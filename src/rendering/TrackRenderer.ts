@@ -1,9 +1,28 @@
-import type { Bounds, Point, Project, Sample, Scene, TightTurn, ViewMode } from '../domain/types';
+import type {
+  BarrierDraft,
+  BarrierSide,
+  BarrierType,
+  Bounds,
+  Point,
+  Project,
+  Sample,
+  Scene,
+  TightTurn,
+  ViewMode,
+} from '../domain/types';
 import { createProject, clamp } from '../domain/project';
 import { bounds, trackStats, sampleAt } from '../domain/geometry';
 import { terrainBounds } from '../domain/terrain';
 import { buildScene } from '../domain/scene';
 import { MATERIALS } from '../domain/mesh';
+import { DEFAULT_BARRIER_OFFSET, barrierPath } from '../domain/barriers';
+const BARRIER_STYLE: Record<BarrierType, { color: string; width: number; dash: number[] }> = {
+  guardrail: { color: '#c8d3d7', width: 2.5, dash: [] },
+  tires: { color: '#98a2a9', width: 3, dash: [2, 3] },
+  tecpro: { color: '#d0664a', width: 3.5, dash: [6, 4] },
+  wall: { color: '#e7e6da', width: 4, dash: [] },
+};
+const DRAFT_COLOR = '#d3f47d';
 class TrackRenderer {
   canvas: HTMLCanvasElement;
   elevation: HTMLCanvasElement;
@@ -27,6 +46,9 @@ class TrackRenderer {
   observer: ResizeObserver;
   onDraw?: () => void;
   tightTurns: TightTurn[] = [];
+  selectedBarrier = -1;
+  barrierDraft: BarrierDraft | null = null;
+  barrierHover: { index: number; side: BarrierSide } | null = null;
   dispose() {
     this.observer.disconnect();
     if (this.frame !== null) cancelAnimationFrame(this.frame);
@@ -70,11 +92,20 @@ class TrackRenderer {
     if (this.project && !this.fitted) this.fit();
     this.requestDraw();
   }
-  setProject(project: Project, samples: Sample[], selected: number, tightTurns: TightTurn[] = []) {
+  setProject(
+    project: Project,
+    samples: Sample[],
+    selected: number,
+    tightTurns: TightTurn[] = [],
+    selectedBarrier = -1,
+    barrierDraft: BarrierDraft | null = null,
+  ) {
     this.project = project;
     this.samples = samples;
     this.selected = selected;
     this.tightTurns = tightTurns;
+    this.selectedBarrier = selectedBarrier;
+    this.barrierDraft = barrierDraft;
     this.scene = null;
     if (!this.fitted) this.fit();
     this.requestDraw();
@@ -179,9 +210,47 @@ class TrackRenderer {
           y: p.y + (q.y - p.y) * t,
           z: p.z + (q.z - p.z) * t,
           segment: p.segment,
+          nx: p.nx,
+          nz: p.nz,
         };
       }
     }
+    return best;
+  }
+  /** Point de contrôle le plus proche du clic, avec la rive visée. */
+  hitRoadPoint(x: number, y: number) {
+    const road = this.hitRoad(x, y);
+    const count = this.project.points.length;
+    if (!road || !count) return null;
+    const a = road.segment,
+      b = (a + 1) % count;
+    const sa = this.screen(this.project.points[a]),
+      sb = this.screen(this.project.points[b]);
+    const index = Math.hypot(sa.x - x, sa.y - y) <= Math.hypot(sb.x - x, sb.y - y) ? a : b;
+    const world = this.world(x, y);
+    const side: BarrierSide =
+      (world.x - road.x) * road.nx + (world.z - road.z) * road.nz >= 0 ? 'right' : 'left';
+    return { index, side };
+  }
+  /** Tronçon de barrière le plus proche du clic, dans la limite de 8 px. */
+  hitBarrier(x: number, y: number) {
+    let best = -1,
+      bestDistance = 8;
+    (this.project.barriers ?? []).forEach((barrier, index) => {
+      const path = barrierPath(this.project, this.samples, barrier);
+      for (let i = 1; i < path.length; i++) {
+        const a = this.screen(path[i - 1]),
+          b = this.screen(path[i]);
+        const dx = b.x - a.x,
+          dy = b.y - a.y;
+        const t = clamp(((x - a.x) * dx + (y - a.y) * dy) / (dx * dx + dy * dy || 1), 0, 1);
+        const d = Math.hypot(x - a.x - dx * t, y - a.y - dy * t);
+        if (d < bestDistance) {
+          bestDistance = d;
+          best = index;
+        }
+      }
+    });
     return best;
   }
   requestDraw() {
@@ -334,6 +403,7 @@ class TrackRenderer {
       }
       this.drawStart();
       this.drawTightTurns();
+      this.drawBarriers();
     }
     const affectedPoints = new Set(this.tightTurns.flatMap((turn) => turn.pointIndices));
     p.points.forEach((point, i) => {
@@ -404,6 +474,58 @@ class TrackRenderer {
     }
     ctx.restore();
   }
+  drawBarriers() {
+    const ctx = this.ctx;
+    for (const [index, barrier] of (this.project.barriers ?? []).entries()) {
+      const path = barrierPath(this.project, this.samples, barrier);
+      if (path.length < 2) continue;
+      const style = BARRIER_STYLE[barrier.type];
+      this.trace(path);
+      if (index === this.selectedBarrier) {
+        ctx.strokeStyle = '#d3f47d44';
+        ctx.lineWidth = style.width + 5;
+        ctx.stroke();
+      }
+      ctx.strokeStyle = style.color;
+      ctx.lineWidth = style.width;
+      if (style.dash.length) ctx.setLineDash(style.dash);
+      ctx.stroke();
+      if (style.dash.length) ctx.setLineDash([]);
+    }
+    const draft = this.barrierDraft,
+      hover = this.barrierHover;
+    if (draft && hover && hover.index !== draft.from) {
+      const from = this.project.closed ? draft.from : Math.min(draft.from, hover.index);
+      const to = this.project.closed ? hover.index : Math.max(draft.from, hover.index);
+      const path = barrierPath(this.project, this.samples, {
+        type: draft.type,
+        side: draft.side,
+        from,
+        to,
+        offset: DEFAULT_BARRIER_OFFSET,
+      });
+      if (path.length > 1) {
+        this.trace(path);
+        ctx.strokeStyle = DRAFT_COLOR;
+        ctx.lineWidth = 3;
+        ctx.setLineDash([6, 5]);
+        ctx.stroke();
+        ctx.setLineDash([]);
+      }
+    }
+    const marker = (index: number, color: string) => {
+      const point = this.project.points[index];
+      if (!point) return;
+      const s = this.screen(point);
+      ctx.beginPath();
+      ctx.arc(s.x, s.y, 10, 0, Math.PI * 2);
+      ctx.strokeStyle = color;
+      ctx.lineWidth = 1.5;
+      ctx.stroke();
+    };
+    if (hover) marker(hover.index, '#d3f47d88');
+    if (draft) marker(draft.from, DRAFT_COLOR);
+  }
   drawStart() {
     const ctx = this.ctx,
       start = sampleAt(this.samples, Math.min(28, this.samples.at(-1)!.s * 0.25))!;
@@ -434,6 +556,8 @@ class TrackRenderer {
     const ctx = this.ctx,
       faces = [];
     for (const mesh of this.scene.meshes) {
+      // Les colliders de barrière restent invisibles en jeu : on ne les dessine pas.
+      if (mesh.renderable === false) continue;
       const color = MATERIALS[mesh.material].color;
       for (let i = 0; i < mesh.indices.length; i += 3) {
         const verts = mesh.indices.slice(i, i + 3).map((index) => mesh.vertices[index]);

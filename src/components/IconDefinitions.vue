@@ -47,6 +47,9 @@
       <symbol id="i-mountain" viewBox="0 0 24 24">
         <path d="m2 21 8-18 5 10 3-6 5 14zM7 10l3 2 3-2" />
       </symbol>
+      <symbol id="i-wall" viewBox="0 0 24 24">
+        <path d="M4 4v16M12 4v16M20 4v16M3 9h18M3 15h18" />
+      </symbol>
       <symbol id="i-flag" viewBox="0 0 24 24">
         <path d="M5 22V3m0 1c5-4 9 4 15 0v10c-6 4-10-4-15 0" />
       </symbol>

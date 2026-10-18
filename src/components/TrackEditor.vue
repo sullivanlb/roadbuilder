@@ -76,6 +76,17 @@ const {
           <svg class="icon"><use href="#i-plus" /></svg>
         </button>
         <button
+          id="tool-barrier"
+          class="tool"
+          :class="{ active: e.tool === 'barrier' }"
+          @click="e.setTool('barrier')"
+          title="Tracer une barrière (B)"
+          aria-label="Tracer une barrière (B)"
+          :aria-pressed="e.tool === 'barrier'"
+        >
+          <svg class="icon"><use href="#i-wall" /></svg>
+        </button>
+        <button
           id="tool-pan"
           class="tool"
           :class="{ active: e.tool === 'pan' }"

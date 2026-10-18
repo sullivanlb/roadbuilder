@@ -54,15 +54,16 @@ Les composants utilisent la Composition API. Les données géométriques volumin
 
 ### Vérifications avant livraison
 
-Les tests vérifient les projets anciens et invalides, le maillage et ses indices, les exports identiques octet par octet à l’ancienne version, les gestes et raccourcis, l’historique, la restauration, la récupération des sauvegardes corrompues et les téléchargements. Les tests d’interface utilisent un DOM et un canvas simulés : ils ne remplacent pas une vérification visuelle dans un navigateur.
+Les tests vérifient les projets anciens et invalides, le maillage et ses indices, les exports identiques octet par octet à l’ancienne version, les gestes et raccourcis, l’historique, la restauration, la récupération des sauvegardes corrompues, les téléchargements, ainsi que les barrières : validation, colliders orientés vers la piste, bridage dans les virages, traçage, sélection, entretien et exports. Les tests d’interface utilisent un DOM et un canvas simulés : ils ne remplacent pas une vérification visuelle dans un navigateur.
 
-Pour la vérification manuelle : ouvrir les trois modèles et une page blanche, déplacer/ajouter/supprimer des points, régler largeur et relief, naviguer en 2D/3D, tester zoom et raccourcis, enregistrer/recharger/importer un projet, puis télécharger les ZIP Assetto Corsa et OBJ. Comparer également le rendu aux dimensions bureau et mobile. La validation dans Assetto Corsa reste manuelle.
+Pour la vérification manuelle : ouvrir les trois modèles et une page blanche, déplacer/ajouter/supprimer des points, régler largeur et relief, naviguer en 2D/3D, tester zoom et raccourcis, tracer des barrières des quatre types, enregistrer/recharger/importer un projet, puis télécharger les ZIP Assetto Corsa et OBJ. Comparer également le rendu aux dimensions bureau et mobile. La validation dans Assetto Corsa reste manuelle.
 
 ## Fonctionnalités disponibles
 
 - Circuits fermés et routes ouvertes, avec modèles club, karting, montagne et page blanche.
 - Dessin en 2D : ajout, déplacement et suppression de points, zoom et navigation.
 - Réglage de la largeur, des accotements, des vibreurs et de l’altitude par point.
+- Barrières avec collision : glissières, pneus, blocs TecPro et murs en béton, tracés en deux clics le long de la piste.
 - Terrain complet en herbe, raccordé au relief, à l’intérieur et autour du tracé, avec une marge réglable de 50 à 500 m et des collisions dans Assetto Corsa.
 - Aperçu 3D orientable et profil d’altitude.
 - Annulation et rétablissement des modifications.
@@ -75,8 +76,9 @@ Pour la vérification manuelle : ouvrir les trois modèles et une page blanche, 
 1. Cliquez sur **Nouveau** et choisissez un modèle ou une page blanche.
 2. Déplacez les points en **Plan 2D**. L’outil **+** ajoute un point après celui sélectionné ; un double-clic sur la chaussée insère un point à cet endroit.
 3. Réglez la largeur et les accotements, puis sélectionnez les points pour modifier leur altitude. Dans **Le terrain**, choisissez la marge autour du tracé. Les unités sont en mètres.
-4. Consultez **Aperçu 3D** pour observer le relief ; glissez pour tourner et utilisez la molette pour zoomer.
-5. Cliquez sur **Enregistrer** pour télécharger un fichier projet. Utilisez **Ouvrir** pour le reprendre plus tard.
+4. Sécurisez les bords dans **Les barrières** : choisissez un type, puis tracez un tronçon en deux clics, du point de départ au point d’arrivée. Réglez son écartement, changez-le de côté ou supprimez-le.
+5. Consultez **Aperçu 3D** pour observer le relief ; glissez pour tourner et utilisez la molette pour zoomer.
+6. Cliquez sur **Enregistrer** pour télécharger un fichier projet. Utilisez **Ouvrir** pour le reprendre plus tard.
 
 La sauvegarde automatique dépend du navigateur et de l’adresse de l’application. Enregistrez une copie du projet avant de déplacer l’application ou de supprimer les données du navigateur. L’historique d’annulation reste limité à la session en cours.
 
@@ -98,9 +100,18 @@ Le contour en pointillés du plan 2D montre la limite extérieure. L’aperçu 3
 
 Les anciens projets restent compatibles et reçoivent automatiquement la marge par défaut. Pour ajouter le terrain à un circuit déjà installé, ouvrez son projet, exportez un nouveau ZIP et remplacez son dossier dans le jeu après avoir sauvegardé l’ancienne version.
 
+### Barrières et collisions
+
+Les tronçons se posent avec l’outil **B** ou le bouton **Tracer sur le plan** : un premier clic fixe le point de départ sur la rive cliquée, un second le point d’arrivée. L’aperçu suit la piste entre les deux points. Échap annule le tracé en cours ; les tronçons se règlent ensuite dans **Les barrières** (écartement de 0 à 10 m au-delà du vibreur, changement de côté, suppression). Maximum **120 tronçons**.
+
+Les quatre types ont des hauteurs réalistes : glissière 0,78 m, pneus 0,85 m, TecPro 0,85 m, mur en béton 1,1 m. Comme les circuits officiels, chaque tronçon produit un **collider invisible** nommé `1WALL_*` que le jeu utilise pour la collision, plus un décor visible (rail, pneus, blocs rouges et blancs ou mur). Les colliders restent à l’extérieur de la chaussée, y compris dans les virages très serrés.
+
+L’inversion du sens du tracé retourne les tronçons, la suppression d’un point déplace ou supprime les tronçons concernés, et le passage en route ouverte scinde les tronçons qui bouclaient. Les projets sans barrière gardent des exports strictement identiques à la version précédente.
+
 | Action | Raccourci |
 | --- | --- |
 | Sélection / ajout / déplacement de la vue | V / A / H |
+| Tracer une barrière | B |
 | Navigation temporaire | Espace + glisser, ou bouton central |
 | Cadrer le tracé | F |
 | Grille de 5 m pendant un déplacement | Maj |
@@ -124,10 +135,10 @@ Conservez une copie de l’ancienne version si vous remplacez un circuit existan
 
 Les cases cochées indiquent les fonctionnalités livrées. Les autres restent à réaliser.
 
-Prochaines priorités : **barrières → stands → trajectoires IA**.
+Prochaines priorités : **stands → trajectoires IA → dévers**.
 
 - [x] **Terrain complet** : sol continu à l’intérieur et autour du tracé, marge réglable, adaptation au relief, aperçu 2D/3D et export avec collisions.
-- [ ] **Barrières et murs** : placer des glissières, pneus et protections avec collisions.
+- [x] **Barrières et murs** : glissières, pneus, TecPro et murs en béton tracés en deux clics, avec colliders invisibles dans Assetto Corsa.
 - [ ] **Vrais stands** : créer une voie d’entrée et de sortie, plusieurs emplacements et une grille de départ.
 - [ ] **Trajectoires IA** : permettre aux adversaires de parcourir le circuit et de rejoindre les stands.
 - [ ] **Largeur variable** : régler la largeur par portion pour élargir une ligne droite ou resserrer un passage.
@@ -151,7 +162,8 @@ L’import dans Assetto Corsa a été confirmé par l’utilisateur pour la vers
 - Un emplacement de départ et un stand, sans véritable voie des stands.
 - Pas de trajectoires IA ni de courses avec des adversaires.
 - Chronométrage à vérifier, particulièrement sur les routes ouvertes, prévues pour le roulage libre.
-- Le terrain reste limité au rectangle visible dans l’éditeur. Il n’y a pas de barrières au bord extérieur : au-delà, une chute reste possible.
+- Le terrain reste limité au rectangle visible dans l’éditeur ; posez des barrières aux endroits risqués, sinon une chute reste possible au-delà.
+- Les barrières sont des colliders simplifiés : vérifiez le comportement des impacts en jeu.
 - Pas de ponts, de dévers ni de décors. Les matériaux sont simples.
 - Les intersections et certains virages trop serrés bloquent l’export ; tous les chevauchements de bords ou d’accotements ne sont pas détectés.
 

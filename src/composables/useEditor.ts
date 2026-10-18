@@ -11,9 +11,25 @@ import {
   triggerRef,
 } from 'vue';
 import type { InjectionKey } from 'vue';
-import type { ExportFormat, Point, Template, Tool, ViewMode } from '../domain/types';
+import type {
+  BarrierDraft,
+  BarrierSide,
+  BarrierType,
+  ExportFormat,
+  Point,
+  Template,
+  Tool,
+  ViewMode,
+} from '../domain/types';
 import { clamp, LIMITS, slugify, validateProject, createProject } from '../domain/project';
 import { sampleTrack, trackIssues, trackStats } from '../domain/geometry';
+import {
+  DEFAULT_BARRIER_OFFSET,
+  insertBarrierPoint,
+  removeBarrierPoint,
+  reverseBarriers,
+  splitWrappingBarriers,
+} from '../domain/barriers';
 import { ProjectHistory } from '../domain/history';
 import { persistProject, restoreProject } from '../domain/storage';
 import type { ProjectStorage } from '../domain/storage';
@@ -23,7 +39,7 @@ import type { TrackRenderer } from '../rendering/TrackRenderer';
 export const number = (value: number, digits = 0) =>
   value.toLocaleString('fr-FR', { minimumFractionDigits: digits, maximumFractionDigits: digits });
 export type Dialog = 'new' | 'export' | 'help' | null;
-export type NumericField = 'width' | 'shoulder' | 'terrainMargin' | 'x' | 'y' | 'z';
+export type NumericField = 'width' | 'shoulder' | 'terrainMargin' | 'x' | 'y' | 'z' | 'barrierOffset';
 const ranges: Record<NumericField, [number, number]> = {
   width: [4, 24],
   shoulder: [2, 20],
@@ -31,6 +47,7 @@ const ranges: Record<NumericField, [number, number]> = {
   x: [-LIMITS.coordinate, LIMITS.coordinate],
   z: [-LIMITS.coordinate, LIMITS.coordinate],
   y: [LIMITS.minAltitude, LIMITS.maxAltitude],
+  barrierOffset: [0, 10],
 };
 const errorMessage = (error: unknown) => (error instanceof Error ? error.message : String(error));
 
@@ -56,6 +73,10 @@ export function createEditor() {
   const selectedTightTurns = computed(() =>
     issues.value.tightTurns.filter((turn) => turn.pointIndices.includes(selected.value)),
   );
+  const barriers = computed(() => project.value.barriers ?? []);
+  const selectedBarrier = ref(-1);
+  const barrierDraft = ref<BarrierDraft | null>(null);
+  const barrierType = ref<BarrierType>('guardrail');
   const notification = ref({ message: '', error: false });
   const saveState = ref<'saved' | 'pending' | 'unavailable' | 'recovery'>('saved');
   const exportAuthor = ref('');
@@ -71,6 +92,12 @@ export function createEditor() {
   const downloads = new Map<string, ReturnType<typeof setTimeout>>();
   const snapshot = () => JSON.stringify(project.value);
   const refresh = () => triggerRef(project);
+  function clampBarrierSelection() {
+    selectedBarrier.value = Math.min(
+      selectedBarrier.value,
+      (project.value.barriers?.length ?? 0) - 1,
+    );
+  }
 
   function toast(message: string, error = false) {
     clearTimeout(toastTimer);
@@ -119,6 +146,8 @@ export function createEditor() {
     ++importGeneration;
     project.value = validateProject(JSON.parse(next));
     selected.value = Math.min(selected.value, project.value.points.length - 1);
+    barrierDraft.value = null;
+    clampBarrierSelection();
     queueSave();
   }
   function setNumeric(field: NumericField, value: number) {
@@ -128,6 +157,9 @@ export function createEditor() {
     if (field === 'x' || field === 'y' || field === 'z') {
       if (!point.value) return;
       point.value[field] = clamp(value, min, max);
+    } else if (field === 'barrierOffset') {
+      const barrier = barriers.value[selectedBarrier.value];
+      if (barrier) barrier.offset = clamp(value, min, max);
     } else project.value[field] = clamp(value, min, max);
     refresh();
     queueSave();
@@ -142,9 +174,74 @@ export function createEditor() {
     flushEdit();
     selected.value = clamp(index, -1, project.value.points.length - 1);
   }
+  function selectBarrier(index: number) {
+    flushEdit();
+    selectedBarrier.value = clamp(index, -1, barriers.value.length - 1);
+  }
+  function setBarrierType(type: BarrierType) {
+    barrierType.value = type;
+    if (barrierDraft.value) {
+      barrierDraft.value.type = type;
+      return;
+    }
+    const barrier = barriers.value[selectedBarrier.value];
+    if (barrier && barrier.type !== type)
+      change(() => {
+        barrier.type = type;
+      });
+  }
+  function beginBarrier(index: number, side: BarrierSide) {
+    if (index < 0 || index >= project.value.points.length) return;
+    barrierDraft.value = { from: index, side, type: barrierType.value };
+  }
+  function cancelBarrier() {
+    barrierDraft.value = null;
+    renderer?.requestDraw();
+  }
+  function completeBarrier(to: number) {
+    const draft = barrierDraft.value;
+    if (!draft) return;
+    if (to === draft.from) {
+      toast('Choisissez un point d’arrivée différent du point de départ.', true);
+      return;
+    }
+    if (barriers.value.length >= LIMITS.barriers) {
+      toast(`Maximum ${LIMITS.barriers} tronçons de barrière.`, true);
+      return;
+    }
+    let from = draft.from;
+    if (!project.value.closed && from > to) [from, to] = [to, from];
+    change(() => {
+      const list = project.value.barriers ?? (project.value.barriers = []);
+      list.push({ type: draft.type, side: draft.side, from, to, offset: DEFAULT_BARRIER_OFFSET });
+      selectedBarrier.value = list.length - 1;
+    });
+    barrierDraft.value = null;
+    toast('Barrière ajoutée. Échap pour terminer le tracé.');
+  }
+  function swapBarrierSide() {
+    const barrier = barriers.value[selectedBarrier.value];
+    if (!barrier) return;
+    change(() => {
+      barrier.side = barrier.side === 'right' ? 'left' : 'right';
+    });
+  }
+  function deleteBarrier() {
+    const list = project.value.barriers;
+    const index = selectedBarrier.value;
+    if (!list || !list[index]) return;
+    change(() => {
+      list.splice(index, 1);
+    });
+    selectedBarrier.value = Math.min(index, list.length - 1);
+  }
   function setTool(next: Tool) {
     if (view.value === '3d' && next !== 'pan') setView('2d');
     tool.value = next;
+    if (next !== 'barrier') {
+      barrierDraft.value = null;
+      if (renderer) renderer.barrierHover = null;
+    }
   }
   function setView(mode: ViewMode) {
     endGesture?.();
@@ -160,15 +257,27 @@ export function createEditor() {
           ...project.value.points.slice(1).reverse(),
         ];
       else project.value.points.reverse();
+      const list = project.value.barriers;
+      if (list?.length)
+        project.value.barriers = reverseBarriers(
+          list,
+          project.value.points.length,
+          project.value.closed,
+        );
       selected.value = current ? project.value.points.indexOf(current) : -1;
     });
   }
   function deletePoint() {
     if (!point.value) return;
     change(() => {
-      project.value.points.splice(selected.value, 1);
+      const index = selected.value;
+      project.value.points.splice(index, 1);
+      const list = project.value.barriers;
+      if (list?.length)
+        project.value.barriers = removeBarrierPoint(list, index, project.value.closed);
       selected.value = Math.min(selected.value, project.value.points.length - 1);
     });
+    clampBarrierSelection();
     if (!project.value.points.length) setTool('add');
   }
   function addPoint(p: Pick<Point, 'x' | 'z'> & { y?: number }, after = selected.value) {
@@ -188,6 +297,8 @@ export function createEditor() {
     change(() => {
       const index = clamp(after + 1, 0, project.value.points.length);
       project.value.points.splice(index, 0, next);
+      const list = project.value.barriers;
+      if (list?.length) project.value.barriers = insertBarrierPoint(list, index);
       selected.value = index;
     });
   }
@@ -231,6 +342,8 @@ export function createEditor() {
       change(() => {
         project.value = loaded;
         selected.value = loaded.points.length ? 0 : -1;
+        selectedBarrier.value = -1;
+        barrierDraft.value = null;
       });
       syncRenderer();
       renderer?.fit();
@@ -251,6 +364,8 @@ export function createEditor() {
     change(() => {
       project.value = createProject(template);
       selected.value = project.value.points.length ? 0 : -1;
+      selectedBarrier.value = -1;
+      barrierDraft.value = null;
     });
     dialog.value = null;
     syncRenderer();
@@ -291,7 +406,14 @@ export function createEditor() {
     }
   }
   function syncRenderer() {
-    renderer?.setProject(project.value, samples.value, selected.value, issues.value.tightTurns);
+    renderer?.setProject(
+      project.value,
+      samples.value,
+      selected.value,
+      issues.value.tightTurns,
+      selectedBarrier.value,
+      barrierDraft.value,
+    );
   }
   function focusTightTurn(segment: number) {
     const turn = issues.value.tightTurns.find((turn) => turn.segment === segment);
@@ -333,13 +455,16 @@ export function createEditor() {
       undo(true);
     } else if (!modifier && key === 'v') setTool('select');
     else if (!modifier && key === 'a') setTool('add');
+    else if (!modifier && key === 'b') setTool('barrier');
     else if (!modifier && key === 'h') setTool('pan');
     else if (!modifier && key === 'f') renderer?.fit();
     else if (key === 'delete' || key === 'backspace') {
       event.preventDefault();
       deletePoint();
-    } else if (key === 'escape') setTool('select');
-    else if (key === '?') openDialog('help');
+    } else if (key === 'escape') {
+      if (barrierDraft.value) cancelBarrier();
+      else setTool('select');
+    } else if (key === '?') openDialog('help');
   }
   function onBlur() {
     endGesture?.();
@@ -389,6 +514,10 @@ export function createEditor() {
     issues,
     point,
     selectedTightTurns,
+    barriers,
+    selectedBarrier,
+    barrierDraft,
+    barrierType,
     notification,
     saveState,
     exportAuthor,
@@ -404,6 +533,13 @@ export function createEditor() {
     setNumeric,
     setName,
     selectPoint,
+    selectBarrier,
+    setBarrierType,
+    beginBarrier,
+    cancelBarrier,
+    completeBarrier,
+    swapBarrierSide,
+    deleteBarrier,
     setTool,
     setView,
     reverseTrack,
@@ -423,6 +559,9 @@ export function createEditor() {
     setClosed: (closed: boolean) =>
       change(() => {
         project.value.closed = closed;
+        const list = project.value.barriers;
+        if (!closed && list?.length)
+          project.value.barriers = splitWrappingBarriers(list, project.value.points.length);
       }),
     setKerbs: (kerbs: boolean) =>
       change(() => {

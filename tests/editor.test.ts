@@ -5,6 +5,7 @@ import { createApp, nextTick } from 'vue';
 import type { App as VueApp } from 'vue';
 import App from '../src/App.vue';
 import { createProject } from '../src/domain/project';
+import { barrierPath } from '../src/domain/barriers';
 import { STORAGE_KEY } from '../src/domain/storage';
 import { TrackRenderer } from '../src/rendering/TrackRenderer';
 import type { Project } from '../src/domain/types';
@@ -55,6 +56,29 @@ function pointer(type: string, x: number, y: number, extra: MouseEventInit = {})
   $('track-canvas').dispatchEvent(
     new MouseEvent(type, { clientX: x, clientY: y, button: 0, bubbles: true, ...extra }),
   );
+}
+/** Clic sur la chaussée, à 2 m du point de contrôle, du côté demandé. */
+function roadClick(type: string, index: number, side: 'left' | 'right') {
+  const point = renderer.project.points[index];
+  const sample = renderer.samples.find((s) => s.segment === index && s.t === 0)!;
+  const sign = side === 'right' ? 1 : -1;
+  const target = {
+    x: point.x + sample.nx * 2 * sign,
+    y: point.y,
+    z: point.z + sample.nz * 2 * sign,
+  };
+  const screen = renderer.screen(target);
+  pointer(type, screen.x, screen.y);
+}
+async function traceBarrier(from: number, to: number, side: 'left' | 'right' = 'right') {
+  roadClick('pointerdown', from, side);
+  roadClick('pointerup', from, side);
+  await flush();
+  roadClick('pointermove', to, side);
+  await flush();
+  roadClick('pointerdown', to, side);
+  roadClick('pointerup', to, side);
+  await flush();
 }
 async function mount() {
   const spy = vi.spyOn(TrackRenderer.prototype, 'setProject');
@@ -425,5 +449,158 @@ describe('interface Vue (DOM et canvas simulés)', () => {
     resolve(JSON.stringify(createProject('kart')));
     await flush();
     expect((await saved()).name).toBe('Mon nouveau tracé');
+  });
+
+  it('trace une barrière en deux clics, l’affiche, la sélectionne et la persiste', async () => {
+    await mount();
+    await click('tool-barrier');
+    expect($('tool-barrier').getAttribute('aria-pressed')).toBe('true');
+    expect($('barrier-status').textContent).toContain('point de départ');
+    strokeColors = [];
+    roadClick('pointerdown', 1, 'right');
+    roadClick('pointerup', 1, 'right');
+    await flush();
+    expect($('barrier-status').textContent).toContain('point d’arrivée');
+    expect(strokeColors).toContain('#d3f47d');
+    roadClick('pointermove', 4, 'right');
+    await flush();
+    strokeColors = [];
+    roadClick('pointerdown', 4, 'right');
+    roadClick('pointerup', 4, 'right');
+    await flush();
+    expect(strokeColors).toContain('#c8d3d7');
+    const project = await saved();
+    expect(project.barriers).toEqual([
+      { type: 'guardrail', side: 'right', from: 1, to: 4, offset: 1 },
+    ]);
+    expect($('barrier-count').textContent).toContain('01');
+    expect($('barrier-row-0')).not.toBeNull();
+    expect($('barrier-editor')).not.toBeNull();
+    expect($<HTMLInputElement>('barrier-offset').value).toBe('1');
+
+    await click('tool-select');
+    expect($('barrier-status').textContent).toContain('sélectionné');
+    roadClick('pointerdown', 1, 'right');
+    roadClick('pointerup', 1, 'right');
+    await flush();
+    expect($('barrier-editor')).toBeNull();
+    const path = barrierPath(renderer.project, renderer.samples, renderer.project.barriers![0]);
+    const mid = renderer.screen(path[Math.floor(path.length / 2)]);
+    pointer('pointerdown', mid.x, mid.y);
+    pointer('pointerup', mid.x, mid.y);
+    await flush();
+    expect($('barrier-row-0').classList.contains('active')).toBe(true);
+    expect($('barrier-editor')).not.toBeNull();
+    await click('view-3d');
+    expect(drawCalls).toBeGreaterThan(0);
+  });
+
+  it('refuse un tronçon qui démarre et s’arrête sur le même point', async () => {
+    await mount();
+    await click('barrier-draw');
+    roadClick('pointerdown', 2, 'right');
+    roadClick('pointerup', 2, 'right');
+    await flush();
+    roadClick('pointerdown', 2, 'right');
+    roadClick('pointerup', 2, 'right');
+    await flush();
+    expect($('toast').textContent).toContain('différent');
+    expect((await saved()).barriers ?? []).toEqual([]);
+    expect($('barrier-empty')).not.toBeNull();
+  });
+
+  it('modifie, inverse, supprime et répare les tronçons avec l’historique', async () => {
+    await mount();
+    await click('tool-barrier');
+    await traceBarrier(1, 4);
+    await click('barrier-type-wall');
+    expect((await saved()).barriers![0].type).toBe('wall');
+    expect($('barrier-type-note').textContent).toContain('Le tronçon sélectionné');
+    await input('barrier-offset', '2.5');
+    expect((await saved()).barriers![0].offset).toBe(2.5);
+    expect($('barrier-offset-value').textContent).toContain('2,5 m');
+    await click('barrier-swap');
+    expect((await saved()).barriers![0].side).toBe('left');
+    await click('undo');
+    expect((await saved()).barriers![0].side).toBe('right');
+    await click('redo');
+    expect((await saved()).barriers![0].side).toBe('left');
+    await click('barrier-delete');
+    expect((await saved()).barriers).toEqual([]);
+    expect($('barrier-empty')).not.toBeNull();
+    await click('undo');
+    expect((await saved()).barriers).toHaveLength(1);
+
+    await click('barrier-row-0');
+    await click('point-next');
+    await click('point-next');
+    expect($('point-badge').textContent).toBe('POINT 03');
+    await click('delete-point');
+    expect((await saved()).barriers).toEqual([
+      { type: 'wall', side: 'left', from: 1, to: 3, offset: 2.5 },
+    ]);
+    await click('undo');
+    await click('point-previous');
+    expect($('point-badge').textContent).toBe('POINT 02');
+    await click('delete-point');
+    expect((await saved()).barriers).toEqual([]);
+  });
+
+  it('rejoue les barrières à l’envers et les scinde au passage en route ouverte', async () => {
+    await mount();
+    await openFile({
+      ...createProject('club'),
+      barriers: [{ type: 'wall', side: 'left', from: 7, to: 2, offset: 2 }],
+    });
+    expect(renderer.project.barriers).toHaveLength(1);
+    expect($('barrier-count').textContent).toContain('01');
+    await click('reverse-track');
+    expect((await saved()).barriers).toEqual([
+      { type: 'wall', side: 'right', from: 7, to: 2, offset: 2 },
+    ]);
+    await click('undo');
+    await click('mode-open');
+    expect((await saved()).barriers).toEqual([
+      { type: 'wall', side: 'left', from: 7, to: 8, offset: 2 },
+      { type: 'wall', side: 'left', from: 0, to: 2, offset: 2 },
+    ]);
+  });
+
+  it('trace au clavier, annule le tracé en cours puis quitte l’outil avec Échap', async () => {
+    await mount();
+    key('b');
+    await flush();
+    expect($('tool-barrier').getAttribute('aria-pressed')).toBe('true');
+    roadClick('pointerdown', 1, 'right');
+    roadClick('pointerup', 1, 'right');
+    await flush();
+    expect($('barrier-status').textContent).toContain('point d’arrivée');
+    key('Escape');
+    await flush();
+    expect($('barrier-status').textContent).toContain('point de départ');
+    expect($('tool-barrier').getAttribute('aria-pressed')).toBe('true');
+    key('Escape');
+    await flush();
+    expect($('tool-select').getAttribute('aria-pressed')).toBe('true');
+    expect((await saved()).barriers ?? []).toEqual([]);
+  });
+
+  it('ouvre un projet ancien sans barrières, normalise le sens de tracé et retrouve les tronçons au remontage', async () => {
+    await mount();
+    await openFile(createProject('mountain'));
+    expect($('barrier-empty')).not.toBeNull();
+    await click('tool-barrier');
+    await traceBarrier(0, 3);
+    await traceBarrier(5, 2);
+    expect((await saved()).barriers).toEqual([
+      { type: 'guardrail', side: 'right', from: 0, to: 3, offset: 1 },
+      { type: 'guardrail', side: 'right', from: 2, to: 5, offset: 1 },
+    ]);
+    app!.unmount();
+    app = null;
+    await mount();
+    expect(renderer.project.barriers).toHaveLength(2);
+    expect($('barrier-row-0')).not.toBeNull();
+    expect($('barrier-row-1')).not.toBeNull();
   });
 });
