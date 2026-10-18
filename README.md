@@ -25,14 +25,14 @@ La page de récupération n’est pas incluse dans la compilation de production.
 
 ## Développement et distribution
 
-| Commande | Usage |
-| --- | --- |
-| `npm run dev` | Serveur de développement avec rechargement automatique |
+| Commande            | Usage                                                            |
+| ------------------- | ---------------------------------------------------------------- |
+| `npm run dev`       | Serveur de développement avec rechargement automatique           |
 | `npm run typecheck` | Typage strict de l’application, de la configuration et des tests |
-| `npm test` | Tests de géométrie, exports, historique, stockage et interface |
-| `npm run test:ui` | Tests de l’interface Vue avec DOM et canvas simulés |
-| `npm run build` | Vérification des types et compilation dans `dist/` |
-| `npm run preview` | Aperçu local de la compilation, à l’adresse affichée par Vite |
+| `npm test`          | Tests de géométrie, exports, historique, stockage et interface   |
+| `npm run test:ui`   | Tests de l’interface Vue avec DOM et canvas simulés              |
+| `npm run build`     | Vérification des types et compilation dans `dist/`               |
+| `npm run preview`   | Aperçu local de la compilation, à l’adresse affichée par Vite    |
 
 Pour distribuer l’application, servez le contenu de **`dist/`** sur un hébergement statique HTTP(S). Les chemins des ressources sont relatifs pour permettre un sous-répertoire. Aucun PHP ni serveur applicatif n’est requis ; `dist/index.html` n’est pas prévu pour une ouverture directe par double-clic. La sauvegarde automatique est propre à l’adresse de l’hébergement : utilisez l’export/import JSON pour transférer vos projets.
 
@@ -108,16 +108,16 @@ Les quatre types ont des hauteurs réalistes : glissière 0,78 m, pneus 0,85 m, 
 
 L’inversion du sens du tracé retourne les tronçons, la suppression d’un point déplace ou supprime les tronçons concernés, et le passage en route ouverte scinde les tronçons qui bouclaient. Les projets sans barrière gardent des exports strictement identiques à la version précédente.
 
-| Action | Raccourci |
-| --- | --- |
-| Sélection / ajout / déplacement de la vue | V / A / H |
-| Tracer une barrière | B |
-| Navigation temporaire | Espace + glisser, ou bouton central |
-| Cadrer le tracé | F |
-| Grille de 5 m pendant un déplacement | Maj |
-| Annuler / rétablir | Ctrl+Z / Ctrl+Maj+Z ou Ctrl+Y |
-| Enregistrer le projet | Ctrl+S |
-| Supprimer le point sélectionné | Suppr |
+| Action                                    | Raccourci                           |
+| ----------------------------------------- | ----------------------------------- |
+| Sélection / ajout / déplacement de la vue | V / A / H                           |
+| Tracer une barrière                       | B                                   |
+| Navigation temporaire                     | Espace + glisser, ou bouton central |
+| Cadrer le tracé                           | F                                   |
+| Grille de 5 m pendant un déplacement      | Maj                                 |
+| Annuler / rétablir                        | Ctrl+Z / Ctrl+Maj+Z ou Ctrl+Y       |
+| Enregistrer le projet                     | Ctrl+S                              |
+| Supprimer le point sélectionné            | Suppr                               |
 
 Sur macOS, les raccourcis Ctrl acceptent aussi Cmd.
 
@@ -163,7 +163,7 @@ L’import dans Assetto Corsa a été confirmé par l’utilisateur pour la vers
 - Pas de trajectoires IA ni de courses avec des adversaires.
 - Chronométrage à vérifier, particulièrement sur les routes ouvertes, prévues pour le roulage libre.
 - Le terrain reste limité au rectangle visible dans l’éditeur ; posez des barrières aux endroits risqués, sinon une chute reste possible au-delà.
-- Les barrières sont des colliders simplifiés : vérifiez le comportement des impacts en jeu.
+- Les barrières utilisent des colliders simplifiés ; leur blocage de la voiture a été confirmé en jeu.
 - Pas de ponts, de dévers ni de décors. Les matériaux sont simples.
 - Les intersections et certains virages trop serrés bloquent l’export ; tous les chevauchements de bords ou d’accotements ne sont pas détectés.
 
