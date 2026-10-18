@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { useEditor } from '../composables/useEditor';
+import { useEditor } from '../../composables/useEditor';
 import ExportDialog from './ExportDialog.vue';
 import HelpDialog from './HelpDialog.vue';
 import NewDialog from './NewDialog.vue';

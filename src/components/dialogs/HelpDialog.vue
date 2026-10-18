@@ -1,8 +1,8 @@
 <script setup lang="ts">
-import { useEditor } from '../composables/useEditor';
-import { useModalDialog } from '../composables/useModalDialog';
-import { LIMITS } from '../domain/project/limits';
-import { t } from '../i18n';
+import { useEditor } from '../../composables/useEditor';
+import { useModalDialog } from '../../composables/useModalDialog';
+import { LIMITS } from '../../domain/project/limits';
+import { t } from '../../i18n';
 
 const props = defineProps<{ open: boolean }>();
 const e = useEditor();

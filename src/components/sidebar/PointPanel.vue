@@ -1,7 +1,7 @@
 <script setup lang="ts">
-import { useEditor } from '../composables/useEditor';
-import NumericInput from './NumericInput.vue';
-import { formatTrackIssue, t } from '../i18n';
+import { useEditor } from '../../composables/useEditor';
+import NumericInput from '../ui/NumericInput.vue';
+import { formatTrackIssue, t } from '../../i18n';
 
 const e = useEditor();
 </script>

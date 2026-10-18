@@ -1,7 +1,7 @@
 <script setup lang="ts">
-import { useEditor } from '../composables/useEditor';
+import { useEditor } from '../../composables/useEditor';
 import { ref } from 'vue';
-import { locale, setLocale, t } from '../i18n';
+import { locale, setLocale, t } from '../../i18n';
 
 const e = useEditor();
 const fileInput = ref<HTMLInputElement | null>(null);

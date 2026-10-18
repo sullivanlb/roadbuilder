@@ -38,7 +38,7 @@ Pour distribuer l’application, servez le contenu de **`dist/`** sur un héberg
 
 ### Organisation du code
 
-- `src/components/` : barre d’actions, réglages, canvas, profil d’altitude, statistiques et dialogues Vue.
+- `src/components/` : composants Vue rangés par zone — `layout/` (barre d’actions), `sidebar/` (réglages, barrières, relief), `workspace/` (canvas, statistiques, profil d’altitude), `dialogs/` (nouveau, export, aide) et `ui/` (champs et icônes partagés).
 - `src/composables/` : état partagé de l’éditeur, historique des actions, sauvegarde et interactions avec le canvas. L’état est créé par instance d’application et partagé par injection.
 - `src/domain/` : types des projets, validation, géométrie, maillages, terrain, scènes, historique et accès au stockage. Ces modules ne dépendent pas de Vue.
 - `src/export/` : encodeurs binaires PNG/ZIP, KN5, OBJ et structure des archives Assetto Corsa.

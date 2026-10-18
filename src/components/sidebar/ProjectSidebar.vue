@@ -1,8 +1,8 @@
 <script setup lang="ts">
-import { useEditor } from '../composables/useEditor';
-import { formatNumber, t } from '../i18n';
+import { useEditor } from '../../composables/useEditor';
+import { formatNumber, t } from '../../i18n';
 import { computed, ref, watch } from 'vue';
-import NumericInput from './NumericInput.vue';
+import NumericInput from '../ui/NumericInput.vue';
 import BarrierPanel from './BarrierPanel.vue';
 import PointPanel from './PointPanel.vue';
 

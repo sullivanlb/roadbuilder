@@ -1,10 +1,10 @@
 <script setup lang="ts">
 import { provideEditor } from './composables/useEditor';
-import IconDefinitions from './components/IconDefinitions.vue';
-import TopBar from './components/TopBar.vue';
-import ProjectSidebar from './components/ProjectSidebar.vue';
-import TrackEditor from './components/TrackEditor.vue';
-import EditorDialogs from './components/EditorDialogs.vue';
+import IconDefinitions from './components/ui/IconDefinitions.vue';
+import TopBar from './components/layout/TopBar.vue';
+import ProjectSidebar from './components/sidebar/ProjectSidebar.vue';
+import TrackEditor from './components/workspace/TrackEditor.vue';
+import EditorDialogs from './components/dialogs/EditorDialogs.vue';
 const e = provideEditor();
 </script>
 <template>

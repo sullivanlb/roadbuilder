@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue';
-import { useEditor } from '../composables/useEditor';
-import type { NumericField } from '../composables/useEditor';
+import { useEditor } from '../../composables/useEditor';
+import type { NumericField } from '../../composables/useEditor';
 const props = withDefaults(
   defineProps<{
     field: NumericField;

@@ -1,9 +1,9 @@
 <script setup lang="ts">
-import { useEditor } from '../composables/useEditor';
-import { formatNumber, t } from '../i18n';
+import { useEditor } from '../../composables/useEditor';
+import { formatNumber, t } from '../../i18n';
 import { computed } from 'vue';
-import NumericInput from './NumericInput.vue';
-import type { Barrier, BarrierType } from '../domain/types';
+import NumericInput from '../ui/NumericInput.vue';
+import type { Barrier, BarrierType } from '../../domain/types';
 
 const e = useEditor();
 const swatches: Record<BarrierType, string> = {

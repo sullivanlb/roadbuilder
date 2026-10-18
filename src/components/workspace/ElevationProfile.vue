@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import { useEditor } from '../composables/useEditor';
-import { formatNumber, t } from '../i18n';
+import { useEditor } from '../../composables/useEditor';
+import { formatNumber, t } from '../../i18n';
 import { ref } from 'vue';
 
 const e = useEditor();

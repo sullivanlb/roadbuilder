@@ -1,10 +1,10 @@
 <script setup lang="ts">
-import { useEditor } from '../composables/useEditor';
+import { useEditor } from '../../composables/useEditor';
 import { computed, ref } from 'vue';
-import { useCanvas } from '../composables/useCanvas';
+import { useCanvas } from '../../composables/useCanvas';
 import TrackTelemetry from './TrackTelemetry.vue';
 import ElevationProfile from './ElevationProfile.vue';
-import { formatTrackIssue, t } from '../i18n';
+import { formatTrackIssue, t } from '../../i18n';
 
 const e = useEditor();
 const issueTitle = computed(() =>

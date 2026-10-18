@@ -1,8 +1,8 @@
 <script setup lang="ts">
 import { computed } from 'vue';
-import { useEditor } from '../composables/useEditor';
-import { useModalDialog } from '../composables/useModalDialog';
-import { formatNumber, formatTrackIssue, t } from '../i18n';
+import { useEditor } from '../../composables/useEditor';
+import { useModalDialog } from '../../composables/useModalDialog';
+import { formatNumber, formatTrackIssue, t } from '../../i18n';
 
 const props = defineProps<{ open: boolean }>();
 const e = useEditor();
