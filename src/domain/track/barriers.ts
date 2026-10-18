@@ -1,4 +1,4 @@
-import type { Barrier, BarrierSide, BarrierType, Mesh, Point, Project, Sample } from '../types';
+import type { Barrier, BarrierSide, Mesh, Point, Project, Sample } from '../types';
 import { BARRIER_MATERIALS, newMesh, addQuad } from './mesh';
 
 /**
@@ -14,12 +14,6 @@ const BARRIER_SIZES = {
   wall: { collider: 1.1, thickness: 0.25, capWidth: 0.25 },
 } as const;
 const DEFAULT_BARRIER_OFFSET = 1;
-const BARRIER_TYPE_LABELS: Record<BarrierType, string> = {
-  guardrail: 'Glissière',
-  tires: 'Pneus',
-  tecpro: 'TecPro',
-  wall: 'Mur béton',
-};
 /** Position, local frame and curvature of a ribbon point. */
 type Frame = Pick<Sample, 'x' | 'y' | 'z' | 'nx' | 'nz' | 's' | 'curvature'>;
 const frame = (sample: Sample): Frame => ({
@@ -427,4 +421,4 @@ export function splitWrappingBarriers(barriers: Barrier[], count: number): Barri
   });
 }
 
-export { BARRIER_SIZES, BARRIER_TYPE_LABELS, DEFAULT_BARRIER_OFFSET, buildBarrierMeshes };
+export { BARRIER_SIZES, DEFAULT_BARRIER_OFFSET, buildBarrierMeshes };

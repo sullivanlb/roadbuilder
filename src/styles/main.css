@@ -198,6 +198,23 @@ input {
   background: var(--line);
   margin: 0 8px;
 }
+.locale-switch {
+  display: flex;
+  gap: 2px;
+  padding: 2px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+}
+.locale-switch .button {
+  min-height: 30px;
+  padding: 4px 9px;
+  font-size: 11px;
+  letter-spacing: 0.04em;
+}
+.locale-switch .button[aria-pressed='true'] {
+  background: #2a3436;
+  color: var(--accent);
+}
 .workspace {
   display: grid;
   grid-template-columns: 288px minmax(0, 1fr);

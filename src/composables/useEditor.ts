@@ -1,14 +1,12 @@
 import { inject, onBeforeUnmount, onMounted, provide, reactive } from 'vue';
 import type { InjectionKey } from 'vue';
+import { initLocale, t } from '../i18n';
 import { createActions } from './editor/actions';
 import { createKeyboardHandler } from './editor/keyboard';
 import { createSession } from './editor/session';
 import { createEditorState } from './editor/state';
 
 export type { Dialog, NumericField } from './editor/state';
-
-export const formatNumber = (value: number, digits = 0) =>
-  value.toLocaleString('fr-FR', { minimumFractionDigits: digits, maximumFractionDigits: digits });
 
 export function createEditor() {
   const state = createEditorState();
@@ -29,12 +27,13 @@ export function createEditor() {
     }
   }
   onMounted(() => {
+    initLocale();
     document.addEventListener('keydown', onKeydown);
     window.addEventListener('blur', onBlur);
     window.addEventListener('pagehide', onBlur);
     window.addEventListener('beforeunload', onBeforeUnload);
     session.saveLocal();
-    if (state.restoredMessage) session.toast(state.restoredMessage, true);
+    if (state.restoredNotice) session.toast(t('toast.storageUnreadable'), true);
   });
   onBeforeUnmount(() => {
     session.markDisposed();
@@ -113,6 +112,6 @@ export function provideEditor() {
 }
 export function useEditor() {
   const editor = inject(editorKey);
-  if (!editor) throw new Error('Éditeur non initialisé.');
+  if (!editor) throw new Error('Editor was not provided.');
   return editor;
 }

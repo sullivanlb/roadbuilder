@@ -185,13 +185,14 @@ describe('local persistence', () => {
     const storage = memory(JSON.stringify(createProject('kart')));
     const restored = restoreProject(storage);
     expect(restored.project.name).toBe('Karting des Pins');
+    expect(restored.notice).toBe(null);
     expect(persistProject(storage, createProject(), false)).toBe('saved');
     expect(restoreProject(storage).project.name).toBe('Circuit des Collines');
   });
   it('preserves corrupted content before any new save', () => {
     const storage = memory('{invalid');
     const restored = restoreProject(storage);
-    expect(restored.message).not.toBe('');
+    expect(restored.notice).toBe('storage-unreadable');
     expect(
       [...storage.values.keys()].some((key) => key.startsWith(`${STORAGE_KEY}.recovery.`)),
     ).toBe(true);
@@ -207,6 +208,7 @@ describe('local persistence', () => {
     };
     const restored = restoreProject(storage);
     expect(restored.recoveryPending).toBe(true);
+    expect(restored.notice).toBe('storage-unreadable');
     expect(persistProject(storage, restored.project, true)).toBe('recovery');
     expect(persistProject(null, restored.project, false)).toBe('unavailable');
   });

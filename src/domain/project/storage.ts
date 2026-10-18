@@ -5,18 +5,20 @@ import type { Project } from '../types';
 export const STORAGE_KEY = 'roadbuilder.project.v1';
 export type ProjectStorage = Pick<Storage, 'getItem' | 'setItem'>;
 
+/** Why the last save could not be read back; the interface localises it. */
+export type RestoreNotice = 'storage-unreadable';
+
 export function restoreProject(storage: ProjectStorage | null) {
   let project = createProject();
   let raw: string | null = null;
   let recoveryPending = false;
-  let message = '';
+  let notice: RestoreNotice | null = null;
   try {
-    if (!storage) throw new Error('Stockage indisponible');
+    if (!storage) throw new Error('Storage unavailable');
     raw = storage.getItem(STORAGE_KEY);
     if (raw !== null) project = validateProject(JSON.parse(raw));
   } catch {
-    message =
-      'La sauvegarde locale n’a pas pu être relue. Le circuit de démonstration est ouvert ; votre fichier projet reste importable.';
+    notice = 'storage-unreadable';
     if (raw !== null) {
       try {
         storage!.setItem(`${STORAGE_KEY}.recovery.${Date.now()}`, raw);
@@ -25,7 +27,7 @@ export function restoreProject(storage: ProjectStorage | null) {
       }
     }
   }
-  return { project, recoveryPending, message };
+  return { project, recoveryPending, notice };
 }
 
 export function persistProject(
@@ -35,7 +37,7 @@ export function persistProject(
 ) {
   if (recoveryPending) return 'recovery' as const;
   try {
-    if (!storage) throw new Error('Stockage indisponible');
+    if (!storage) throw new Error('Storage unavailable');
     storage.setItem(STORAGE_KEY, JSON.stringify(project));
     return 'saved' as const;
   } catch {

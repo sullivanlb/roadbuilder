@@ -57,7 +57,7 @@ export function createEditorState() {
   return {
     storage,
     recoveryPending: restored.recoveryPending,
-    restoredMessage: restored.message,
+    restoredNotice: restored.notice,
     project,
     selected,
     tool,

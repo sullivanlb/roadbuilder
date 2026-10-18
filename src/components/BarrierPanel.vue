@@ -1,23 +1,19 @@
 <script setup lang="ts">
-import { useEditor, formatNumber } from '../composables/useEditor';
+import { useEditor } from '../composables/useEditor';
+import { formatNumber, t } from '../i18n';
 import { computed } from 'vue';
 import NumericInput from './NumericInput.vue';
-import { BARRIER_TYPE_LABELS } from '../domain/track/barriers';
 import type { Barrier, BarrierType } from '../domain/types';
 
 const e = useEditor();
-const typeNotes: Record<BarrierType, string> = {
-  guardrail: 'Rail métallique de 0,78 m : le compromis idéal le long des enchaînements.',
-  tires: 'Trois rangées de pneus de 0,85 m : les chocs sont absorbés et les erreurs pardonnées.',
-  tecpro: 'Blocs rouges et blancs de 0,85 m, parfaits pour protéger une sortie de virage.',
-  wall: 'Mur de béton de 1,1 m : la limite la plus franche, à réserver aux zones à risque.',
-};
 const swatches: Record<BarrierType, string> = {
   guardrail: '#c8d3d7',
   tires: '#98a2a9',
   tecpro: '#d0664a',
   wall: '#e7e6da',
 };
+const typeLabel = (type: BarrierType) => t(`barriers.${type}`);
+const typeNoteOf = (type: BarrierType) => t(`barriers.${type}Note`);
 // The project is a shallowRef refreshed through triggerRef: return a fresh array so
 // the template re-renders after every edit, even when the stored array itself is unchanged.
 const barriers = computed(() => [...(e.project.barriers ?? [])]);
@@ -25,71 +21,73 @@ const selectedBarrier = computed(() => barriers.value[e.selectedBarrier] ?? null
 const activeType = computed(() => selectedBarrier.value?.type ?? e.barrierType);
 const typeNote = computed(
   () =>
-    (selectedBarrier.value ? 'Le tronçon sélectionné : ' : 'Prochain tronçon : ') +
-    typeNotes[activeType.value],
+    (selectedBarrier.value ? t('barriers.selectedNote') : t('barriers.nextNote')) +
+    typeNoteOf(activeType.value),
 );
 const barrierSummary = computed(() => {
   const counts = new Map<BarrierType, number>();
   for (const barrier of barriers.value)
     counts.set(barrier.type, (counts.get(barrier.type) ?? 0) + 1);
-  return [...counts].map(([type, count]) => `${count} × ${BARRIER_TYPE_LABELS[type]}`).join(' · ');
+  return [...counts].map(([type, count]) => `${count} × ${typeLabel(type)}`).join(' · ');
 });
 const barrierStatus = computed(() => {
   const draft = e.barrierDraft;
   if (draft)
-    return `Départ au point ${String(draft.from + 1).padStart(2, '0')} (côté ${
-      draft.side === 'right' ? 'droit' : 'gauche'
-    }) — cliquez le point d’arrivée.`;
-  if (e.tool === 'barrier') return 'Cliquez le point de départ sur la piste. Échap annule.';
-  if (selectedBarrier.value)
-    return 'Tronçon sélectionné : réglez son écartement, changez de côté ou supprimez-le.';
-  return barriers.value.length
-    ? 'Cliquez un tronçon sur le plan pour le modifier.'
-    : 'Glissière, pneus, TecPro ou mur : deux clics sur le plan et la piste se sécurise.';
+    return t('barriers.statusDraft', {
+      point: String(draft.from + 1).padStart(2, '0'),
+      side: draft.side === 'right' ? t('barriers.sideRightShort') : t('barriers.sideLeftShort'),
+    });
+  if (e.tool === 'barrier') return t('barriers.statusTool');
+  if (selectedBarrier.value) return t('barriers.statusSelected');
+  return barriers.value.length ? t('barriers.statusChoose') : t('barriers.statusEmpty');
 });
 const rowLabel = (barrier: Barrier, index: number) =>
-  `${String(index + 1).padStart(2, '0')} · ${BARRIER_TYPE_LABELS[barrier.type]} · ${
-    barrier.side === 'right' ? 'droite' : 'gauche'
-  } · pts ${barrier.from + 1}→${barrier.to + 1}`;
+  t('barriers.row', {
+    index: String(index + 1).padStart(2, '0'),
+    type: typeLabel(barrier.type),
+    side: barrier.side === 'right' ? t('barriers.sideRight') : t('barriers.sideLeft'),
+    from: barrier.from + 1,
+    to: barrier.to + 1,
+  });
 </script>
 <template>
   <section class="panel-section barrier-section">
     <h2>
-      <span class="section-index">04</span> Les barrières
-      <span v-if="barriers.length" id="barrier-count" class="point-badge"
-        >{{ String(barriers.length).padStart(2, '0') }} TRONÇON{{
-          barriers.length > 1 ? 'S' : ''
-        }}</span
-      >
+      <span class="section-index">04</span> {{ t('barriers.title') }}
+      <span v-if="barriers.length" id="barrier-count" class="point-badge">{{
+        barriers.length > 1
+          ? t('barriers.countMany', { count: String(barriers.length).padStart(2, '0') })
+          : t('barriers.countOne', { count: String(barriers.length).padStart(2, '0') })
+      }}</span>
     </h2>
-    <div class="segmented" aria-label="Type de barrière">
+    <div class="segmented" :aria-label="t('barriers.typeAria')">
       <button
         id="barrier-type-guardrail"
         :aria-pressed="activeType === 'guardrail'"
         @click="e.setBarrierType('guardrail')"
       >
-        Glissière
+        {{ t('barriers.guardrail') }}
       </button>
       <button
         id="barrier-type-tires"
         :aria-pressed="activeType === 'tires'"
         @click="e.setBarrierType('tires')"
       >
-        Pneus
+        {{ t('barriers.tires') }}
       </button>
       <button
         id="barrier-type-tecpro"
         :aria-pressed="activeType === 'tecpro'"
         @click="e.setBarrierType('tecpro')"
       >
-        TecPro
+        {{ t('barriers.tecpro') }}
       </button>
       <button
         id="barrier-type-wall"
         :aria-pressed="activeType === 'wall'"
         @click="e.setBarrierType('wall')"
       >
-        Mur béton
+        {{ t('barriers.wall') }}
       </button>
     </div>
     <p id="barrier-type-note" class="field-note">{{ typeNote }}</p>
@@ -99,7 +97,7 @@ const rowLabel = (barrier: Barrier, index: number) =>
       :class="{ active: e.tool === 'barrier' }"
       @click="e.setTool('barrier')"
     >
-      <svg class="icon"><use href="#i-wall" /></svg>Tracer sur le plan <kbd>B</kbd>
+      <svg class="icon"><use href="#i-wall" /></svg>{{ t('barriers.draw') }} <kbd>B</kbd>
     </button>
     <p id="barrier-status" class="field-note">{{ barrierStatus }}</p>
     <div v-if="barriers.length" id="barrier-frame" class="barrier-frame">
@@ -118,7 +116,7 @@ const rowLabel = (barrier: Barrier, index: number) =>
     </div>
     <div v-if="selectedBarrier" id="barrier-editor" class="barrier-editor">
       <label class="range-label" for="barrier-offset"
-        >Écartement du collider
+        >{{ t('barriers.offset') }}
         <output id="barrier-offset-value"
           >{{ formatNumber(selectedBarrier.offset, 1) }} m</output
         ></label
@@ -132,17 +130,20 @@ const rowLabel = (barrier: Barrier, index: number) =>
         field="barrierOffset"
         :value="selectedBarrier.offset"
       />
-      <div class="range-ticks"><span>0 m · bord</span><span>10 m</span></div>
+      <div class="range-ticks">
+        <span>{{ t('barriers.offsetMin') }}</span
+        ><span>10 m</span>
+      </div>
       <div class="barrier-actions">
         <button id="barrier-swap" class="button quiet small" @click="e.swapBarrierSide()">
-          <svg class="icon"><use href="#i-move" /></svg>Changer de côté
+          <svg class="icon"><use href="#i-move" /></svg>{{ t('barriers.swap') }}
         </button>
         <button
           id="barrier-delete"
           class="button quiet small delete-point"
           @click="e.deleteBarrier()"
         >
-          <svg class="icon"><use href="#i-trash" /></svg>Supprimer
+          <svg class="icon"><use href="#i-trash" /></svg>{{ t('barriers.delete') }}
         </button>
       </div>
     </div>
@@ -150,7 +151,7 @@ const rowLabel = (barrier: Barrier, index: number) =>
       {{ barrierSummary }}
     </p>
     <p v-else id="barrier-empty" class="field-note">
-      Aucune barrière pour l’instant. Le tracé se sécurise en deux clics : départ puis arrivée.
+      {{ t('barriers.empty') }}
     </p>
   </section>
 </template>

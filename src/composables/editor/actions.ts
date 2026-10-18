@@ -5,7 +5,7 @@ import { LIMITS } from '../../domain/project/limits';
 import { createProject, slugify } from '../../domain/project/factory';
 import { validateProject } from '../../domain/project/validation';
 import { ExportError, ProjectError } from '../../domain/diagnostics';
-import { formatExportError, formatProjectError } from '../../i18n';
+import { formatExportError, formatProjectError, t } from '../../i18n';
 import {
   DEFAULT_BARRIER_OFFSET,
   insertBarrierPoint,
@@ -35,6 +35,7 @@ export function createActions(state: EditorState, session: EditorSession) {
       state.issues.value.tightTurns,
       state.selectedBarrier.value,
       state.barrierDraft.value,
+      { start: t('canvas.start'), finish: t('canvas.finish') },
     );
   }
   function setTool(next: Tool) {
@@ -86,7 +87,7 @@ export function createActions(state: EditorState, session: EditorSession) {
   }
   function setName(value: string) {
     session.beginEdit();
-    state.project.value.name = value.trim().slice(0, 80) || 'Mon tracé';
+    state.project.value.name = value.trim().slice(0, 80) || t('project.defaultName');
     state.refresh();
     session.queueSave();
   }
@@ -122,11 +123,11 @@ export function createActions(state: EditorState, session: EditorSession) {
     const draft = state.barrierDraft.value;
     if (!draft) return;
     if (to === draft.from) {
-      session.toast('Choisissez un point d’arrivée différent du point de départ.', true);
+      session.toast(t('toast.barrierSamePoint'), true);
       return;
     }
     if (state.barriers.value.length >= LIMITS.barriers) {
-      session.toast(`Maximum ${LIMITS.barriers} tronçons de barrière.`, true);
+      session.toast(t('toast.barriersLimit', { max: LIMITS.barriers }), true);
       return;
     }
     let from = draft.from;
@@ -137,7 +138,7 @@ export function createActions(state: EditorState, session: EditorSession) {
       state.selectedBarrier.value = list.length - 1;
     });
     state.barrierDraft.value = null;
-    session.toast('Barrière ajoutée. Échap pour terminer le tracé.');
+    session.toast(t('toast.barrierAdded'));
   }
   function swapBarrierSide() {
     const barrier = state.barriers.value[state.selectedBarrier.value];
@@ -189,7 +190,7 @@ export function createActions(state: EditorState, session: EditorSession) {
   }
   function addPoint(p: Pick<Point, 'x' | 'z'> & { y?: number }, after = state.selected.value) {
     if (state.project.value.points.length >= LIMITS.points) {
-      session.toast(`Maximum ${LIMITS.points} points par tracé.`, true);
+      session.toast(t('toast.pointsLimit', { max: LIMITS.points }), true);
       return;
     }
     const next = {
@@ -198,7 +199,7 @@ export function createActions(state: EditorState, session: EditorSession) {
       z: clamp(p.z, -LIMITS.coordinate, LIMITS.coordinate),
     };
     if (state.project.value.points.some((p) => Math.hypot(p.x - next.x, p.z - next.z) < 2)) {
-      session.toast('Placez ce point à au moins 2 mètres des autres.', true);
+      session.toast(t('toast.pointTooClose'), true);
       return;
     }
     session.change(() => {
@@ -218,15 +219,17 @@ export function createActions(state: EditorState, session: EditorSession) {
       'application/json',
     );
     session.saveLocal();
-    session.toast('Projet téléchargé. Gardez ce fichier pour reprendre votre travail.');
+    session.toast(t('toast.projectDownloaded'));
   }
   async function importProject(file: File) {
     session.finishGesture();
     session.flushEdit();
     const edit = session.bumpGeneration();
+    if (file.size > 1024 * 1024) {
+      session.toast(t('toast.importTooLarge'), true);
+      return;
+    }
     try {
-      if (file.size > 1024 * 1024)
-        throw new Error('Ce fichier dépasse 1 Mo. Choisissez un projet Roadbuilder JSON.');
       const loaded = validateProject(JSON.parse(await file.text()));
       if (session.isStale(edit)) return;
       session.change(() => {
@@ -238,14 +241,14 @@ export function createActions(state: EditorState, session: EditorSession) {
       syncRenderer();
       renderer?.fit();
       setTool(loaded.points.length ? 'select' : 'add');
-      session.toast(`« ${loaded.name} » est ouvert.`);
+      session.toast(t('toast.projectOpened', { name: loaded.name }));
     } catch (error) {
       if (session.isStale(edit)) return;
       session.toast(
         error instanceof ProjectError
           ? formatProjectError(error.detail)
           : error instanceof SyntaxError
-            ? 'Le fichier n’est pas un JSON valide. Votre projet actuel est conservé.'
+            ? t('toast.importInvalidJson')
             : errorMessage(error),
         true,
       );
@@ -264,7 +267,7 @@ export function createActions(state: EditorState, session: EditorSession) {
     setView('2d');
     renderer?.fit();
     setTool(state.project.value.points.length ? 'select' : 'add');
-    session.toast('Nouveau tracé. Ctrl+Z permet de retrouver le précédent.');
+    session.toast(t('toast.newProject'));
   }
   function openDialog(next: Dialog) {
     session.finishGesture();
@@ -288,14 +291,14 @@ export function createActions(state: EditorState, session: EditorSession) {
       state.dialog.value = null;
       session.toast(
         state.exportFormat.value === 'ac'
-          ? 'Archive téléchargée. Le guide d’installation est dans le ZIP.'
-          : 'Sources 3D téléchargées : OBJ, matériaux et textures.',
+          ? t('toast.archiveDownloaded')
+          : t('toast.sourcesDownloaded'),
       );
     } catch (error) {
       session.toast(
-        `Export impossible : ${
-          error instanceof ExportError ? formatExportError(error) : errorMessage(error)
-        }`,
+        t('toast.exportFailed', {
+          reason: error instanceof ExportError ? formatExportError(error) : errorMessage(error),
+        }),
         true,
       );
     } finally {

@@ -1,8 +1,8 @@
 <script setup lang="ts">
 import { computed } from 'vue';
-import { useEditor, formatNumber } from '../composables/useEditor';
+import { useEditor } from '../composables/useEditor';
 import { useModalDialog } from '../composables/useModalDialog';
-import { formatTrackIssue } from '../i18n';
+import { formatNumber, formatTrackIssue, t } from '../i18n';
 
 const props = defineProps<{ open: boolean }>();
 const e = useEditor();
@@ -12,6 +12,12 @@ const errors = computed(() =>
     text: formatTrackIssue(issue),
     segment: e.issues.tightTurns.find((turn) => turn.issue === issue)?.segment,
   })),
+);
+const summary = computed(() =>
+  t('export.summary', {
+    length: formatNumber(e.stats.length / 1000, 2),
+    mode: e.project.closed ? t('sidebar.closed') : t('sidebar.open'),
+  }),
 );
 </script>
 <template>
@@ -23,37 +29,39 @@ const errors = computed(() =>
   >
     <div class="dialog-heading">
       <div>
-        <span class="eyebrow">PROCHAINE ÉTAPE : LE VOLANT</span>
-        <h2 id="export-title">Emportez votre tracé.</h2>
+        <span class="eyebrow">{{ t('export.eyebrow') }}</span>
+        <h2 id="export-title">{{ t('export.title') }}</h2>
       </div>
       <button
         class="tool"
         data-close="export-dialog"
-        aria-label="Fermer"
+        :aria-label="t('dialog.close')"
         @click="e.openDialog(null)"
       >
         <svg class="icon"><use href="#i-close" /></svg>
       </button>
     </div>
-    <label class="field-label" for="export-author">Créateur <span>facultatif</span></label
+    <label class="field-label" for="export-author"
+      >{{ t('export.author') }} <span>{{ t('export.authorOptional') }}</span></label
     ><input
       id="export-author"
       v-model="e.exportAuthor"
       class="text-input"
       maxlength="80"
-      placeholder="Votre nom ou pseudo"
+      :placeholder="t('export.authorPlaceholder')"
     />
     <fieldset class="export-formats">
-      <legend>Format de l’export</legend>
+      <legend>{{ t('export.formatLegend') }}</legend>
       <label
         ><input v-model="e.exportFormat" type="radio" name="export-format" value="ac" /><span
-          ><strong>Assetto Corsa <small>EXPÉRIMENTAL</small></strong
-          ><span>Archive ZIP : modèle KN5, textures, surfaces, départ et stand.</span></span
+          ><strong
+            >{{ t('export.ac') }} <small>{{ t('export.acTag') }}</small></strong
+          ><span>{{ t('export.acNote') }}</span></span
         ></label
       ><label
         ><input v-model="e.exportFormat" type="radio" name="export-format" value="obj" /><span
-          ><strong>Modèle 3D · OBJ</strong
-          ><span>Géométrie et textures pour poursuivre le travail dans Blender.</span></span
+          ><strong>{{ t('export.obj') }}</strong
+          ><span>{{ t('export.objNote') }}</span></span
         ></label
       >
     </fieldset>
@@ -66,7 +74,7 @@ const errors = computed(() =>
           :data-tight-turn="error.segment"
           @click="e.focusTightTurn(error.segment)"
         >
-          Voir le virage
+          {{ t('editor.locateTurn') }}
         </button>
       </p>
       <p v-for="(warning, index) in e.issues.warnings" :key="index" class="warning">
@@ -76,29 +84,23 @@ const errors = computed(() =>
     <div class="export-notice">
       <svg class="icon"><use href="#i-help" /></svg>
       <p v-if="e.project.barriers?.length">
-        <strong>Pour essais libres en solo.</strong>Terrain complet inclus, avec une limite
-        extérieure visible dans l’éditeur. Un stand, sans trajectoire IA ; les barrières tracées
-        sont incluses avec collision. Le KN5 et le chronométrage doivent être vérifiés dans Assetto
-        Corsa ; les routes ouvertes sont prévues pour le roulage libre.
+        <strong>{{ t('export.noticeLead') }}</strong
+        >{{ t('export.noticeWithBarriers') }}
       </p>
       <p v-else>
-        <strong>Pour essais libres en solo.</strong>Terrain complet inclus, avec une limite
-        extérieure visible dans l’éditeur. Un stand, sans trajectoire IA ni barrières. Le KN5 et le
-        chronométrage doivent être vérifiés dans Assetto Corsa ; les routes ouvertes sont prévues
-        pour le roulage libre.
+        <strong>{{ t('export.noticeLead') }}</strong
+        >{{ t('export.noticeNoBarriers') }}
       </p>
     </div>
     <div class="export-install">
       <span>01</span>
       <p>
-        Décompressez le ZIP, puis copiez son dossier de circuit dans
-        <code>assettocorsa/content/tracks/</code>. Le guide est inclus.
+        {{ t('export.installBefore') }} <code>assettocorsa/content/tracks/</code
+        >{{ t('export.installAfter') }}
       </p>
     </div>
     <div class="dialog-footer">
-      <span id="export-summary"
-        >{{ formatNumber(e.stats.length / 1000, 2) }} km ·
-        {{ e.project.closed ? 'Circuit fermé' : 'Route ouverte' }} · 1 voiture</span
+      <span id="export-summary">{{ summary }}</span
       ><button
         id="download-export"
         :disabled="e.exporting || e.issues.errors.length > 0"
@@ -106,7 +108,7 @@ const errors = computed(() =>
         @click="e.exportProject"
       >
         <svg class="icon"><use href="#i-export" /></svg
-        >{{ e.exporting ? 'Création du circuit…' : 'Télécharger le ZIP' }}
+        >{{ e.exporting ? t('export.building') : t('export.download') }}
       </button>
     </div>
   </dialog>

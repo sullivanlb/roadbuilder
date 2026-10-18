@@ -13,6 +13,7 @@ import { clamp } from '../domain/math';
 import { createProject } from '../domain/project/factory';
 import { bounds } from '../domain/track/geometry';
 import { terrainBounds } from '../domain/track/terrain';
+import type { CanvasLabels } from './view';
 import { draw2d } from './draw2d';
 import { draw3d } from './draw3d';
 import { drawGrid } from './grid';
@@ -46,6 +47,7 @@ class TrackRenderer implements View {
   selectedBarrier = -1;
   barrierDraft: BarrierDraft | null = null;
   barrierHover: BarrierHover | null = null;
+  labels: CanvasLabels = { start: 'START', finish: 'FINISH' };
   dispose() {
     this.observer.disconnect();
     if (this.frame !== null) cancelAnimationFrame(this.frame);
@@ -96,6 +98,7 @@ class TrackRenderer implements View {
     tightTurns: TightTurn[] = [],
     selectedBarrier = -1,
     barrierDraft: BarrierDraft | null = null,
+    labels: CanvasLabels = this.labels,
   ) {
     this.project = project;
     this.samples = samples;
@@ -103,6 +106,7 @@ class TrackRenderer implements View {
     this.tightTurns = tightTurns;
     this.selectedBarrier = selectedBarrier;
     this.barrierDraft = barrierDraft;
+    this.labels = labels;
     this.scene = null;
     if (!this.fitted) this.fit();
     this.requestDraw();

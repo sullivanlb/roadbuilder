@@ -215,9 +215,9 @@ export function drawStart(view: View) {
   ctx.font = '8px "Segoe UI", sans-serif';
   ctx.textAlign = 'left';
   ctx.fillStyle = '#b3c69b';
-  ctx.fillText('DÉPART', p.x + 13, p.y + half + 24);
+  ctx.fillText(view.labels.start, p.x + 13, p.y + half + 24);
   if (!view.project.closed) {
     const end = view.screen(view.samples.at(-1)!);
-    ctx.fillText('ARRIVÉE', end.x + 13, end.y + 21);
+    ctx.fillText(view.labels.finish, end.x + 13, end.y + 21);
   }
 }

@@ -52,5 +52,5 @@ export function draw3d(view: View) {
   ctx.lineTo(start.x, start.y - 8);
   ctx.stroke();
   ctx.font = '8px "Segoe UI", sans-serif';
-  ctx.fillText('DÉPART', start.x + 8, start.y - 9);
+  ctx.fillText(view.labels.start, start.x + 8, start.y - 9);
 }

@@ -33,6 +33,12 @@ export interface BarrierHover {
   side: BarrierSide;
 }
 
+/** Start/finish wording drawn on the plan and the preview. */
+export interface CanvasLabels {
+  start: string;
+  finish: string;
+}
+
 /**
  * Everything the drawing passes and the hit tests need from the renderer.
  * TrackRenderer implements it; the passes only read this surface.
@@ -49,6 +55,7 @@ export interface View {
   project: Project;
   samples: Sample[];
   scene: Scene | null;
+  labels: CanvasLabels;
   camera: Camera;
   selected: number;
   hover: number;

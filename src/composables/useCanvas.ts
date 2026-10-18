@@ -4,7 +4,8 @@ import { clamp } from '../domain/math';
 import { LIMITS } from '../domain/project/limits';
 import type { Point } from '../domain/types';
 import { TrackRenderer } from '../rendering/TrackRenderer';
-import { formatNumber, useEditor } from './useEditor';
+import { formatNumber, locale, t } from '../i18n';
+import { useEditor } from './useEditor';
 
 type Drag =
   | { type: 'pan'; x: number; y: number; cameraX: number; cameraZ: number }
@@ -37,16 +38,16 @@ export function useCanvas(
   );
   const hint = computed(() =>
     e.view === '3d'
-      ? 'Glissez pour tourner · Molette pour zoomer · Retour au plan 2D pour modifier'
+      ? t('canvas.hint3d')
       : e.tool === 'barrier'
         ? e.barrierDraft
-          ? 'Cliquez le point d’arrivée du tronçon · Échap annule le tracé'
-          : 'Cliquez le point de départ du tronçon · Échap quitte l’outil'
+          ? t('canvas.hintBarrierDraft')
+          : t('canvas.hintBarrier')
         : e.tool === 'add'
-          ? 'Cliquez pour ajouter après le point sélectionné · Échap pour terminer'
+          ? t('canvas.hintAdd')
           : e.tool === 'pan'
-            ? 'Glissez pour déplacer le plan · Molette pour zoomer'
-            : 'Glissez un point · Molette pour zoomer · Espace + glisser pour naviguer',
+            ? t('canvas.hintPan')
+            : t('canvas.hintSelect'),
   );
   function position(event: MouseEvent) {
     const rect = canvas.value!.getBoundingClientRect();
@@ -199,11 +200,13 @@ export function useCanvas(
     endDrag();
   }
   watchEffect(() => {
-    // Touch every reactive input so any editor change re-syncs the renderer.
+    // Touch every reactive input so any editor change re-syncs the renderer,
+    // including the language of the canvas labels.
     void e.project;
     void e.selected;
     void e.selectedBarrier;
     void e.barrierDraft;
+    void locale.value;
     e.syncRenderer();
   });
   onMounted(() => {

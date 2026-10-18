@@ -4,7 +4,7 @@ import { computed, ref } from 'vue';
 import { useCanvas } from '../composables/useCanvas';
 import TrackTelemetry from './TrackTelemetry.vue';
 import ElevationProfile from './ElevationProfile.vue';
-import { formatTrackIssue } from '../i18n';
+import { formatTrackIssue, t } from '../i18n';
 
 const e = useEditor();
 const issueTitle = computed(() =>
@@ -31,17 +31,17 @@ const {
 } = useCanvas(canvas, () => profile.value?.canvas ?? null);
 </script>
 <template>
-  <section class="editor" aria-label="Éditeur du tracé">
+  <section class="editor" :aria-label="t('editor.aria')">
     <div class="editor-heading">
       <div>
-        <span class="eyebrow">ATELIER DE CRÉATION</span>
-        <h1>De l’idée à la piste<span>.</span></h1>
+        <span class="eyebrow">{{ t('editor.eyebrow') }}</span>
+        <h1>{{ t('editor.title') }}<span>.</span></h1>
       </div>
-      <div class="view-tabs" aria-label="Vue de l’éditeur">
+      <div class="view-tabs" :aria-label="t('editor.viewAria')">
         <button id="view-2d" :aria-pressed="e.view === '2d'" @click="e.setView('2d')">
-          <svg class="icon"><use href="#i-map" /></svg>Plan 2D</button
+          <svg class="icon"><use href="#i-map" /></svg>{{ t('editor.view2d') }}</button
         ><button id="view-3d" :aria-pressed="e.view === '3d'" @click="e.setView('3d')">
-          <svg class="icon"><use href="#i-cube" /></svg>Aperçu 3D
+          <svg class="icon"><use href="#i-cube" /></svg>{{ t('editor.view3d') }}
         </button>
       </div>
     </div>
@@ -51,7 +51,7 @@ const {
         ref="canvas"
         :style="{ cursor }"
         tabindex="0"
-        aria-label="Éditeur de circuit : sélectionnez et déplacez les points à la souris. Le panneau de gauche permet aussi de modifier leurs coordonnées."
+        :aria-label="t('editor.canvasAria')"
         @pointerdown="pointerDown"
         @pointermove="pointerMove"
         @pointerup="endDrag"
@@ -60,13 +60,13 @@ const {
         @dblclick="doubleClick"
         @wheel.prevent="wheel"
       ></canvas>
-      <div class="tool-palette" role="toolbar" aria-label="Outils de dessin">
+      <div class="tool-palette" role="toolbar" :aria-label="t('editor.toolsAria')">
         <button
           id="tool-select"
           class="tool"
           :class="{ active: e.tool === 'select' }"
-          title="Sélectionner et déplacer un point (V)"
-          aria-label="Sélectionner (V)"
+          :title="t('editor.selectTitle')"
+          :aria-label="t('editor.selectAria')"
           :aria-pressed="e.tool === 'select'"
           @click="e.setTool('select')"
         >
@@ -76,8 +76,8 @@ const {
           id="tool-add"
           class="tool"
           :class="{ active: e.tool === 'add' }"
-          title="Ajouter des points (A)"
-          aria-label="Ajouter des points (A)"
+          :title="t('editor.addTitle')"
+          :aria-label="t('editor.addTitle')"
           :aria-pressed="e.tool === 'add'"
           @click="e.setTool('add')"
         >
@@ -87,8 +87,8 @@ const {
           id="tool-barrier"
           class="tool"
           :class="{ active: e.tool === 'barrier' }"
-          title="Tracer une barrière (B)"
-          aria-label="Tracer une barrière (B)"
+          :title="t('editor.barrierTitle')"
+          :aria-label="t('editor.barrierTitle')"
           :aria-pressed="e.tool === 'barrier'"
           @click="e.setTool('barrier')"
         >
@@ -98,8 +98,8 @@ const {
           id="tool-pan"
           class="tool"
           :class="{ active: e.tool === 'pan' }"
-          title="Déplacer la vue (H)"
-          aria-label="Déplacer la vue (H)"
+          :title="t('editor.panTitle')"
+          :aria-label="t('editor.panTitle')"
           :aria-pressed="e.tool === 'pan'"
           @click="e.setTool('pan')"
         >
@@ -109,8 +109,8 @@ const {
         <button
           id="undo"
           class="tool"
-          title="Annuler (Ctrl+Z)"
-          aria-label="Annuler"
+          :title="t('editor.undoTitle')"
+          :aria-label="t('help.shortcutUndo')"
           :disabled="!e.history.canUndo"
           @click="e.undo()"
         >
@@ -119,8 +119,8 @@ const {
         <button
           id="redo"
           class="tool"
-          title="Rétablir (Ctrl+Maj+Z)"
-          aria-label="Rétablir"
+          :title="t('editor.redoTitle')"
+          :aria-label="t('help.shortcutRedo')"
           :disabled="!e.history.canRedo"
           @click="e.undo(true)"
         >
@@ -129,32 +129,34 @@ const {
       </div>
       <div class="scene-badge">
         <span class="live-dot"></span
-        ><span id="scene-label">{{ e.view === '2d' ? 'VUE DE DESSUS' : 'APERÇU DU RELIEF' }}</span
-        ><span id="point-count">{{ String(e.project.points.length).padStart(2, '0') }} POINTS</span>
+        ><span id="scene-label">{{
+          e.view === '2d' ? t('editor.scene2d') : t('editor.scene3d')
+        }}</span
+        ><span id="point-count">{{
+          t('editor.pointCount', { count: String(e.project.points.length).padStart(2, '0') })
+        }}</span>
       </div>
       <div v-if="!e.project.points.length" id="empty-canvas" class="empty-canvas">
         <svg class="icon"><use href="#i-route" /></svg>
-        <h2>Votre terrain de jeu.</h2>
-        <p>
-          Cliquez pour poser votre premier point.<br />Le suivant dessinera le début de votre route.
-        </p>
+        <h2>{{ t('editor.emptyTitle') }}</h2>
+        <p>{{ t('editor.emptyLine1') }}<br />{{ t('editor.emptyLine2') }}</p>
       </div>
       <div id="canvas-hint" class="canvas-hint">{{ hint }}</div>
       <div v-show="e.view === '2d'" id="map-scale" class="scale">
         <span :style="{ width: `${scaleWidth}px` }"></span><output>{{ scaleLabel }}</output>
       </div>
-      <div class="zoom-controls" role="toolbar" aria-label="Zoom">
-        <button id="zoom-out" class="tool" aria-label="Dézoomer" @click="e.zoom(0.8)">
+      <div class="zoom-controls" role="toolbar" :aria-label="t('editor.zoomAria')">
+        <button id="zoom-out" class="tool" :aria-label="t('editor.zoomOut')" @click="e.zoom(0.8)">
           <svg class="icon"><use href="#i-minus" /></svg></button
         ><span id="zoom-level">{{ zoomLevel }} %</span
-        ><button id="zoom-in" class="tool" aria-label="Zoomer" @click="e.zoom(1.25)">
+        ><button id="zoom-in" class="tool" :aria-label="t('editor.zoomIn')" @click="e.zoom(1.25)">
           <svg class="icon"><use href="#i-plus" /></svg></button
         ><span class="tool-divider"></span
         ><button
           id="fit-view"
           class="tool"
-          title="Cadrer le tracé (F)"
-          aria-label="Cadrer le tracé"
+          :title="t('editor.fitTitle')"
+          :aria-label="t('editor.fitAria')"
           @click="e.fit()"
         >
           <svg class="icon"><use href="#i-fit" /></svg>
@@ -176,8 +178,7 @@ const {
         id="validation-status"
         :class="{ invalid: e.issues.errors.length > 0 }"
         :title="issueTitle"
-        ><span class="status-dot"></span
-        >{{ issueStatus || 'Géométrie prête · export en jeu expérimental' }}</span
+        ><span class="status-dot"></span>{{ issueStatus || t('editor.statusReady') }}</span
       >
       <button
         v-if="e.issues.tightTurns.length"
@@ -185,9 +186,11 @@ const {
         class="button secondary small"
         @click="e.focusTightTurn(e.issues.tightTurns[0].segment)"
       >
-        Voir le virage
+        {{ t('editor.locateTurn') }}
       </button>
-      <span>1 unité = 1 mètre<span class="footer-dot">·</span>Tout reste sur votre appareil</span>
+      <span
+        >{{ t('editor.unitHint') }}<span class="footer-dot">·</span>{{ t('editor.privacy') }}</span
+      >
     </footer>
   </section>
 </template>

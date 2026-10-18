@@ -1,17 +1,17 @@
 <script setup lang="ts">
 import { useEditor } from '../composables/useEditor';
 import NumericInput from './NumericInput.vue';
-import { formatTrackIssue } from '../i18n';
+import { formatTrackIssue, t } from '../i18n';
 
 const e = useEditor();
 </script>
 <template>
   <section class="panel-section point-section">
     <h2>
-      <span class="section-index">05</span> Le relief
-      <span v-if="e.point" id="point-badge" class="point-badge"
-        >POINT {{ String(e.selected + 1).padStart(2, '0') }}</span
-      >
+      <span class="section-index">05</span> {{ t('point.title') }}
+      <span v-if="e.point" id="point-badge" class="point-badge">{{
+        t('point.badge', { index: String(e.selected + 1).padStart(2, '0') })
+      }}</span>
     </h2>
     <div v-if="e.point" id="point-editor">
       <div v-if="e.selectedTightTurns.length" id="point-issues" class="point-issues" role="status">
@@ -20,7 +20,7 @@ const e = useEditor();
         </p>
       </div>
       <div class="range-label">
-        <label for="point-altitude">Altitude du point</label
+        <label for="point-altitude">{{ t('point.altitude') }}</label
         ><span class="unit-input"
           ><NumericInput
             id="point-altitude"
@@ -39,7 +39,7 @@ const e = useEditor();
         :min="-100"
         :max="1000"
         :step="0.5"
-        aria-label="Altitude du point sélectionné"
+        :aria-label="t('point.altitudeAria')"
         field="y"
         :value="e.point.y"
       />
@@ -71,7 +71,7 @@ const e = useEditor();
           id="point-previous"
           :disabled="e.selected <= 0"
           class="button quiet small"
-          aria-label="Point précédent"
+          :aria-label="t('point.previous')"
           @click="e.selectPoint(Math.max(0, e.selected - 1))"
         >
           ←</button
@@ -79,17 +79,17 @@ const e = useEditor();
           id="point-next"
           :disabled="e.selected >= e.project.points.length - 1"
           class="button quiet small"
-          aria-label="Point suivant"
+          :aria-label="t('point.next')"
           @click="e.selectPoint(Math.min(e.project.points.length - 1, e.selected + 1))"
         >
           →</button
         ><button id="delete-point" class="button quiet small delete-point" @click="e.deletePoint()">
-          <svg class="icon"><use href="#i-trash" /></svg>Supprimer
+          <svg class="icon"><use href="#i-trash" /></svg>{{ t('point.delete') }}
         </button>
       </div>
     </div>
     <p v-else id="point-empty" class="field-note">
-      Sélectionnez un point du tracé pour modifier sa position et son altitude.
+      {{ t('point.empty') }}
     </p>
   </section>
 </template>
