@@ -1,5 +1,5 @@
-import type { Point, PlanPoint, Project, Sample, Bounds, TightTurn, TrackIssues } from './types';
-import { distance, clamp } from './project';
+import type { Point, PlanPoint, Project, Sample, Bounds, TightTurn, TrackIssues } from '../types';
+import { clamp, distance } from '../math';
 // Centripetal Catmull–Rom: stable bends even with unevenly spaced control points.
 function interpolate(p0: Point, p1: Point, p2: Point, p3: Point, t: number) {
   const t0 = 0,

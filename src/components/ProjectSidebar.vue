@@ -2,7 +2,7 @@
 import { useEditor, number } from '../composables/useEditor';
 import { computed, ref, watch } from 'vue';
 import NumericInput from './NumericInput.vue';
-import { BARRIER_TYPE_LABELS } from '../domain/barriers';
+import { BARRIER_TYPE_LABELS } from '../domain/track/barriers';
 import type { Barrier, BarrierType } from '../domain/types';
 
 const e = useEditor();

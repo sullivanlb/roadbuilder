@@ -1,4 +1,4 @@
-import type { Barrier, BarrierSide, BarrierType, Mesh, Point, Project, Sample } from './types';
+import type { Barrier, BarrierSide, BarrierType, Mesh, Point, Project, Sample } from '../types';
 import { BARRIER_MATERIALS, newMesh, addQuad } from './mesh';
 
 /**

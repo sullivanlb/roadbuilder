@@ -1,5 +1,6 @@
-import type { Point, PlanPoint, Project, Sample, Mesh, Bounds } from './types';
-import { DEFAULT_TERRAIN_MARGIN, clamp } from './project';
+import type { Point, PlanPoint, Project, Sample, Mesh, Bounds } from '../types';
+import { clamp } from '../math';
+import { DEFAULT_TERRAIN_MARGIN } from '../project/limits';
 import { bounds, sampleTrack } from './geometry';
 import { newMesh } from './mesh';
 function terrainBounds(project: Project, samples = sampleTrack(project)) {

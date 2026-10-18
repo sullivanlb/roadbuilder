@@ -21,18 +21,21 @@ import type {
   Tool,
   ViewMode,
 } from '../domain/types';
-import { clamp, LIMITS, slugify, validateProject, createProject } from '../domain/project';
-import { sampleTrack, trackIssues, trackStats } from '../domain/geometry';
+import { clamp } from '../domain/math';
+import { LIMITS } from '../domain/project/limits';
+import { createProject, slugify } from '../domain/project/factory';
+import { validateProject } from '../domain/project/validation';
+import { sampleTrack, trackIssues, trackStats } from '../domain/track/geometry';
 import {
   DEFAULT_BARRIER_OFFSET,
   insertBarrierPoint,
   removeBarrierPoint,
   reverseBarriers,
   splitWrappingBarriers,
-} from '../domain/barriers';
-import { ProjectHistory } from '../domain/history';
-import { persistProject, restoreProject } from '../domain/storage';
-import type { ProjectStorage } from '../domain/storage';
+} from '../domain/track/barriers';
+import { ProjectHistory } from '../domain/project/history';
+import { persistProject, restoreProject } from '../domain/project/storage';
+import type { ProjectStorage } from '../domain/project/storage';
 import { buildExport } from '../export/trackExport';
 import type { TrackRenderer } from '../rendering/TrackRenderer';
 

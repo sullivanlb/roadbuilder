@@ -1,8 +1,16 @@
 import { createHash } from 'node:crypto';
 import { describe, expect, it } from 'vitest';
-import { createProject, validateProject, LIMITS } from '../src/domain/project';
-import { bounds, sampleAt, sampleTrack, trackIssues, trackStats } from '../src/domain/geometry';
-import { buildScene } from '../src/domain/scene';
+import { LIMITS } from '../src/domain/project/limits';
+import { createProject } from '../src/domain/project/factory';
+import { validateProject } from '../src/domain/project/validation';
+import {
+  bounds,
+  sampleAt,
+  sampleTrack,
+  trackIssues,
+  trackStats,
+} from '../src/domain/track/geometry';
+import { buildScene } from '../src/domain/track/scene';
 import {
   barrierLateral,
   barrierPath,
@@ -12,11 +20,11 @@ import {
   removeBarrierPoint,
   reverseBarriers,
   splitWrappingBarriers,
-} from '../src/domain/barriers';
+} from '../src/domain/track/barriers';
 import { buildExport } from '../src/export/trackExport';
 import { crc32, zipFiles } from '../src/export/binary';
-import { ProjectHistory } from '../src/domain/history';
-import { persistProject, restoreProject, STORAGE_KEY } from '../src/domain/storage';
+import { ProjectHistory } from '../src/domain/project/history';
+import { persistProject, restoreProject, STORAGE_KEY } from '../src/domain/project/storage';
 import type { Barrier } from '../src/domain/types';
 import baseline from './fixtures/legacy-baseline.json';
 import tightTurnFixture from './fixtures/tight-turn.roadbuilder.json';

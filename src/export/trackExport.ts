@@ -1,9 +1,10 @@
 import type { Project, Scene, Sample, ExportFiles, ExportFormat } from '../domain/types';
-import { validateProject, slugify } from '../domain/project';
-import { sampleTrack, trackStats, trackIssues, bounds } from '../domain/geometry';
-import { buildScene } from '../domain/scene';
-import { barrierPath } from '../domain/barriers';
-import { MATERIALS, BASE_MATERIALS } from '../domain/mesh';
+import { slugify } from '../domain/project/factory';
+import { validateProject } from '../domain/project/validation';
+import { sampleTrack, trackStats, trackIssues, bounds } from '../domain/track/geometry';
+import { buildScene } from '../domain/track/scene';
+import { barrierPath } from '../domain/track/barriers';
+import { MATERIALS, BASE_MATERIALS } from '../domain/track/mesh';
 import { BinaryWriter, zipFiles, texturePng, encodePng, utf8 } from './binary';
 const IDENTITY = [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1];
 

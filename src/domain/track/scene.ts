@@ -1,5 +1,5 @@
-import type { Project, Sample, Scene, Mesh, Marker } from './types';
-import { distance } from './project';
+import type { Project, Sample, Scene, Mesh, Marker } from '../types';
+import { distance } from '../math';
 import { sampleTrack, sampleAt } from './geometry';
 import { newMesh, offsetPoint, addQuad } from './mesh';
 import { buildBarrierMeshes } from './barriers';

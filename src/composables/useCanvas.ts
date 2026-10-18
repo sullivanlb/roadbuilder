@@ -1,6 +1,7 @@
 import { computed, onBeforeUnmount, onMounted, ref, watchEffect } from 'vue';
 import type { Ref } from 'vue';
-import { clamp, LIMITS } from '../domain/project';
+import { clamp } from '../domain/math';
+import { LIMITS } from '../domain/project/limits';
 import type { Point } from '../domain/types';
 import { TrackRenderer } from '../rendering/TrackRenderer';
 import { number, useEditor } from './useEditor';

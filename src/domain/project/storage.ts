@@ -1,5 +1,6 @@
-import { createProject, validateProject } from './project';
-import type { Project } from './types';
+import { createProject } from './factory';
+import { validateProject } from './validation';
+import type { Project } from '../types';
 
 export const STORAGE_KEY = 'roadbuilder.project.v1';
 export type ProjectStorage = Pick<Storage, 'getItem' | 'setItem'>;

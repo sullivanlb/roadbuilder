@@ -1,4 +1,4 @@
-import type { Mesh, Sample } from './types';
+import type { Mesh, Sample } from '../types';
 const MATERIALS = [
   { name: 'asphalt', color: [67, 72, 76], texture: 'asphalt.png' },
   { name: 'grass', color: [76, 103, 62], texture: 'grass.png' },

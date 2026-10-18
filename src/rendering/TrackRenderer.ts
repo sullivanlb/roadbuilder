@@ -10,12 +10,13 @@ import type {
   TightTurn,
   ViewMode,
 } from '../domain/types';
-import { createProject, clamp } from '../domain/project';
-import { bounds, trackStats, sampleAt } from '../domain/geometry';
-import { terrainBounds } from '../domain/terrain';
-import { buildScene } from '../domain/scene';
-import { MATERIALS } from '../domain/mesh';
-import { DEFAULT_BARRIER_OFFSET, barrierPath } from '../domain/barriers';
+import { clamp } from '../domain/math';
+import { createProject } from '../domain/project/factory';
+import { bounds, trackStats, sampleAt } from '../domain/track/geometry';
+import { terrainBounds } from '../domain/track/terrain';
+import { buildScene } from '../domain/track/scene';
+import { MATERIALS } from '../domain/track/mesh';
+import { DEFAULT_BARRIER_OFFSET, barrierPath } from '../domain/track/barriers';
 const BARRIER_STYLE: Record<BarrierType, { color: string; width: number; dash: number[] }> = {
   guardrail: { color: '#c8d3d7', width: 2.5, dash: [] },
   tires: { color: '#98a2a9', width: 3, dash: [2, 3] },
