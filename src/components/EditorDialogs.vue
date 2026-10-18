@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { useEditor, number } from '../composables/useEditor';
+import { useEditor, formatNumber } from '../composables/useEditor';
 import { computed, ref, watch, onBeforeUnmount } from 'vue';
 
 const e = useEditor();
@@ -162,7 +162,7 @@ onBeforeUnmount(() => {
     </div>
     <div class="dialog-footer">
       <span id="export-summary"
-        >{{ number(e.stats.length / 1000, 2) }} km ·
+        >{{ formatNumber(e.stats.length / 1000, 2) }} km ·
         {{ e.project.closed ? 'Circuit fermé' : 'Route ouverte' }} · 1 voiture</span
       ><button
         id="download-export"

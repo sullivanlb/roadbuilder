@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { useEditor, number } from '../composables/useEditor';
+import { useEditor, formatNumber } from '../composables/useEditor';
 import { ref } from 'vue';
 
 const e = useEditor();
@@ -11,7 +11,9 @@ defineExpose({ canvas });
   <div class="elevation-panel">
     <div class="elevation-heading">
       <span>PROFIL D’ALTITUDE</span
-      ><span id="elevation-range">{{ number(e.stats.min) }} → {{ number(e.stats.max) }} m</span>
+      ><span id="elevation-range"
+        >{{ formatNumber(e.stats.min) }} → {{ formatNumber(e.stats.max) }} m</span
+      >
     </div>
     <canvas
       id="elevation-canvas"
@@ -23,7 +25,7 @@ defineExpose({ canvas });
       <span>DÉPART</span
       ><span id="elevation-end"
         >{{ e.project.closed ? 'RETOUR AU DÉPART' : 'ARRIVÉE' }} ·
-        {{ number(e.stats.length / 1000, 2) }} KM</span
+        {{ formatNumber(e.stats.length / 1000, 2) }} KM</span
       >
     </div>
   </div>

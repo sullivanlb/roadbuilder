@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { useEditor, number } from '../composables/useEditor';
+import { useEditor, formatNumber } from '../composables/useEditor';
 import { computed, ref, watch } from 'vue';
 import NumericInput from './NumericInput.vue';
 import { BARRIER_TYPE_LABELS } from '../domain/track/barriers';
@@ -133,7 +133,7 @@ function finishName() {
       <label class="range-label" for="track-width"
         >Largeur de la route
         <output id="width-value"
-          >{{ number(e.project.width, e.project.width % 1 ? 1 : 0) }} m</output
+          >{{ formatNumber(e.project.width, e.project.width % 1 ? 1 : 0) }} m</output
         ></label
       >
       <NumericInput
@@ -149,7 +149,7 @@ function finishName() {
       <label class="range-label" for="track-shoulder"
         >Accotements
         <output id="shoulder-value"
-          >{{ number(e.project.shoulder, e.project.shoulder % 1 ? 1 : 0) }} m</output
+          >{{ formatNumber(e.project.shoulder, e.project.shoulder % 1 ? 1 : 0) }} m</output
         ></label
       >
       <NumericInput
@@ -180,7 +180,10 @@ function finishName() {
       <label class="range-label" for="terrain-margin"
         >Marge autour du tracé
         <output id="terrain-value"
-          >{{ number(e.project.terrainMargin, e.project.terrainMargin % 1 ? 1 : 0) }} m</output
+          >{{
+            formatNumber(e.project.terrainMargin, e.project.terrainMargin % 1 ? 1 : 0)
+          }}
+          m</output
         ></label
       >
       <NumericInput
@@ -266,7 +269,7 @@ function finishName() {
         <label class="range-label" for="barrier-offset"
           >Écartement du collider
           <output id="barrier-offset-value"
-            >{{ number(selectedBarrier.offset, 1) }} m</output
+            >{{ formatNumber(selectedBarrier.offset, 1) }} m</output
           ></label
         >
         <NumericInput

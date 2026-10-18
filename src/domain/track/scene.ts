@@ -118,9 +118,9 @@ function buildScene(project: Project, samples = sampleTrack(project)): Scene {
   marker('AC_START_0', spawn, 0, 0.25);
   marker('AC_HOTLAP_START_0', spawn, 0, 0.25);
   marker('AC_PIT_0', spawn, pitOffset, 0.3);
-  const timing = (number: number, at: Sample) => {
-    marker(`AC_TIME_${number}_L`, at, -half - 1);
-    marker(`AC_TIME_${number}_R`, at, half + 1);
+  const timing = (index: number, at: Sample) => {
+    marker(`AC_TIME_${index}_L`, at, -half - 1);
+    marker(`AC_TIME_${index}_R`, at, half + 1);
   };
   timing(0, start);
   timing(1, at(samples, project.closed ? length / 3 : length / 2));

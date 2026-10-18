@@ -4,7 +4,7 @@ import { clamp } from '../domain/math';
 import { LIMITS } from '../domain/project/limits';
 import type { Point } from '../domain/types';
 import { TrackRenderer } from '../rendering/TrackRenderer';
-import { number, useEditor } from './useEditor';
+import { formatNumber, useEditor } from './useEditor';
 
 type Drag =
   | { type: 'pan'; x: number; y: number; cameraX: number; cameraZ: number }
@@ -219,7 +219,8 @@ export function useCanvas(
         .map((n) => n * magnitude)
         .reduce((best, n) => (Math.abs(n - ideal) < Math.abs(best - ideal) ? n : best));
       scaleWidth.value = units * renderer.camera.scale;
-      scaleLabel.value = units >= 1000 ? `${number(units / 1000)} km` : `${number(units)} m`;
+      scaleLabel.value =
+        units >= 1000 ? `${formatNumber(units / 1000)} km` : `${formatNumber(units)} m`;
     };
     e.attachRenderer(renderer, finish);
     document.addEventListener('keydown', onKeydown);

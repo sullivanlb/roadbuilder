@@ -1,483 +1,29 @@
-import {
-  computed,
-  inject,
-  nextTick,
-  onBeforeUnmount,
-  onMounted,
-  provide,
-  reactive,
-  ref,
-  shallowRef,
-  triggerRef,
-} from 'vue';
+import { inject, onBeforeUnmount, onMounted, provide, reactive } from 'vue';
 import type { InjectionKey } from 'vue';
-import type {
-  BarrierDraft,
-  BarrierSide,
-  BarrierType,
-  ExportFormat,
-  Point,
-  Template,
-  Tool,
-  ViewMode,
-} from '../domain/types';
-import { clamp } from '../domain/math';
-import { LIMITS } from '../domain/project/limits';
-import { createProject, slugify } from '../domain/project/factory';
-import { validateProject } from '../domain/project/validation';
-import { sampleTrack, trackIssues, trackStats } from '../domain/track/geometry';
-import {
-  DEFAULT_BARRIER_OFFSET,
-  insertBarrierPoint,
-  removeBarrierPoint,
-  reverseBarriers,
-  splitWrappingBarriers,
-} from '../domain/track/barriers';
-import { ProjectHistory } from '../domain/project/history';
-import { persistProject, restoreProject } from '../domain/project/storage';
-import type { ProjectStorage } from '../domain/project/storage';
-import { buildExport } from '../export/trackExport';
-import type { TrackRenderer } from '../rendering/TrackRenderer';
+import { createActions } from './editor/actions';
+import { createKeyboardHandler } from './editor/keyboard';
+import { createSession } from './editor/session';
+import { createEditorState } from './editor/state';
 
-export const number = (value: number, digits = 0) =>
+export type { Dialog, NumericField } from './editor/state';
+
+export const formatNumber = (value: number, digits = 0) =>
   value.toLocaleString('fr-FR', { minimumFractionDigits: digits, maximumFractionDigits: digits });
-export type Dialog = 'new' | 'export' | 'help' | null;
-export type NumericField =
-  'width' | 'shoulder' | 'terrainMargin' | 'x' | 'y' | 'z' | 'barrierOffset';
-const ranges: Record<NumericField, [number, number]> = {
-  width: [4, 24],
-  shoulder: [2, 20],
-  terrainMargin: [50, 500],
-  x: [-LIMITS.coordinate, LIMITS.coordinate],
-  z: [-LIMITS.coordinate, LIMITS.coordinate],
-  y: [LIMITS.minAltitude, LIMITS.maxAltitude],
-  barrierOffset: [0, 10],
-};
-const errorMessage = (error: unknown) => (error instanceof Error ? error.message : String(error));
 
 export function createEditor() {
-  let storage: ProjectStorage | null = null;
-  try {
-    storage = window.localStorage;
-  } catch {
-    /* Manual downloads remain available. */
-  }
-  const restored = restoreProject(storage);
-  // Large sampled meshes remain ordinary objects; only editable state is reactive.
-  const project = shallowRef(restored.project);
-  const selected = ref(project.value.points.length ? 0 : -1);
-  const tool = ref<Tool>(project.value.points.length ? 'select' : 'add');
-  const view = ref<ViewMode>('2d');
-  const dialog = ref<Dialog>(null);
-  const history = reactive(new ProjectHistory());
-  const samples = computed(() => sampleTrack(project.value));
-  const stats = computed(() => trackStats(samples.value));
-  const issues = computed(() => trackIssues(project.value, samples.value));
-  const point = computed(() => project.value.points[selected.value]);
-  const selectedTightTurns = computed(() =>
-    issues.value.tightTurns.filter((turn) => turn.pointIndices.includes(selected.value)),
-  );
-  const barriers = computed(() => project.value.barriers ?? []);
-  const selectedBarrier = ref(-1);
-  const barrierDraft = ref<BarrierDraft | null>(null);
-  const barrierType = ref<BarrierType>('guardrail');
-  const notification = ref({ message: '', error: false });
-  const saveState = ref<'saved' | 'pending' | 'unavailable' | 'recovery'>('saved');
-  const exportAuthor = ref('');
-  const exportFormat = ref<ExportFormat>('ac');
-  const exporting = ref(false);
-  let renderer: TrackRenderer | null = null;
-  let inputBefore: string | null = null;
-  let autosaveTimer: ReturnType<typeof setTimeout> | undefined;
-  let toastTimer: ReturnType<typeof setTimeout> | undefined;
-  let importGeneration = 0;
-  let disposed = false;
-  let endGesture: (() => void) | null = null;
-  const downloads = new Map<string, ReturnType<typeof setTimeout>>();
-  const snapshot = () => JSON.stringify(project.value);
-  const refresh = () => triggerRef(project);
-  function clampBarrierSelection() {
-    selectedBarrier.value = Math.min(
-      selectedBarrier.value,
-      (project.value.barriers?.length ?? 0) - 1,
-    );
-  }
+  const state = createEditorState();
+  const session = createSession(state);
+  const actions = createActions(state, session);
+  const onKeydown = createKeyboardHandler(state, session, actions);
 
-  function toast(message: string, error = false) {
-    clearTimeout(toastTimer);
-    notification.value = { message, error };
-    toastTimer = setTimeout(
-      () => {
-        notification.value.message = '';
-      },
-      error ? 9000 : 4500,
-    );
-  }
-  function saveLocal() {
-    clearTimeout(autosaveTimer);
-    saveState.value = persistProject(storage, project.value, restored.recoveryPending);
-  }
-  function queueSave() {
-    clearTimeout(autosaveTimer);
-    saveState.value = 'pending';
-    autosaveTimer = setTimeout(saveLocal, 300);
-  }
-  function remember(before: string) {
-    history.remember(before, snapshot());
-    if (before !== snapshot()) queueSave();
-  }
-  function flushEdit() {
-    if (inputBefore === null) return;
-    const before = inputBefore;
-    inputBefore = null;
-    remember(before);
-  }
-  function beginEdit() {
-    if (inputBefore === null) inputBefore = snapshot();
-  }
-  function change(action: () => void) {
-    flushEdit();
-    const before = snapshot();
-    action();
-    refresh();
-    remember(before);
-  }
-  function undo(redo = false) {
-    endGesture?.();
-    flushEdit();
-    const next = redo ? history.redo(snapshot()) : history.undo(snapshot());
-    if (next === undefined) return;
-    ++importGeneration;
-    project.value = validateProject(JSON.parse(next));
-    selected.value = Math.min(selected.value, project.value.points.length - 1);
-    barrierDraft.value = null;
-    clampBarrierSelection();
-    queueSave();
-  }
-  function setNumeric(field: NumericField, value: number) {
-    if (!Number.isFinite(value)) return;
-    beginEdit();
-    const [min, max] = ranges[field];
-    if (field === 'x' || field === 'y' || field === 'z') {
-      if (!point.value) return;
-      point.value[field] = clamp(value, min, max);
-    } else if (field === 'barrierOffset') {
-      const barrier = barriers.value[selectedBarrier.value];
-      if (barrier) barrier.offset = clamp(value, min, max);
-    } else project.value[field] = clamp(value, min, max);
-    refresh();
-    queueSave();
-  }
-  function setName(value: string) {
-    beginEdit();
-    project.value.name = value.trim().slice(0, 80) || 'Mon tracé';
-    refresh();
-    queueSave();
-  }
-  function selectPoint(index: number) {
-    flushEdit();
-    selected.value = clamp(index, -1, project.value.points.length - 1);
-  }
-  function selectBarrier(index: number) {
-    flushEdit();
-    selectedBarrier.value = clamp(index, -1, barriers.value.length - 1);
-  }
-  function setBarrierType(type: BarrierType) {
-    barrierType.value = type;
-    if (barrierDraft.value) {
-      barrierDraft.value.type = type;
-      return;
-    }
-    const barrier = barriers.value[selectedBarrier.value];
-    if (barrier && barrier.type !== type)
-      change(() => {
-        barrier.type = type;
-      });
-  }
-  function beginBarrier(index: number, side: BarrierSide) {
-    if (index < 0 || index >= project.value.points.length) return;
-    barrierDraft.value = { from: index, side, type: barrierType.value };
-  }
-  function cancelBarrier() {
-    barrierDraft.value = null;
-    renderer?.requestDraw();
-  }
-  function completeBarrier(to: number) {
-    const draft = barrierDraft.value;
-    if (!draft) return;
-    if (to === draft.from) {
-      toast('Choisissez un point d’arrivée différent du point de départ.', true);
-      return;
-    }
-    if (barriers.value.length >= LIMITS.barriers) {
-      toast(`Maximum ${LIMITS.barriers} tronçons de barrière.`, true);
-      return;
-    }
-    let from = draft.from;
-    if (!project.value.closed && from > to) [from, to] = [to, from];
-    change(() => {
-      const list = project.value.barriers ?? (project.value.barriers = []);
-      list.push({ type: draft.type, side: draft.side, from, to, offset: DEFAULT_BARRIER_OFFSET });
-      selectedBarrier.value = list.length - 1;
-    });
-    barrierDraft.value = null;
-    toast('Barrière ajoutée. Échap pour terminer le tracé.');
-  }
-  function swapBarrierSide() {
-    const barrier = barriers.value[selectedBarrier.value];
-    if (!barrier) return;
-    change(() => {
-      barrier.side = barrier.side === 'right' ? 'left' : 'right';
-    });
-  }
-  function deleteBarrier() {
-    const list = project.value.barriers;
-    const index = selectedBarrier.value;
-    if (!list || !list[index]) return;
-    change(() => {
-      list.splice(index, 1);
-    });
-    selectedBarrier.value = Math.min(index, list.length - 1);
-  }
-  function setTool(next: Tool) {
-    if (view.value === '3d' && next !== 'pan') setView('2d');
-    tool.value = next;
-    if (next !== 'barrier') {
-      barrierDraft.value = null;
-      if (renderer) renderer.barrierHover = null;
-    }
-  }
-  function setView(mode: ViewMode) {
-    endGesture?.();
-    view.value = mode;
-    renderer?.setMode(mode);
-  }
-  function reverseTrack() {
-    change(() => {
-      const current = point.value;
-      if (project.value.closed && project.value.points.length)
-        project.value.points = [
-          project.value.points[0],
-          ...project.value.points.slice(1).reverse(),
-        ];
-      else project.value.points.reverse();
-      const list = project.value.barriers;
-      if (list?.length)
-        project.value.barriers = reverseBarriers(
-          list,
-          project.value.points.length,
-          project.value.closed,
-        );
-      selected.value = current ? project.value.points.indexOf(current) : -1;
-    });
-  }
-  function deletePoint() {
-    if (!point.value) return;
-    change(() => {
-      const index = selected.value;
-      project.value.points.splice(index, 1);
-      const list = project.value.barriers;
-      if (list?.length)
-        project.value.barriers = removeBarrierPoint(list, index, project.value.closed);
-      selected.value = Math.min(selected.value, project.value.points.length - 1);
-    });
-    clampBarrierSelection();
-    if (!project.value.points.length) setTool('add');
-  }
-  function addPoint(p: Pick<Point, 'x' | 'z'> & { y?: number }, after = selected.value) {
-    if (project.value.points.length >= LIMITS.points) {
-      toast(`Maximum ${LIMITS.points} points par tracé.`, true);
-      return;
-    }
-    const next = {
-      x: clamp(p.x, -LIMITS.coordinate, LIMITS.coordinate),
-      y: clamp(p.y ?? point.value?.y ?? 0, LIMITS.minAltitude, LIMITS.maxAltitude),
-      z: clamp(p.z, -LIMITS.coordinate, LIMITS.coordinate),
-    };
-    if (project.value.points.some((p) => Math.hypot(p.x - next.x, p.z - next.z) < 2)) {
-      toast('Placez ce point à au moins 2 mètres des autres.', true);
-      return;
-    }
-    change(() => {
-      const index = clamp(after + 1, 0, project.value.points.length);
-      project.value.points.splice(index, 0, next);
-      const list = project.value.barriers;
-      if (list?.length) project.value.barriers = insertBarrierPoint(list, index);
-      selected.value = index;
-    });
-  }
-  function download(data: string | Uint8Array, filename: string, type: string) {
-    const content = typeof data === 'string' ? data : new Uint8Array(data);
-    const url = URL.createObjectURL(new Blob([content], { type }));
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = filename;
-    document.body.append(a);
-    a.click();
-    a.remove();
-    downloads.set(
-      url,
-      setTimeout(() => {
-        URL.revokeObjectURL(url);
-        downloads.delete(url);
-      }, 30000),
-    );
-  }
-  function downloadProject() {
-    endGesture?.();
-    flushEdit();
-    download(
-      JSON.stringify(project.value, null, 2),
-      `${slugify(project.value.name)}.roadbuilder.json`,
-      'application/json',
-    );
-    saveLocal();
-    toast('Projet téléchargé. Gardez ce fichier pour reprendre votre travail.');
-  }
-  async function importProject(file: File) {
-    endGesture?.();
-    flushEdit();
-    const generation = ++importGeneration;
-    try {
-      if (file.size > 1024 * 1024)
-        throw new Error('Ce fichier dépasse 1 Mo. Choisissez un projet Roadbuilder JSON.');
-      const loaded = validateProject(JSON.parse(await file.text()));
-      if (disposed || generation !== importGeneration) return;
-      change(() => {
-        project.value = loaded;
-        selected.value = loaded.points.length ? 0 : -1;
-        selectedBarrier.value = -1;
-        barrierDraft.value = null;
-      });
-      syncRenderer();
-      renderer?.fit();
-      setTool(loaded.points.length ? 'select' : 'add');
-      toast(`« ${loaded.name} » est ouvert.`);
-    } catch (error) {
-      if (disposed || generation !== importGeneration) return;
-      toast(
-        error instanceof SyntaxError
-          ? 'Le fichier n’est pas un JSON valide. Votre projet actuel est conservé.'
-          : errorMessage(error),
-        true,
-      );
-    }
-  }
-  function newProject(template: Template) {
-    ++importGeneration;
-    change(() => {
-      project.value = createProject(template);
-      selected.value = project.value.points.length ? 0 : -1;
-      selectedBarrier.value = -1;
-      barrierDraft.value = null;
-    });
-    dialog.value = null;
-    syncRenderer();
-    setView('2d');
-    renderer?.fit();
-    setTool(project.value.points.length ? 'select' : 'add');
-    toast('Nouveau tracé. Ctrl+Z permet de retrouver le précédent.');
-  }
-  function openDialog(next: Dialog) {
-    endGesture?.();
-    flushEdit();
-    if (next === 'export') exportAuthor.value = project.value.author;
-    dialog.value = next;
-  }
-  async function exportProject() {
-    if (exporting.value || issues.value.errors.length) return;
-    exporting.value = true;
-    try {
-      await new Promise((resolve) => setTimeout(resolve, 40));
-      if (disposed) return;
-      const author = exportAuthor.value.trim().slice(0, 80);
-      if (project.value.author !== author)
-        change(() => {
-          project.value.author = author;
-        });
-      const output = buildExport(project.value, exportFormat.value);
-      download(output.bytes, output.filename, 'application/zip');
-      dialog.value = null;
-      toast(
-        exportFormat.value === 'ac'
-          ? 'Archive téléchargée. Le guide d’installation est dans le ZIP.'
-          : 'Sources 3D téléchargées : OBJ, matériaux et textures.',
-      );
-    } catch (error) {
-      toast(`Export impossible : ${errorMessage(error)}`, true);
-    } finally {
-      exporting.value = false;
-    }
-  }
-  function syncRenderer() {
-    renderer?.setProject(
-      project.value,
-      samples.value,
-      selected.value,
-      issues.value.tightTurns,
-      selectedBarrier.value,
-      barrierDraft.value,
-    );
-  }
-  function focusTightTurn(segment: number) {
-    const turn = issues.value.tightTurns.find((turn) => turn.segment === segment);
-    if (!turn) return;
-    openDialog(null);
-    setView('2d');
-    setTool('select');
-    selectPoint(turn.pointIndices[0]);
-    syncRenderer();
-    renderer?.focus([
-      samples.value[turn.sampleIndex],
-      ...turn.pointIndices.map((index) => project.value.points[index]),
-    ]);
-    // Native dialogs restore focus when closing; focus the editor afterwards.
-    void nextTick(() => renderer?.canvas.focus({ preventScroll: true }));
-  }
-  function attachRenderer(next: TrackRenderer | null, finish: (() => void) | null = null) {
-    renderer = next;
-    endGesture = finish;
-    syncRenderer();
-  }
-  function onKeydown(event: KeyboardEvent) {
-    const editing =
-      ['INPUT', 'TEXTAREA', 'SELECT'].includes(document.activeElement?.tagName ?? '') ||
-      (document.activeElement instanceof HTMLElement && document.activeElement.isContentEditable);
-    const key = event.key.toLowerCase(),
-      modifier = event.ctrlKey || event.metaKey;
-    if (modifier && key === 's' && !dialog.value) {
-      event.preventDefault();
-      downloadProject();
-      return;
-    }
-    if (editing || dialog.value) return;
-    if (modifier && key === 'z') {
-      event.preventDefault();
-      undo(event.shiftKey);
-    } else if (modifier && key === 'y') {
-      event.preventDefault();
-      undo(true);
-    } else if (!modifier && key === 'v') setTool('select');
-    else if (!modifier && key === 'a') setTool('add');
-    else if (!modifier && key === 'b') setTool('barrier');
-    else if (!modifier && key === 'h') setTool('pan');
-    else if (!modifier && key === 'f') renderer?.fit();
-    else if (key === 'delete' || key === 'backspace') {
-      event.preventDefault();
-      deletePoint();
-    } else if (key === 'escape') {
-      if (barrierDraft.value) cancelBarrier();
-      else setTool('select');
-    } else if (key === '?') openDialog('help');
-  }
   function onBlur() {
-    endGesture?.();
-    flushEdit();
-    saveLocal();
+    session.finishGesture();
+    session.flushEdit();
+    session.saveLocal();
   }
   function onBeforeUnload(event: BeforeUnloadEvent) {
     onBlur();
-    if (saveState.value === 'unavailable' || saveState.value === 'recovery') {
+    if (state.saveState.value === 'unavailable' || state.saveState.value === 'recovery') {
       event.preventDefault();
       event.returnValue = '';
     }
@@ -487,90 +33,75 @@ export function createEditor() {
     window.addEventListener('blur', onBlur);
     window.addEventListener('pagehide', onBlur);
     window.addEventListener('beforeunload', onBeforeUnload);
-    saveLocal();
-    if (restored.message) toast(restored.message, true);
+    session.saveLocal();
+    if (state.restoredMessage) session.toast(state.restoredMessage, true);
   });
   onBeforeUnmount(() => {
-    disposed = true;
-    ++importGeneration;
+    session.markDisposed();
     onBlur();
-    clearTimeout(autosaveTimer);
-    clearTimeout(toastTimer);
+    session.dispose();
     document.removeEventListener('keydown', onKeydown);
     window.removeEventListener('blur', onBlur);
     window.removeEventListener('pagehide', onBlur);
     window.removeEventListener('beforeunload', onBeforeUnload);
-    for (const [url, timer] of downloads) {
-      clearTimeout(timer);
-      URL.revokeObjectURL(url);
-    }
-    downloads.clear();
+    actions.disposeDownloads();
   });
   return reactive({
-    project,
-    selected,
-    tool,
-    view,
-    dialog,
-    history,
-    samples,
-    stats,
-    issues,
-    point,
-    selectedTightTurns,
-    barriers,
-    selectedBarrier,
-    barrierDraft,
-    barrierType,
-    notification,
-    saveState,
-    exportAuthor,
-    exportFormat,
-    exporting,
-    snapshot,
-    refresh,
-    remember,
-    beginEdit,
-    flushEdit,
-    change,
-    undo,
-    setNumeric,
-    setName,
-    selectPoint,
-    selectBarrier,
-    setBarrierType,
-    beginBarrier,
-    cancelBarrier,
-    completeBarrier,
-    swapBarrierSide,
-    deleteBarrier,
-    setTool,
-    setView,
-    reverseTrack,
-    deletePoint,
-    addPoint,
-    downloadProject,
-    importProject,
-    newProject,
-    openDialog,
-    focusTightTurn,
-    exportProject,
-    attachRenderer,
-    syncRenderer,
-    toast,
-    zoom: (factor: number) => renderer?.zoom(factor),
-    fit: () => renderer?.fit(),
-    setClosed: (closed: boolean) =>
-      change(() => {
-        project.value.closed = closed;
-        const list = project.value.barriers;
-        if (!closed && list?.length)
-          project.value.barriers = splitWrappingBarriers(list, project.value.points.length);
-      }),
-    setKerbs: (kerbs: boolean) =>
-      change(() => {
-        project.value.kerbs = kerbs;
-      }),
+    project: state.project,
+    selected: state.selected,
+    tool: state.tool,
+    view: state.view,
+    dialog: state.dialog,
+    history: state.history,
+    samples: state.samples,
+    stats: state.stats,
+    issues: state.issues,
+    point: state.point,
+    selectedTightTurns: state.selectedTightTurns,
+    barriers: state.barriers,
+    selectedBarrier: state.selectedBarrier,
+    barrierDraft: state.barrierDraft,
+    barrierType: state.barrierType,
+    notification: state.notification,
+    saveState: state.saveState,
+    exportAuthor: state.exportAuthor,
+    exportFormat: state.exportFormat,
+    exporting: state.exporting,
+    snapshot: session.snapshot,
+    refresh: state.refresh,
+    remember: session.remember,
+    beginEdit: session.beginEdit,
+    flushEdit: session.flushEdit,
+    change: session.change,
+    undo: session.undo,
+    setNumeric: actions.setNumeric,
+    setName: actions.setName,
+    selectPoint: actions.selectPoint,
+    selectBarrier: actions.selectBarrier,
+    setBarrierType: actions.setBarrierType,
+    beginBarrier: actions.beginBarrier,
+    cancelBarrier: actions.cancelBarrier,
+    completeBarrier: actions.completeBarrier,
+    swapBarrierSide: actions.swapBarrierSide,
+    deleteBarrier: actions.deleteBarrier,
+    setTool: actions.setTool,
+    setView: actions.setView,
+    reverseTrack: actions.reverseTrack,
+    deletePoint: actions.deletePoint,
+    addPoint: actions.addPoint,
+    downloadProject: actions.downloadProject,
+    importProject: actions.importProject,
+    newProject: actions.newProject,
+    openDialog: actions.openDialog,
+    focusTightTurn: actions.focusTightTurn,
+    exportProject: actions.exportProject,
+    attachRenderer: actions.attachRenderer,
+    syncRenderer: actions.syncRenderer,
+    toast: session.toast,
+    zoom: actions.zoom,
+    fit: actions.fit,
+    setClosed: actions.setClosed,
+    setKerbs: actions.setKerbs,
   });
 }
 export type Editor = ReturnType<typeof createEditor>;
