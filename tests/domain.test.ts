@@ -22,7 +22,8 @@ import {
   splitWrappingBarriers,
 } from '../src/domain/track/barriers';
 import { buildExport } from '../src/export/trackExport';
-import { crc32, zipFiles } from '../src/export/binary';
+import { crc32 } from '../src/export/binary/crc32';
+import { zipFiles } from '../src/export/binary/zip';
 import { ProjectHistory } from '../src/domain/project/history';
 import { persistProject, restoreProject, STORAGE_KEY } from '../src/domain/project/storage';
 import type { Barrier } from '../src/domain/types';
