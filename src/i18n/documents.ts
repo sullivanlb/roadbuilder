@@ -11,6 +11,8 @@ export interface InstallationParams {
 
 /** Localised texts embedded in the exported archives. */
 export interface DocumentTexts {
+  /** Comment header of the exported track.obj. */
+  objHeader: string;
   /** ui_track.json description. */
   trackDescription(closed: boolean): string;
   /** LIRE-MOI.txt shipped in the OBJ archive. */

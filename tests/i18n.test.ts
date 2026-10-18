@@ -101,6 +101,7 @@ describe('English catalogue', () => {
 
   it('writes the exported documents in English', () => {
     const documents = catalogues.en.documents;
+    expect(documents.objHeader).toBe('# Roadbuilder — meters, Y up, forward -Z');
     expect(documents.trackDescription(true)).toBe(
       'Made with Roadbuilder. Closed circuit. Prototype for solo free practice.',
     );
@@ -138,8 +139,11 @@ describe('English catalogue', () => {
     expect(jsonFile(french.files, 'ui/ui_track.json').description).toContain(
       'Créé avec Roadbuilder',
     );
-    expect(buildExport(project, 'obj', 'en').files['LIRE-MOI.txt']).toContain(
-      'Import track.obj into Blender',
+    const englishObj = buildExport(project, 'obj', 'en');
+    expect(englishObj.files['LIRE-MOI.txt']).toContain('Import track.obj into Blender');
+    expect(englishObj.files['track.obj']).toContain('# Roadbuilder — meters');
+    expect(buildExport(project, 'obj', 'fr').files['track.obj']).toContain(
+      '# Roadbuilder — mètres',
     );
   });
 });

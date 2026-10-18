@@ -42,7 +42,7 @@ export function encodeKn5(scene: Scene) {
     .u8(1)
     .floats(IDENTITY);
   for (const mesh of scene.meshes) {
-    if (mesh.vertices.length > 65535) throw new Error('Trop de sommets dans un objet KN5.');
+    if (mesh.vertices.length > 65535) throw new Error('Too many vertices in a KN5 object.');
     writer.u32(2).string(mesh.name).u32(0).u8(1).u8(1).u8(1).u8(0).u32(mesh.vertices.length);
     for (const v of mesh.vertices)
       writer.floats(v.position).floats(v.normal).floats(v.uv).floats(v.tangent);

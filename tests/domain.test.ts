@@ -220,7 +220,7 @@ it('writes a ZIP with CRC and rejects dangerous paths', () => {
   expect(view.getUint32(0, true)).toBe(0x04034b50);
   expect(view.getUint32(14, true)).toBe(crc32(new TextEncoder().encode('bonjour')));
   expect(view.getUint32(bytes.length - 22, true)).toBe(0x06054b50);
-  expect(() => zipFiles({ '../track.kn5': 'x' })).toThrow('Chemin ZIP invalide');
+  expect(() => zipFiles({ '../track.kn5': 'x' })).toThrow('Invalid ZIP path');
 });
 
 describe('locating overly tight turns', () => {

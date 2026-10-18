@@ -38,7 +38,7 @@ export class BinaryWriter {
     return this;
   }
   f32(value: number) {
-    if (!Number.isFinite(value)) throw new Error('Valeur non finie dans le modèle 3D.');
+    if (!Number.isFinite(value)) throw new Error('Non-finite value in the 3D model.');
     this.reserve(4);
     this.view.setFloat32(this.offset, value, true);
     this.offset += 4;

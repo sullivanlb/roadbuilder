@@ -20,7 +20,7 @@ function pngChunk(name: string, bytes: Uint8Array) {
 
 /** Encodes RGBA pixels into a PNG image (stored deflate blocks). */
 export function encodePng(width: number, height: number, pixels: Uint8Array) {
-  if (pixels.length !== width * height * 4) throw new Error('Dimensions PNG invalides.');
+  if (pixels.length !== width * height * 4) throw new Error('Invalid PNG dimensions.');
   const scanlines = new Uint8Array((width * 4 + 1) * height);
   for (let y = 0; y < height; y++)
     scanlines.set(pixels.subarray(y * width * 4, (y + 1) * width * 4), y * (width * 4 + 1) + 1);

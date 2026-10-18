@@ -8,7 +8,7 @@ export function zipFiles(files: ExportFiles) {
     records = [];
   for (const [path, content] of Object.entries(files)) {
     if (path.startsWith('/') || path.split('/').includes('..') || path.includes('\\'))
-      throw new Error('Chemin ZIP invalide.');
+      throw new Error('Invalid ZIP path.');
     const name = utf8(path),
       data = typeof content === 'string' ? utf8(content) : content;
     const crc = crc32(data),

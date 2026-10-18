@@ -35,7 +35,7 @@ export function buildExport(project: Project, format: ExportFormat = 'ac', local
   }
   const files: ExportFiles = {};
   if (format === 'obj') {
-    const { obj, mtl } = encodeObj(scene);
+    const { obj, mtl } = encodeObj(scene, locale);
     files['track.obj'] = obj;
     files['track.mtl'] = mtl;
     files['markers.json'] = JSON.stringify(scene.markers, null, 2);

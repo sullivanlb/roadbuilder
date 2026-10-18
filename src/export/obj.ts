@@ -1,10 +1,12 @@
 import type { Scene } from '../domain/types';
 import { MATERIALS } from '../domain/track/mesh';
+import { catalogues } from '../i18n/catalogues';
+import type { Locale } from '../i18n/catalogues';
 import { usedMaterialIndexes } from './materials';
 
 /** Encodes the scene as Wavefront OBJ plus its material library. */
-export function encodeObj(scene: Scene) {
-  const lines = ['# Roadbuilder — mètres, Y vertical, avant -Z', 'mtllib track.mtl'];
+export function encodeObj(scene: Scene, locale: Locale = 'fr') {
+  const lines = [catalogues[locale].documents.objHeader, 'mtllib track.mtl'];
   let offset = 1;
   for (const mesh of scene.meshes) {
     lines.push(`o ${mesh.name}`, `usemtl ${MATERIALS[mesh.material].name}`);

@@ -307,6 +307,7 @@ export function formatExportError(error: ExportError): string {
 
 /** English texts embedded in the exported archives. */
 export const enDocuments: DocumentTexts = {
+  objHeader: '# Roadbuilder — meters, Y up, forward -Z',
   trackDescription: (closed) =>
     `Made with Roadbuilder. ${closed ? 'Closed circuit' : 'Open road'}. Prototype for solo free practice.`,
   objReadme: (barrierCount) =>
