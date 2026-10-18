@@ -1,6 +1,6 @@
 # Roadbuilder
 
-Un éditeur local, en français, pour créer des circuits fermés et des routes ouvertes pour Assetto Corsa. L’application utilise **Vue 3, TypeScript strict et Vite**. Le dessin, le terrain, l’aperçu 3D, la sauvegarde et les exports sont exécutés dans le navigateur ; les projets ne sont pas envoyés à un serveur.
+Un éditeur local, **en français et en anglais**, pour créer des circuits fermés et des routes ouvertes pour Assetto Corsa. L’application utilise **Vue 3, TypeScript strict et Vite**. Le dessin, le terrain, l’aperçu 3D, la sauvegarde et les exports sont exécutés dans le navigateur ; les projets ne sont pas envoyés à un serveur.
 
 ## Installer et lancer
 
@@ -42,6 +42,7 @@ Pour distribuer l’application, servez le contenu de **`dist/`** sur un héberg
 - `src/composables/` : état partagé de l’éditeur, historique des actions, sauvegarde et interactions avec le canvas. L’état est créé par instance d’application et partagé par injection.
 - `src/domain/` : types des projets, validation, géométrie, maillages, terrain, scènes, historique et accès au stockage. Ces modules ne dépendent pas de Vue.
 - `src/export/` : encodeurs binaires PNG/ZIP, KN5, OBJ et structure des archives Assetto Corsa.
+- `src/i18n/` : catalogues français et anglais (messages typés, diagnostics, documents exportés), formats de nombres et sélecteur de langue.
 - `src/rendering/` : moteur canvas 2D/3D, avec nettoyage des observateurs et animations au démontage.
 - `src/styles/` : styles de l’interface existante.
 - `tests/` : tests Vitest ; `fixtures/legacy-baseline.json` contient les mesures et empreintes SHA-256 capturées avant migration pour les trois modèles et leurs deux exports.
@@ -54,7 +55,7 @@ Les composants utilisent la Composition API. Les données géométriques volumin
 
 ### Vérifications avant livraison
 
-Les tests vérifient les projets anciens et invalides, le maillage et ses indices, les exports identiques octet par octet à l’ancienne version, les gestes et raccourcis, l’historique, la restauration, la récupération des sauvegardes corrompues, les téléchargements, ainsi que les barrières : validation, colliders orientés vers la piste, bridage dans les virages, traçage, sélection, entretien et exports. Les tests d’interface utilisent un DOM et un canvas simulés : ils ne remplacent pas une vérification visuelle dans un navigateur.
+Les tests vérifient les projets anciens et invalides, le maillage et ses indices, les exports identiques octet par octet à l’ancienne version, les gestes et raccourcis, l’historique, la restauration, la récupération des sauvegardes corrompues, les téléchargements, ainsi que les barrières : validation, colliders orientés vers la piste, bridage dans les virages, traçage, sélection, entretien et exports. Les deux catalogues de langue sont comparés clé par clé. Les tests d’interface utilisent un DOM et un canvas simulés : ils ne remplacent pas une vérification visuelle dans un navigateur.
 
 Pour la vérification manuelle : ouvrir les trois modèles et une page blanche, déplacer/ajouter/supprimer des points, régler largeur et relief, naviguer en 2D/3D, tester zoom et raccourcis, tracer des barrières des quatre types, enregistrer/recharger/importer un projet, puis télécharger les ZIP Assetto Corsa et OBJ. Comparer également le rendu aux dimensions bureau et mobile. La validation dans Assetto Corsa reste manuelle.
 
@@ -70,6 +71,7 @@ Pour la vérification manuelle : ouvrir les trois modèles et une page blanche, 
 - Sauvegarde locale automatique et import/export de projets `.roadbuilder.json`.
 - Export ZIP Assetto Corsa avec modèle KN5, textures, surfaces, départ et stand.
 - Export OBJ avec matériaux et textures pour poursuivre la modélisation dans un outil 3D.
+- Interface bilingue **français / anglais** : le sélecteur **FR / EN** de la barre d’actions traduit l’interface et les documents exportés (`INSTALLATION.txt`, `LIRE-MOI.txt`, description `ui_track.json`). Le choix est mémorisé dans le navigateur.
 
 ## Créer et conserver un tracé
 

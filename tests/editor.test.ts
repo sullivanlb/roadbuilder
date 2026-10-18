@@ -606,4 +606,24 @@ describe('Vue interface (simulated DOM and canvas)', () => {
     expect($('barrier-row-0')).not.toBeNull();
     expect($('barrier-row-1')).not.toBeNull();
   });
+
+  it('switches the interface language, the canvas labels and the stored preference', async () => {
+    await mount();
+    expect($('locale-fr').getAttribute('aria-pressed')).toBe('true');
+    expect(renderer.labels.start).toBe('DÉPART');
+    await click('locale-en');
+    expect($('locale-en').getAttribute('aria-pressed')).toBe('true');
+    expect($('new-project').textContent).toContain('New');
+    expect($('scene-label').textContent).toBe('TOP-DOWN VIEW');
+    expect($('point-count').textContent).toBe('09 POINTS');
+    expect($('validation-status').textContent).toContain('Geometry ready');
+    expect(renderer.labels.start).toBe('START');
+    expect(document.documentElement.lang).toBe('en');
+    expect(localStorage.getItem('roadbuilder.locale')).toBe('en');
+    await click('locale-fr');
+    expect($('new-project').textContent).toContain('Nouveau');
+    expect(renderer.labels.start).toBe('DÉPART');
+    expect(document.documentElement.lang).toBe('fr');
+    expect(localStorage.getItem('roadbuilder.locale')).toBe('fr');
+  });
 });

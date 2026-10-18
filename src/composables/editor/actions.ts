@@ -5,7 +5,7 @@ import { LIMITS } from '../../domain/project/limits';
 import { createProject, slugify } from '../../domain/project/factory';
 import { validateProject } from '../../domain/project/validation';
 import { ExportError, ProjectError } from '../../domain/diagnostics';
-import { formatExportError, formatProjectError, t } from '../../i18n';
+import { formatExportError, formatProjectError, locale, t } from '../../i18n';
 import {
   DEFAULT_BARRIER_OFFSET,
   insertBarrierPoint,
@@ -286,7 +286,7 @@ export function createActions(state: EditorState, session: EditorSession) {
         session.change(() => {
           state.project.value.author = author;
         });
-      const output = buildExport(state.project.value, state.exportFormat.value);
+      const output = buildExport(state.project.value, state.exportFormat.value, locale.value);
       downloads.download(output.bytes, output.filename, 'application/zip');
       state.dialog.value = null;
       session.toast(

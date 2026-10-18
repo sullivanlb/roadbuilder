@@ -1,5 +1,6 @@
 import type { ExportFiles, ExportFormat, Project } from '../domain/types';
 import { ExportError } from '../domain/diagnostics';
+import type { Locale } from '../i18n/catalogues';
 import { slugify } from '../domain/project/factory';
 import { validateProject } from '../domain/project/validation';
 import { sampleTrack, trackStats, trackIssues } from '../domain/track/geometry';
@@ -14,7 +15,7 @@ import { usedMaterialIndexes } from './materials';
 import { encodeObj } from './obj';
 
 /** Validates the project and builds the complete archive for one export format. */
-export function buildExport(project: Project, format: ExportFormat = 'ac') {
+export function buildExport(project: Project, format: ExportFormat = 'ac', locale: Locale = 'fr') {
   project = validateProject(project);
   const samples = sampleTrack(project),
     issues = trackIssues(project, samples);
@@ -40,7 +41,7 @@ export function buildExport(project: Project, format: ExportFormat = 'ac') {
     files['markers.json'] = JSON.stringify(scene.markers, null, 2);
     for (const index of usedMaterialIndexes(scene))
       files[`texture/${MATERIALS[index].texture}`] = texturePng(MATERIALS[index].color);
-    files['LIRE-MOI.txt'] = objReadme(barrierCount);
+    files['LIRE-MOI.txt'] = objReadme(barrierCount, locale);
   } else {
     const root = `content/tracks/${slug}/`;
     const map = makeMap(project, samples),
@@ -54,12 +55,13 @@ export function buildExport(project: Project, format: ExportFormat = 'ac') {
     files[`${root}map.png`] = map.png;
     files[`${root}ui/outline.png`] = map.png;
     files[`${root}ui/preview.png`] = preview.png;
-    files[`${root}ui/ui_track.json`] = uiTrackJson(project, samples, stats);
+    files[`${root}ui/ui_track.json`] = uiTrackJson(project, samples, stats, locale);
     files['INSTALLATION.txt'] = installationText({
       project,
       slug,
       barrierCount,
       warnings: issues.warnings,
+      locale,
     });
   }
   files['projet.roadbuilder.json'] = JSON.stringify(project, null, 2);
