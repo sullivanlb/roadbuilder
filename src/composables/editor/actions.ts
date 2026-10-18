@@ -5,7 +5,7 @@ import { LIMITS } from '../../domain/project/limits';
 import { createProject, slugify } from '../../domain/project/factory';
 import { validateProject } from '../../domain/project/validation';
 import { ExportError, ProjectError } from '../../domain/diagnostics';
-import { formatExportError, formatProjectError } from '../../i18n/fr';
+import { formatExportError, formatProjectError } from '../../i18n';
 import {
   DEFAULT_BARRIER_OFFSET,
   insertBarrierPoint,

@@ -4,7 +4,7 @@ import { computed, ref } from 'vue';
 import { useCanvas } from '../composables/useCanvas';
 import TrackTelemetry from './TrackTelemetry.vue';
 import ElevationProfile from './ElevationProfile.vue';
-import { formatTrackIssue } from '../i18n/fr';
+import { formatTrackIssue } from '../i18n';
 
 const e = useEditor();
 const issueTitle = computed(() =>

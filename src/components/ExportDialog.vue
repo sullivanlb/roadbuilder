@@ -2,7 +2,7 @@
 import { computed } from 'vue';
 import { useEditor, formatNumber } from '../composables/useEditor';
 import { useModalDialog } from '../composables/useModalDialog';
-import { formatTrackIssue } from '../i18n/fr';
+import { formatTrackIssue } from '../i18n';
 
 const props = defineProps<{ open: boolean }>();
 const e = useEditor();

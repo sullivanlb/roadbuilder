@@ -1,0 +1,329 @@
+import type {
+  ExportError,
+  ProjectErrorDetail,
+  ProjectField,
+  TrackIssue,
+} from '../domain/diagnostics';
+import type { DocumentTexts } from './documents';
+import type { MessageKey } from './fr';
+
+/** English catalogue: same keys as the French one, checked by the type system. */
+export const enMessages: Record<MessageKey, string> = {
+  'topbar.brandAria': 'Roadbuilder, back to the editor home',
+  'topbar.projectAria': 'Project',
+  'topbar.language': 'Language',
+  'topbar.new': 'New',
+  'topbar.open': 'Open',
+  'topbar.save': 'Save',
+  'topbar.export': 'Export',
+  'topbar.exportTrack': 'the track',
+
+  'editor.aria': 'Track editor',
+  'editor.eyebrow': 'TRACK-BUILDING WORKSHOP',
+  'editor.title': 'From idea to racetrack',
+  'editor.viewAria': 'Editor view',
+  'editor.view2d': '2D plan',
+  'editor.view3d': '3D preview',
+  'editor.canvasAria':
+    'Track editor: select and drag points with the mouse. The left panel also lets you edit their coordinates.',
+  'editor.toolsAria': 'Drawing tools',
+  'editor.selectTitle': 'Select and drag a point (V)',
+  'editor.selectAria': 'Select (V)',
+  'editor.addTitle': 'Add points (A)',
+  'editor.barrierTitle': 'Draw a barrier (B)',
+  'editor.panTitle': 'Pan the view (H)',
+  'editor.undoTitle': 'Undo (Ctrl+Z)',
+  'editor.redoTitle': 'Redo (Ctrl+Shift+Z)',
+  'editor.zoomAria': 'Zoom',
+  'editor.zoomOut': 'Zoom out',
+  'editor.zoomIn': 'Zoom in',
+  'editor.fitTitle': 'Fit the track (F)',
+  'editor.fitAria': 'Fit the track',
+  'editor.scene2d': 'TOP-DOWN VIEW',
+  'editor.scene3d': 'TERRAIN PREVIEW',
+  'editor.pointCount': '{count} POINTS',
+  'editor.emptyTitle': 'Your playground.',
+  'editor.emptyLine1': 'Click to place your first point.',
+  'editor.emptyLine2': 'The next one will shape the start of your road.',
+  'editor.statusReady': 'Geometry ready · in-game export experimental',
+  'editor.locateTurn': 'Show the corner',
+  'editor.unitHint': '1 unit = 1 meter',
+  'editor.privacy': 'Everything stays on your device',
+
+  'canvas.hint3d': 'Drag to orbit · Scroll to zoom · Back to the 2D plan to edit',
+  'canvas.hintBarrierDraft': 'Click the end point of the span · Escape cancels the span',
+  'canvas.hintBarrier': 'Click the start point of the span · Escape leaves the tool',
+  'canvas.hintAdd': 'Click to add after the selected point · Escape to finish',
+  'canvas.hintPan': 'Drag to move the plan · Scroll to zoom',
+  'canvas.hintSelect': 'Drag a point · Scroll to zoom · Space + drag to pan',
+  'canvas.start': 'START',
+  'canvas.finish': 'FINISH',
+
+  'telemetry.length': 'TOTAL LENGTH',
+  'telemetry.climb': 'ELEVATION GAIN',
+  'telemetry.grade': 'MAX GRADE',
+  'telemetry.session': 'TARGET SESSION',
+  'telemetry.freePractice': 'Free practice',
+
+  'profile.title': 'ELEVATION PROFILE',
+  'profile.aria': 'Elevation profile of the track',
+  'profile.start': 'START',
+  'profile.closedEnd': 'BACK TO START',
+  'profile.openEnd': 'FINISH',
+
+  'sidebar.aria': 'Track settings',
+  'sidebar.eyebrow': 'YOUR PROJECT',
+  'sidebar.local': 'LOCAL',
+  'sidebar.name': 'Track name',
+  'save.saved': 'Saved on this device',
+  'save.pending': 'Saving…',
+  'save.unavailable': 'Local save unavailable · use Save',
+  'save.recovery': 'Previous save preserved · use Save',
+  'sidebar.track': 'The track',
+  'sidebar.modeAria': 'Track type',
+  'sidebar.closed': 'Closed circuit',
+  'sidebar.open': 'Open road',
+  'sidebar.closedNote': 'One continuous loop. Finding the ideal line is up to you.',
+  'sidebar.openNote': 'A start, a finish. Picture a road that makes you want to drive.',
+  'sidebar.reverse': 'Reverse direction',
+  'sidebar.road': 'The road',
+  'sidebar.width': 'Road width',
+  'sidebar.shoulder': 'Shoulders',
+  'sidebar.kerbs': 'Red and white kerbs',
+  'sidebar.kerbsNote': 'Along both edges',
+  'sidebar.terrain': 'The terrain',
+  'sidebar.terrainMargin': 'Margin around the track',
+  'sidebar.terrainNote':
+    'Continuous ground inside and around the track, joined to the terrain and included in exports. The dotted outline shows its limit.',
+  'sidebar.tipTitle': 'Every corner starts with a point.',
+  'sidebar.tipBody': 'Drag the points to shape the track. Double-click the road to add one.',
+  'sidebar.help': 'Guide & shortcuts',
+
+  'barriers.title': 'Barriers',
+  'barriers.countOne': '{count} SPAN',
+  'barriers.countMany': '{count} SPANS',
+  'barriers.typeAria': 'Barrier type',
+  'barriers.guardrail': 'Guardrail',
+  'barriers.tires': 'Tyres',
+  'barriers.tecpro': 'TecPro',
+  'barriers.wall': 'Concrete wall',
+  'barriers.guardrailNote': 'A 0.78 m metal rail: the ideal compromise along linked corners.',
+  'barriers.tiresNote': 'Three rows of 0.85 m tyres: impacts are absorbed and mistakes forgiven.',
+  'barriers.tecproNote': 'Red and white 0.85 m blocks, perfect to protect a corner exit.',
+  'barriers.wallNote': 'A 1.1 m concrete wall: the bluntest limit, best kept for risky spots.',
+  'barriers.selectedNote': 'Selected span: ',
+  'barriers.nextNote': 'Next span: ',
+  'barriers.draw': 'Draw on the plan',
+  'barriers.statusDraft': 'Start at point {point} ({side}) — click the end point.',
+  'barriers.statusTool': 'Click the start point on the road. Escape cancels.',
+  'barriers.statusSelected': 'Selected span: adjust its offset, swap sides or delete it.',
+  'barriers.statusChoose': 'Click a span on the plan to edit it.',
+  'barriers.statusEmpty':
+    'Guardrail, tyres, TecPro or wall: two clicks on the plan and the track is safer.',
+  'barriers.sideRightShort': 'right',
+  'barriers.sideLeftShort': 'left',
+  'barriers.sideRight': 'right',
+  'barriers.sideLeft': 'left',
+  'barriers.row': '{index} · {type} · {side} · pts {from}→{to}',
+  'barriers.offset': 'Collider offset',
+  'barriers.offsetMin': '0 m · edge',
+  'barriers.swap': 'Swap side',
+  'barriers.delete': 'Delete',
+  'barriers.empty': 'No barrier yet. Two clicks make the track safer: start, then finish.',
+
+  'point.title': 'Elevation',
+  'point.badge': 'POINT {index}',
+  'point.altitude': 'Point altitude',
+  'point.altitudeAria': 'Altitude of the selected point',
+  'point.previous': 'Previous point',
+  'point.next': 'Next point',
+  'point.delete': 'Delete',
+  'point.empty': 'Select a point on the track to edit its position and altitude.',
+
+  'dialog.close': 'Close',
+  'new.eyebrow': 'A NEW STARTING LINE',
+  'new.title': 'What will your next track be?',
+  'new.intro': 'Pick a basis, then make it your own playground.',
+  'new.club': 'Club circuit',
+  'new.clubNote': 'Sweeping corners, gentle relief',
+  'new.kart': 'Karting',
+  'new.kartNote': 'Compact, technical and flat',
+  'new.mountain': 'Mountain road',
+  'new.mountainNote': 'Hairpins and steady climbs',
+  'new.blank': 'Blank page',
+  'new.blankNote': 'Everything starts with you',
+  'new.closedTag': 'CLOSED CIRCUIT',
+  'new.openTag': 'OPEN ROAD',
+  'new.blankTag': 'TO BE DRAWN',
+  'new.note': 'Your current track stays available with “Undo”. Save it to keep it in a file.',
+
+  'export.eyebrow': 'NEXT STEP: THE DRIVER’S SEAT',
+  'export.title': 'Take your track with you.',
+  'export.author': 'Creator',
+  'export.authorOptional': 'optional',
+  'export.authorPlaceholder': 'Your name or nickname',
+  'export.formatLegend': 'Export format',
+  'export.ac': 'Assetto Corsa',
+  'export.acTag': 'EXPERIMENTAL',
+  'export.acNote': 'ZIP archive: KN5 model, textures, surfaces, start and pit.',
+  'export.obj': '3D model · OBJ',
+  'export.objNote': 'Geometry and textures to keep working in Blender.',
+  'export.noticeLead': 'For solo free practice.',
+  'export.noticeWithBarriers':
+    'Full terrain included, with an outer limit visible in the editor. One pit box, no AI line; drawn barriers are included with collision. The KN5 and timing must be checked in Assetto Corsa; open roads are meant for free driving.',
+  'export.noticeNoBarriers':
+    'Full terrain included, with an outer limit visible in the editor. One pit box, no AI line and no barriers. The KN5 and timing must be checked in Assetto Corsa; open roads are meant for free driving.',
+  'export.installBefore': 'Unzip the archive, then copy its track folder into',
+  'export.installAfter': '. The guide is included.',
+  'export.summary': '{length} km · {mode} · 1 car',
+  'export.download': 'Download the ZIP',
+  'export.building': 'Building the track…',
+
+  'help.eyebrow': 'GET BEHIND THE WHEEL',
+  'help.title': 'The first few laps.',
+  'help.step1Title': 'Draw your line.',
+  'help.step1':
+    'Drag the points in the 2D view. The + tool adds a point after the selected one; a double-click on the road inserts it there.',
+  'help.step2Title': 'Give it character.',
+  'help.step2': 'Set the width, kerbs and altitude of every point. Drag to orbit the 3D preview.',
+  'help.step3Title': 'Keep your work.',
+  'help.step3':
+    'The local save is automatic. “Save” downloads a JSON project you can reopen with “Open”.',
+  'help.step4Title': 'Secure the edges.',
+  'help.step4Before': 'In ',
+  'help.step4After':
+    ', pick guardrail, tyres, TecPro or concrete wall, then draw with two clicks on the plan: start, then finish. Escape cancels the span in progress.',
+  'help.step5Title': 'Head to the simulator.',
+  'help.step5':
+    'Export the Assetto Corsa ZIP, install the track folder and start a solo free practice. The in-game export is still experimental.',
+  'help.shortcutSelect': 'Select',
+  'help.shortcutAdd': 'Add a point',
+  'help.shortcutBarrier': 'Draw a barrier',
+  'help.shortcutPan': 'Pan the view',
+  'help.shortcutFit': 'Fit everything',
+  'help.shortcutUndo': 'Undo',
+  'help.shortcutRedo': 'Redo',
+  'help.shortcutDelete': 'Delete a point',
+  'help.keyCtrlZ': 'Ctrl Z',
+  'help.keyCtrlShiftZ': 'Ctrl Shift Z',
+  'help.keyCtrlS': 'Ctrl S',
+  'help.keyDelete': 'Del',
+  'help.note1':
+    'Scroll: zoom · Space + drag: pan the view · Shift while dragging: 5 m grid. The first point sets the start area. A barrier is drawn from its start point to its end point, on the clicked side. Maximum {maxPoints} points and {maxBarriers} barrier spans.',
+  'help.note2':
+    'Roadbuilder is an independent tool, not affiliated with Kunos Simulazioni. No data is sent to any server.',
+
+  'toast.barrierSamePoint': 'Pick an end point different from the start point.',
+  'toast.barriersLimit': 'Maximum {max} barrier spans.',
+  'toast.barrierAdded': 'Barrier added. Escape to finish drawing.',
+  'toast.pointTooClose': 'Place this point at least 2 meters from the others.',
+  'toast.pointsLimit': 'Maximum {max} points per track.',
+  'toast.projectDownloaded': 'Project downloaded. Keep this file to resume your work.',
+  'toast.importTooLarge': 'This file exceeds 1 MB. Pick a Roadbuilder JSON project.',
+  'toast.importInvalidJson': 'The file is not valid JSON. Your current project is preserved.',
+  'toast.projectOpened': '“{name}” is open.',
+  'toast.newProject': 'New track. Ctrl+Z brings the previous one back.',
+  'toast.archiveDownloaded': 'Archive downloaded. The installation guide is inside the ZIP.',
+  'toast.sourcesDownloaded': '3D sources downloaded: OBJ, materials and textures.',
+  'toast.exportFailed': 'Export failed: {reason}',
+  'toast.storageUnreadable':
+    'The local save could not be read back. The demo circuit is open; your project file can still be imported.',
+  'project.defaultName': 'My track',
+};
+
+/** English labels of the ranged numeric fields carried by value-range errors. */
+const FIELD_LABELS: Record<ProjectField, string> = {
+  x: 'Position X',
+  y: 'Altitude',
+  z: 'Position Z',
+  width: 'Width',
+  shoulder: 'Shoulder',
+  terrainMargin: 'Terrain margin',
+  barrierOffset: 'Barrier offset',
+};
+
+/** Turns a project import failure into the English text shown to the user. */
+export function formatProjectError(detail: ProjectErrorDetail): string {
+  switch (detail.code) {
+    case 'project-format':
+      return 'This file is not a Roadbuilder version 1 project.';
+    case 'name-length':
+      return `The name must be between ${detail.min} and ${detail.max} characters.`;
+    case 'author-length':
+      return `Invalid author (${detail.max} characters maximum).`;
+    case 'track-options':
+      return 'Invalid track options.';
+    case 'points-limit':
+      return `Maximum ${detail.max} points.`;
+    case 'invalid-point':
+      return 'Invalid point.';
+    case 'value-range':
+      return `${FIELD_LABELS[detail.field]}: expected value between ${detail.min} and ${detail.max}.`;
+    case 'barriers-limit':
+      return `Maximum ${detail.max} barrier spans.`;
+    case 'barriers-min-points':
+      return 'Barriers need at least two track points.';
+    case 'invalid-barrier':
+      return 'Invalid barrier.';
+    case 'barrier-type':
+      return 'Unknown barrier type.';
+    case 'barrier-side':
+      return 'Invalid barrier side.';
+    case 'barrier-index':
+      return `${detail.end === 'from' ? 'Barrier start' : 'Barrier end'}: point index out of the track.`;
+    case 'barrier-span':
+      return 'A barrier must cover at least two points.';
+    case 'barrier-direction':
+      return 'On an open road, a barrier must follow the track direction.';
+  }
+}
+
+/** Turns a track diagnostic into the English text shown to the user. */
+export function formatTrackIssue(issue: TrackIssue): string {
+  switch (issue.code) {
+    case 'points-minimum':
+      return issue.closed
+        ? `Add at least ${issue.min} points to close the circuit.`
+        : `Add at least ${issue.min} points to create a road.`;
+    case 'track-too-short':
+      return `The track must be at least ${issue.min} m long to host the start.`;
+    case 'points-too-close':
+      return `Two consecutive points are too close (minimum ${issue.min} m).`;
+    case 'steep-grade':
+      return `Maximum grade of ${Math.round(issue.grade)} %: some cars will struggle.`;
+    case 'tight-turn':
+      return `Corner too tight between points ${issue.from + 1} and ${issue.to + 1} for this width. Spread the corner points or reduce the width.`;
+    case 'track-crossing':
+      return 'The track crosses itself: move the points involved. Bridges are not supported.';
+  }
+}
+
+/** Turns a failed export into the English text appended to “Export failed”. */
+export function formatExportError(error: ExportError): string {
+  return error.detail.code === 'invalid-track'
+    ? (error.issues?.errors ?? []).map(formatTrackIssue).join('\n')
+    : 'A road or pit edge folds inside a corner. Spread the points, reduce the width or move the start of the track to a straight.';
+}
+
+/** English texts embedded in the exported archives. */
+export const enDocuments: DocumentTexts = {
+  trackDescription: (closed) =>
+    `Made with Roadbuilder. ${closed ? 'Closed circuit' : 'Open road'}. Prototype for solo free practice.`,
+  objReadme: (barrierCount) =>
+    'Roadbuilder — 3D sources\n\nImport track.obj into Blender (vertical axis Y, forward -Z, scale 1 m).\nTextures live in texture/. The Assetto Corsa marker transforms are in markers.json (4×4 matrices, translation on the last row).\nOBJ does not keep the AC markers: recreate them if you go through Blender/ksEditor.\nFor a direct KN5 export, use Export > Assetto Corsa in Roadbuilder.\n' +
+    (barrierCount
+      ? 'The 1WALL_* meshes are the game colliders (invisible on track); the barriers decorations have no prefix.\n'
+      : ''),
+  installation: ({ name, slug, terrainMargin, barrierCount, warnings }) =>
+    `ROADBUILDER — ${name}\n\nEXPERIMENTAL KN5 EXPORT, TO BE CHECKED IN GAME\n\n1. Unzip this archive into a temporary folder.\n2. Copy content/tracks/${slug} into assettocorsa/content/tracks/.\n   If this name already exists, keep a copy of your previous version before replacing it.\n3. In Content Manager or Assetto Corsa, select ${name}.\n4. Start a FREE PRACTICE session, with a single car and no opponents.\n\nINCLUDED\n${
+      barrierCount
+        ? `Barriers: ${barrierCount} span${barrierCount > 1 ? 's' : ''} with collision (guardrails, tyres, TecPro or walls).\n`
+        : ''
+    }Road with collisions, shoulders, optional kerbs, textures embedded in the KN5,\nstart/pit markers and timing, surfaces, map and preview.\nGrass terrain with collisions, inside and around the track, joined to its relief.\nOuter terrain margin: ${terrainMargin} m beyond the shoulder limits.\nPoint 1 sets the start of the track; the start line is placed after the pit.\n\nLIMITS OF THIS VERSION\nIn-game compatibility has not been verified automatically.\nOne pit box only, without a real pit lane.\nNo AI lines: races against the AI are not supported.\nOpen roads: free practice only; point-to-point timing not validated.\nThe terrain stops at the dotted rectangle visible in the editor.\nBeyond this outer edge, a fall is still possible. Increase the margin if needed.\n${
+      barrierCount
+        ? 'Barriers are simple colliders: check impacts in game.\nThe terrain relief is interpolated automatically.\n'
+        : 'No barriers, bridges or scenery; the terrain relief is interpolated automatically.\n'
+    }Not all road/shoulder edge overlaps are detected.\nFor a competition track, review and complete the model in a 3D tool.\n\nThe project.roadbuilder.json file lets you resume the work in the editor.\n${
+      warnings.length ? '\nWARNINGS\n' + warnings.map(formatTrackIssue).join('\n') : ''
+    }\n`,
+};
