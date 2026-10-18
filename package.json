@@ -20,7 +20,8 @@
     "prepare": "husky"
   },
   "dependencies": {
-    "vue": "^3.5.29"
+    "vue": "^3.5.29",
+    "vue-i18n": "^11.4.16"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",

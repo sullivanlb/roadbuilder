@@ -1,26 +1,34 @@
-import { ref } from 'vue';
+import { createI18n } from 'vue-i18n';
 import type { ExportError, ProjectErrorDetail, TrackIssue } from '../domain/diagnostics';
-import { catalogues } from './catalogues';
-import type { Locale } from './catalogues';
+import type { DocumentTexts } from './documents';
+import { enMessages } from './en';
+import { frMessages } from './fr';
 import type { MessageKey, MessageParams } from './fr';
+import { LOCALE_STORAGE_KEY, storedLocale } from './locale';
+import type { Locale } from './locale';
 
-export type { Locale } from './catalogues';
-export { LOCALES } from './catalogues';
+export type { Locale } from './locale';
+export { LOCALES, LOCALE_STORAGE_KEY } from './locale';
+export type { MessageKey, MessageParams } from './fr';
 
-export const LOCALE_STORAGE_KEY = 'roadbuilder.locale';
+/**
+ * vue-i18n instance installed on the app in main.ts. Messages stay flat objects
+ * whose keys contain dots, hence flatJson; French is both the default and the
+ * fallback, so a missing key can never surface in another language.
+ *
+ * flatJson nests the flat keys *inside the object it is given*, so the instance
+ * receives shallow copies and the fr/en modules keep their flat, immutable shape.
+ */
+export const i18n = createI18n({
+  legacy: false,
+  locale: storedLocale(),
+  fallbackLocale: 'fr',
+  flatJson: true,
+  messages: { fr: { ...frMessages }, en: { ...enMessages } },
+});
 
-function storedLocale(): Locale {
-  try {
-    return typeof window !== 'undefined' && window.localStorage.getItem(LOCALE_STORAGE_KEY) === 'en'
-      ? 'en'
-      : 'fr';
-  } catch {
-    return 'fr';
-  }
-}
-
-/** Current interface language; every t() or format call reads it, so views follow it. */
-export const locale = ref<Locale>(storedLocale());
+/** Current interface language; vue-i18n owns the ref, so views follow setLocale(). */
+export const locale = i18n.global.locale;
 
 /** Mirrors the language onto the root element so assistive tools and CSS follow it. */
 export function initLocale() {
@@ -41,33 +49,136 @@ export function setLocale(next: Locale) {
   }
 }
 
-/** Formats a number with the separators of the current language. */
-export function formatNumber(value: number, digits = 0): string {
-  return value.toLocaleString(locale.value === 'fr' ? 'fr-FR' : 'en-US', {
-    minimumFractionDigits: digits,
-    maximumFractionDigits: digits,
-  });
+/** Fills the {placeholders} of one message and picks the plural form when asked to. */
+type Translate = <K extends MessageKey>(
+  key: K,
+  params?: MessageParams<K>,
+  plural?: number,
+) => string;
+
+/** Bound to one locale, or to the reactive current one when no locale is given. */
+function translator(target?: Locale): Translate {
+  if (target === undefined) {
+    return (key, params, plural) =>
+      plural === undefined
+        ? i18n.global.t(key, params ?? {})
+        : i18n.global.t(key, params ?? {}, plural);
+  }
+  // vue-i18n only honours a per-call locale through its options object, plural included.
+  return (key, params, plural) =>
+    i18n.global.t(
+      key,
+      params ?? {},
+      plural === undefined ? { locale: target } : { locale: target, plural },
+    );
 }
 
 /** Looks up an interface string and fills its {placeholders}. */
-export function t<K extends MessageKey>(key: K, params?: MessageParams<K>): string {
-  const template = catalogues[locale.value].messages[key];
-  if (!params) return template;
-  return template.replace(/\{(\w+)\}/g, (token, name: string) =>
-    Object.prototype.hasOwnProperty.call(params, name)
-      ? String((params as Record<string, string | number>)[name])
-      : token,
-  );
+export const t: Translate = translator();
+
+/** Formats a number with the separators of the current language. */
+export function formatNumber(value: number, digits = 0): string {
+  return i18n.global.n(value, { minimumFractionDigits: digits, maximumFractionDigits: digits });
 }
 
-export function formatProjectError(detail: ProjectErrorDetail): string {
-  return catalogues[locale.value].projectError(detail);
+/** Turns a project import failure into the text shown to the user. */
+export function formatProjectError(detail: ProjectErrorDetail, target?: Locale): string {
+  const tr = translator(target);
+  switch (detail.code) {
+    case 'project-format':
+      return tr('projectError.projectFormat');
+    case 'name-length':
+      return tr('projectError.nameLength', { min: detail.min, max: detail.max });
+    case 'author-length':
+      return tr('projectError.authorLength', { max: detail.max });
+    case 'track-options':
+      return tr('projectError.trackOptions');
+    case 'points-limit':
+      return tr('projectError.pointsLimit', { max: detail.max });
+    case 'invalid-point':
+      return tr('projectError.invalidPoint');
+    case 'value-range':
+      return tr('projectError.valueRange', {
+        field: tr(`projectError.field.${detail.field}`),
+        min: detail.min,
+        max: detail.max,
+      });
+    case 'barriers-limit':
+      return tr('projectError.barriersLimit', { max: detail.max });
+    case 'barriers-min-points':
+      return tr('projectError.barriersMinPoints');
+    case 'invalid-barrier':
+      return tr('projectError.invalidBarrier');
+    case 'barrier-type':
+      return tr('projectError.barrierType');
+    case 'barrier-side':
+      return tr('projectError.barrierSide');
+    case 'barrier-index':
+      return tr(
+        detail.end === 'from' ? 'projectError.barrierStartIndex' : 'projectError.barrierEndIndex',
+      );
+    case 'barrier-span':
+      return tr('projectError.barrierSpan');
+    case 'barrier-direction':
+      return tr('projectError.barrierDirection');
+  }
 }
 
-export function formatTrackIssue(issue: TrackIssue): string {
-  return catalogues[locale.value].trackIssue(issue);
+/** Turns a track diagnostic into the text shown to the user. */
+export function formatTrackIssue(issue: TrackIssue, target?: Locale): string {
+  const tr = translator(target);
+  switch (issue.code) {
+    case 'points-minimum':
+      return issue.closed
+        ? tr('trackIssue.pointsMinimumClosed', { min: issue.min })
+        : tr('trackIssue.pointsMinimumOpen', { min: issue.min });
+    case 'track-too-short':
+      return tr('trackIssue.trackTooShort', { min: issue.min });
+    case 'points-too-close':
+      return tr('trackIssue.pointsTooClose', { min: issue.min });
+    case 'steep-grade':
+      return tr('trackIssue.steepGrade', { grade: Math.round(issue.grade) });
+    case 'tight-turn':
+      return tr('trackIssue.tightTurn', { from: issue.from + 1, to: issue.to + 1 });
+    case 'track-crossing':
+      return tr('trackIssue.trackCrossing');
+  }
 }
 
-export function formatExportError(error: ExportError): string {
-  return catalogues[locale.value].exportError(error);
+/** Turns a failed export into the text appended to the « export failed » toast. */
+export function formatExportError(error: ExportError, target?: Locale): string {
+  return error.detail.code === 'invalid-track'
+    ? (error.issues?.errors ?? []).map((issue) => formatTrackIssue(issue, target)).join('\n')
+    : translator(target)('exportError.foldedEdge');
+}
+
+/** Localised texts embedded in the exported archives. */
+export function documentTexts(target: Locale): DocumentTexts {
+  const tr = translator(target);
+  return {
+    objHeader: tr('documents.objHeader'),
+    trackDescription: (closed) =>
+      tr('documents.trackDescription', {
+        mode: tr(closed ? 'sidebar.closed' : 'sidebar.open'),
+      }),
+    objReadme: (barrierCount) =>
+      tr('documents.objReadme') + (barrierCount ? tr('documents.objReadmeBarriers') : ''),
+    installation: ({ name, slug, terrainMargin, barrierCount, warnings }) =>
+      tr('documents.installationHead', { name, slug }) +
+      (barrierCount
+        ? tr('documents.installationBarriers', { count: barrierCount }, barrierCount) + '\n'
+        : '') +
+      tr('documents.installationBody', { terrainMargin }) +
+      (barrierCount
+        ? tr('documents.installationBarrierLimits')
+        : tr('documents.installationNoBarrierLimits')) +
+      tr('documents.installationTail') +
+      (warnings.length
+        ? '\n' +
+          tr('documents.installationWarnings') +
+          '\n' +
+          warnings.map((issue) => formatTrackIssue(issue, target)).join('\n')
+        : '') +
+      '\n',
+  };
 }

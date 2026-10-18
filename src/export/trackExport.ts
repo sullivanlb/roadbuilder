@@ -1,6 +1,6 @@
 import type { ExportFiles, ExportFormat, Project } from '../domain/types';
 import { ExportError } from '../domain/diagnostics';
-import type { Locale } from '../i18n/catalogues';
+import type { Locale } from '../i18n';
 import { slugify } from '../domain/project/factory';
 import { validateProject } from '../domain/project/validation';
 import { sampleTrack, trackStats, trackIssues } from '../domain/track/geometry';

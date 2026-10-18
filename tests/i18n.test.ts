@@ -3,14 +3,17 @@ import { ExportError } from '../src/domain/diagnostics';
 import { createProject } from '../src/domain/project/factory';
 import { buildExport } from '../src/export/trackExport';
 import type { ExportFiles } from '../src/domain/types';
-import { catalogues } from '../src/i18n/catalogues';
-import { enMessages } from '../src/i18n/en';
 import {
+  documentTexts,
   formatExportError,
   formatProjectError,
   formatTrackIssue,
-  frMessages,
-} from '../src/i18n/fr';
+  i18n,
+  t,
+} from '../src/i18n';
+import { enMessages } from '../src/i18n/en';
+import { frMessages } from '../src/i18n/fr';
+import type { MessageKey } from '../src/i18n/fr';
 
 describe('French catalogue', () => {
   it('formats project import failures with their parameters', () => {
@@ -50,6 +53,11 @@ describe('French catalogue', () => {
       'se replie dans un virage',
     );
   });
+
+  it('picks the plural form with the count', () => {
+    expect(t('barriers.count', { count: '01' }, 1)).toBe('01 TRONÇON');
+    expect(t('barriers.count', { count: '02' }, 2)).toBe('02 TRONÇONS');
+  });
 });
 
 const placeholders = (text: string) =>
@@ -63,44 +71,60 @@ const jsonFile = (files: ExportFiles, suffix: string) =>
 describe('English catalogue', () => {
   it('formats the imported project and export failures', () => {
     expect(
-      catalogues.en.projectError({ code: 'value-range', field: 'x', min: -10000, max: 10000 }),
+      formatProjectError({ code: 'value-range', field: 'x', min: -10000, max: 10000 }, 'en'),
     ).toBe('Position X: expected value between -10000 and 10000.');
-    expect(catalogues.en.projectError({ code: 'barrier-index', end: 'to' })).toBe(
+    expect(formatProjectError({ code: 'barrier-index', end: 'to' }, 'en')).toBe(
       'Barrier end: point index out of the track.',
     );
     const invalid = new ExportError(
       { code: 'invalid-track' },
       { errors: [{ code: 'points-too-close', min: 2 }], warnings: [], tightTurns: [] },
     );
-    expect(catalogues.en.exportError(invalid)).toBe(
+    expect(formatExportError(invalid, 'en')).toBe(
       'Two consecutive points are too close (minimum 2 m).',
     );
-    expect(catalogues.en.exportError(new ExportError({ code: 'folded-edge' }))).toContain(
+    expect(formatExportError(new ExportError({ code: 'folded-edge' }), 'en')).toContain(
       'folds inside a corner',
     );
   });
 
   it('formats the track diagnostics', () => {
-    expect(catalogues.en.trackIssue({ code: 'points-minimum', min: 3, closed: true })).toBe(
+    expect(formatTrackIssue({ code: 'points-minimum', min: 3, closed: true }, 'en')).toBe(
       'Add at least 3 points to close the circuit.',
     );
-    expect(catalogues.en.trackIssue({ code: 'tight-turn', from: 2, to: 3 })).toContain(
+    expect(formatTrackIssue({ code: 'tight-turn', from: 2, to: 3 }, 'en')).toContain(
       'points 3 and 4',
     );
-    expect(catalogues.en.trackIssue({ code: 'steep-grade', grade: 17.6 })).toBe(
+    expect(formatTrackIssue({ code: 'steep-grade', grade: 17.6 }, 'en')).toBe(
       'Maximum grade of 18 %: some cars will struggle.',
+    );
+    expect(i18n.global.t('barriers.count', { count: '02' }, { locale: 'en', plural: 2 })).toBe(
+      '02 SPANS',
     );
   });
 
-  it('covers every French message with the same placeholders', () => {
-    for (const key of Object.keys(frMessages) as (keyof typeof frMessages)[]) {
+  it('covers every French message with the same placeholders and plural forms', () => {
+    for (const key of Object.keys(frMessages) as MessageKey[]) {
       expect(enMessages[key], key).toBeTruthy();
       expect(placeholders(enMessages[key]), key).toEqual(placeholders(frMessages[key]));
+      expect(enMessages[key].split('|').length, key).toBe(frMessages[key].split('|').length);
+    }
+  });
+
+  it('compiles every message with its placeholders filled', () => {
+    for (const locale of ['fr', 'en'] as const) {
+      const messages = locale === 'fr' ? frMessages : enMessages;
+      for (const [key, text] of Object.entries(messages) as [MessageKey, string][]) {
+        const params = Object.fromEntries(placeholders(text).map((name) => [name, 1]));
+        const rendered = i18n.global.t(key, params, { locale, plural: 2 });
+        expect(rendered, `${locale}.${key}`).not.toMatch(/[{}]/);
+        expect(rendered.length, `${locale}.${key}`).toBeGreaterThan(0);
+      }
     }
   });
 
   it('writes the exported documents in English', () => {
-    const documents = catalogues.en.documents;
+    const documents = documentTexts('en');
     expect(documents.objHeader).toBe('# Roadbuilder — meters, Y up, forward -Z');
     expect(documents.trackDescription(true)).toBe(
       'Made with Roadbuilder. Closed circuit. Prototype for solo free practice.',

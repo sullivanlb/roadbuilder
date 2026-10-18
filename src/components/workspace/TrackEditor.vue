@@ -8,7 +8,7 @@ import { formatTrackIssue, t } from '../../i18n';
 
 const e = useEditor();
 const issueTitle = computed(() =>
-  [...e.issues.errors, ...e.issues.warnings].map(formatTrackIssue).join('\n'),
+  [...e.issues.errors, ...e.issues.warnings].map((issue) => formatTrackIssue(issue)).join('\n'),
 );
 const issueStatus = computed(() => {
   const first = e.issues.errors[0] ?? e.issues.warnings[0];

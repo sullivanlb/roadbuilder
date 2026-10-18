@@ -5,5 +5,11 @@ export default defineConfig({
   plugins: [vue()],
   base: './',
   server: { port: 5173, strictPort: true },
+  define: {
+    // vue-i18n feature flags: full install, no deprecated options API, no devtools in production.
+    __VUE_I18N_FULL_INSTALL__: true,
+    __VUE_I18N_LEGACY_API__: false,
+    __INTLIFY_PROD_DEVTOOLS__: false,
+  },
   test: { include: ['tests/**/*.test.ts'] },
 });

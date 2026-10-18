@@ -1,10 +1,3 @@
-import type {
-  ExportError,
-  ProjectErrorDetail,
-  ProjectField,
-  TrackIssue,
-} from '../domain/diagnostics';
-import type { DocumentTexts } from './documents';
 import type { MessageKey } from './fr';
 
 /** English catalogue: same keys as the French one, checked by the type system. */
@@ -100,8 +93,7 @@ export const enMessages: Record<MessageKey, string> = {
   'sidebar.help': 'Guide & shortcuts',
 
   'barriers.title': 'Barriers',
-  'barriers.countOne': '{count} SPAN',
-  'barriers.countMany': '{count} SPANS',
+  'barriers.count': '{count} SPAN | {count} SPANS',
   'barriers.typeAria': 'Barrier type',
   'barriers.guardrail': 'Guardrail',
   'barriers.tires': 'Tyres',
@@ -229,102 +221,61 @@ export const enMessages: Record<MessageKey, string> = {
   'toast.storageUnreadable':
     'The local save could not be read back. The demo circuit is open; your project file can still be imported.',
   'project.defaultName': 'My track',
-};
 
-/** English labels of the ranged numeric fields carried by value-range errors. */
-const FIELD_LABELS: Record<ProjectField, string> = {
-  x: 'Position X',
-  y: 'Altitude',
-  z: 'Position Z',
-  width: 'Width',
-  shoulder: 'Shoulder',
-  terrainMargin: 'Terrain margin',
-  barrierOffset: 'Barrier offset',
-};
+  'projectError.projectFormat': 'This file is not a Roadbuilder version 1 project.',
+  'projectError.nameLength': 'The name must be between {min} and {max} characters.',
+  'projectError.authorLength': 'Invalid author ({max} characters maximum).',
+  'projectError.trackOptions': 'Invalid track options.',
+  'projectError.pointsLimit': 'Maximum {max} points.',
+  'projectError.invalidPoint': 'Invalid point.',
+  'projectError.valueRange': '{field}: expected value between {min} and {max}.',
+  'projectError.barriersLimit': 'Maximum {max} barrier spans.',
+  'projectError.barriersMinPoints': 'Barriers need at least two track points.',
+  'projectError.invalidBarrier': 'Invalid barrier.',
+  'projectError.barrierType': 'Unknown barrier type.',
+  'projectError.barrierSide': 'Invalid barrier side.',
+  'projectError.barrierStartIndex': 'Barrier start: point index out of the track.',
+  'projectError.barrierEndIndex': 'Barrier end: point index out of the track.',
+  'projectError.barrierSpan': 'A barrier must cover at least two points.',
+  'projectError.barrierDirection': 'On an open road, a barrier must follow the track direction.',
+  'projectError.field.x': 'Position X',
+  'projectError.field.y': 'Altitude',
+  'projectError.field.z': 'Position Z',
+  'projectError.field.width': 'Width',
+  'projectError.field.shoulder': 'Shoulder',
+  'projectError.field.terrainMargin': 'Terrain margin',
+  'projectError.field.barrierOffset': 'Barrier offset',
 
-/** Turns a project import failure into the English text shown to the user. */
-export function formatProjectError(detail: ProjectErrorDetail): string {
-  switch (detail.code) {
-    case 'project-format':
-      return 'This file is not a Roadbuilder version 1 project.';
-    case 'name-length':
-      return `The name must be between ${detail.min} and ${detail.max} characters.`;
-    case 'author-length':
-      return `Invalid author (${detail.max} characters maximum).`;
-    case 'track-options':
-      return 'Invalid track options.';
-    case 'points-limit':
-      return `Maximum ${detail.max} points.`;
-    case 'invalid-point':
-      return 'Invalid point.';
-    case 'value-range':
-      return `${FIELD_LABELS[detail.field]}: expected value between ${detail.min} and ${detail.max}.`;
-    case 'barriers-limit':
-      return `Maximum ${detail.max} barrier spans.`;
-    case 'barriers-min-points':
-      return 'Barriers need at least two track points.';
-    case 'invalid-barrier':
-      return 'Invalid barrier.';
-    case 'barrier-type':
-      return 'Unknown barrier type.';
-    case 'barrier-side':
-      return 'Invalid barrier side.';
-    case 'barrier-index':
-      return `${detail.end === 'from' ? 'Barrier start' : 'Barrier end'}: point index out of the track.`;
-    case 'barrier-span':
-      return 'A barrier must cover at least two points.';
-    case 'barrier-direction':
-      return 'On an open road, a barrier must follow the track direction.';
-  }
-}
+  'trackIssue.pointsMinimumClosed': 'Add at least {min} points to close the circuit.',
+  'trackIssue.pointsMinimumOpen': 'Add at least {min} points to create a road.',
+  'trackIssue.trackTooShort': 'The track must be at least {min} m long to host the start.',
+  'trackIssue.pointsTooClose': 'Two consecutive points are too close (minimum {min} m).',
+  'trackIssue.steepGrade': 'Maximum grade of {grade} %: some cars will struggle.',
+  'trackIssue.tightTurn':
+    'Corner too tight between points {from} and {to} for this width. Spread the corner points or reduce the width.',
+  'trackIssue.trackCrossing':
+    'The track crosses itself: move the points involved. Bridges are not supported.',
 
-/** Turns a track diagnostic into the English text shown to the user. */
-export function formatTrackIssue(issue: TrackIssue): string {
-  switch (issue.code) {
-    case 'points-minimum':
-      return issue.closed
-        ? `Add at least ${issue.min} points to close the circuit.`
-        : `Add at least ${issue.min} points to create a road.`;
-    case 'track-too-short':
-      return `The track must be at least ${issue.min} m long to host the start.`;
-    case 'points-too-close':
-      return `Two consecutive points are too close (minimum ${issue.min} m).`;
-    case 'steep-grade':
-      return `Maximum grade of ${Math.round(issue.grade)} %: some cars will struggle.`;
-    case 'tight-turn':
-      return `Corner too tight between points ${issue.from + 1} and ${issue.to + 1} for this width. Spread the corner points or reduce the width.`;
-    case 'track-crossing':
-      return 'The track crosses itself: move the points involved. Bridges are not supported.';
-  }
-}
+  'exportError.foldedEdge':
+    'A road or pit edge folds inside a corner. Spread the points, reduce the width or move the start of the track to a straight.',
 
-/** Turns a failed export into the English text appended to “Export failed”. */
-export function formatExportError(error: ExportError): string {
-  return error.detail.code === 'invalid-track'
-    ? (error.issues?.errors ?? []).map(formatTrackIssue).join('\n')
-    : 'A road or pit edge folds inside a corner. Spread the points, reduce the width or move the start of the track to a straight.';
-}
-
-/** English texts embedded in the exported archives. */
-export const enDocuments: DocumentTexts = {
-  objHeader: '# Roadbuilder — meters, Y up, forward -Z',
-  trackDescription: (closed) =>
-    `Made with Roadbuilder. ${closed ? 'Closed circuit' : 'Open road'}. Prototype for solo free practice.`,
-  objReadme: (barrierCount) =>
-    'Roadbuilder — 3D sources\n\nImport track.obj into Blender (vertical axis Y, forward -Z, scale 1 m).\nTextures live in texture/. The Assetto Corsa marker transforms are in markers.json (4×4 matrices, translation on the last row).\nOBJ does not keep the AC markers: recreate them if you go through Blender/ksEditor.\nFor a direct KN5 export, use Export > Assetto Corsa in Roadbuilder.\n' +
-    (barrierCount
-      ? 'The 1WALL_* meshes are the game colliders (invisible on track); the barriers decorations have no prefix.\n'
-      : ''),
-  installation: ({ name, slug, terrainMargin, barrierCount, warnings }) =>
-    `ROADBUILDER — ${name}\n\nEXPERIMENTAL KN5 EXPORT, TO BE CHECKED IN GAME\n\n1. Unzip this archive into a temporary folder.\n2. Copy content/tracks/${slug} into assettocorsa/content/tracks/.\n   If this name already exists, keep a copy of your previous version before replacing it.\n3. In Content Manager or Assetto Corsa, select ${name}.\n4. Start a FREE PRACTICE session, with a single car and no opponents.\n\nINCLUDED\n${
-      barrierCount
-        ? `Barriers: ${barrierCount} span${barrierCount > 1 ? 's' : ''} with collision (guardrails, tyres, TecPro or walls).\n`
-        : ''
-    }Road with collisions, shoulders, optional kerbs, textures embedded in the KN5,\nstart/pit markers and timing, surfaces, map and preview.\nGrass terrain with collisions, inside and around the track, joined to its relief.\nOuter terrain margin: ${terrainMargin} m beyond the shoulder limits.\nPoint 1 sets the start of the track; the start line is placed after the pit.\n\nLIMITS OF THIS VERSION\nIn-game compatibility has not been verified automatically.\nOne pit box only, without a real pit lane.\nNo AI lines: races against the AI are not supported.\nOpen roads: free practice only; point-to-point timing not validated.\nThe terrain stops at the dotted rectangle visible in the editor.\nBeyond this outer edge, a fall is still possible. Increase the margin if needed.\n${
-      barrierCount
-        ? 'Barriers are simple colliders: check impacts in game.\nThe terrain relief is interpolated automatically.\n'
-        : 'No barriers, bridges or scenery; the terrain relief is interpolated automatically.\n'
-    }Not all road/shoulder edge overlaps are detected.\nFor a competition track, review and complete the model in a 3D tool.\n\nThe project.roadbuilder.json file lets you resume the work in the editor.\n${
-      warnings.length ? '\nWARNINGS\n' + warnings.map(formatTrackIssue).join('\n') : ''
-    }\n`,
+  'documents.objHeader': '# Roadbuilder — meters, Y up, forward -Z',
+  'documents.trackDescription': 'Made with Roadbuilder. {mode}. Prototype for solo free practice.',
+  'documents.objReadme':
+    'Roadbuilder — 3D sources\n\nImport track.obj into Blender (vertical axis Y, forward -Z, scale 1 m).\nTextures live in texture/. The Assetto Corsa marker transforms are in markers.json (4×4 matrices, translation on the last row).\nOBJ does not keep the AC markers: recreate them if you go through Blender/ksEditor.\nFor a direct KN5 export, use Export > Assetto Corsa in Roadbuilder.\n',
+  'documents.objReadmeBarriers':
+    'The 1WALL_* meshes are the game colliders (invisible on track); the barriers decorations have no prefix.\n',
+  'documents.installationHead':
+    'ROADBUILDER — {name}\n\nEXPERIMENTAL KN5 EXPORT, TO BE CHECKED IN GAME\n\n1. Unzip this archive into a temporary folder.\n2. Copy content/tracks/{slug} into assettocorsa/content/tracks/.\n   If this name already exists, keep a copy of your previous version before replacing it.\n3. In Content Manager or Assetto Corsa, select {name}.\n4. Start a FREE PRACTICE session, with a single car and no opponents.\n\nINCLUDED\n',
+  'documents.installationBarriers':
+    'Barriers: {count} span with collision (guardrails, tyres, TecPro or walls).|Barriers: {count} spans with collision (guardrails, tyres, TecPro or walls).',
+  'documents.installationBody':
+    'Road with collisions, shoulders, optional kerbs, textures embedded in the KN5,\nstart/pit markers and timing, surfaces, map and preview.\nGrass terrain with collisions, inside and around the track, joined to its relief.\nOuter terrain margin: {terrainMargin} m beyond the shoulder limits.\nPoint 1 sets the start of the track; the start line is placed after the pit.\n\nLIMITS OF THIS VERSION\nIn-game compatibility has not been verified automatically.\nOne pit box only, without a real pit lane.\nNo AI lines: races against the AI are not supported.\nOpen roads: free practice only; point-to-point timing not validated.\nThe terrain stops at the dotted rectangle visible in the editor.\nBeyond this outer edge, a fall is still possible. Increase the margin if needed.\n',
+  'documents.installationBarrierLimits':
+    'Barriers are simple colliders: check impacts in game.\nThe terrain relief is interpolated automatically.\n',
+  'documents.installationNoBarrierLimits':
+    'No barriers, bridges or scenery; the terrain relief is interpolated automatically.\n',
+  'documents.installationTail':
+    'Not all road/shoulder edge overlaps are detected.\nFor a competition track, review and complete the model in a 3D tool.\n\nThe project.roadbuilder.json file lets you resume the work in the editor.\n',
+  'documents.installationWarnings': 'WARNINGS',
 };

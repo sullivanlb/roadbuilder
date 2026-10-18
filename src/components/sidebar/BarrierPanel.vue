@@ -55,9 +55,7 @@ const rowLabel = (barrier: Barrier, index: number) =>
     <h2>
       <span class="section-index">04</span> {{ t('barriers.title') }}
       <span v-if="barriers.length" id="barrier-count" class="point-badge">{{
-        barriers.length > 1
-          ? t('barriers.countMany', { count: String(barriers.length).padStart(2, '0') })
-          : t('barriers.countOne', { count: String(barriers.length).padStart(2, '0') })
+        t('barriers.count', { count: String(barriers.length).padStart(2, '0') }, barriers.length)
       }}</span>
     </h2>
     <div class="segmented" :aria-label="t('barriers.typeAria')">

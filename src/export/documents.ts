@@ -1,7 +1,7 @@
 import type { Project, Sample } from '../domain/types';
 import type { TrackIssue } from '../domain/diagnostics';
-import { catalogues } from '../i18n/catalogues';
-import type { Locale } from '../i18n/catalogues';
+import { documentTexts } from '../i18n';
+import type { Locale } from '../i18n';
 
 /** Assetto Corsa surfaces.ini: the four physical surfaces used by the meshes. */
 export function surfacesIni(): string {
@@ -28,7 +28,7 @@ export function uiTrackJson(
   return JSON.stringify(
     {
       name: project.name,
-      description: catalogues[locale].documents.trackDescription(project.closed),
+      description: documentTexts(locale).trackDescription(project.closed),
       tags: [project.closed ? 'circuit' : 'hillclimb', 'fictional', 'roadbuilder'],
       country: 'France',
       city: '',
@@ -55,7 +55,7 @@ export function uiTrackJson(
 
 /** LIRE-MOI.txt shipped in the OBJ archive. */
 export function objReadme(barrierCount: number, locale: Locale = 'fr'): string {
-  return catalogues[locale].documents.objReadme(barrierCount);
+  return documentTexts(locale).objReadme(barrierCount);
 }
 
 interface InstallationTextOptions {
@@ -77,7 +77,7 @@ export function installationText({
   warnings,
   locale = 'fr',
 }: InstallationTextOptions): string {
-  return catalogues[locale].documents.installation({
+  return documentTexts(locale).installation({
     name: project.name,
     slug,
     terrainMargin: project.terrainMargin,
