@@ -22,16 +22,16 @@ import baseline from './fixtures/legacy-baseline.json';
 import tightTurnFixture from './fixtures/tight-turn.roadbuilder.json';
 
 // These hashes were captured from the pre-migration HTML, before changing its algorithms.
-describe.each(['club', 'kart', 'mountain'] as const)('compatibilité du modèle %s', (template) => {
+describe.each(['club', 'kart', 'mountain'] as const)('model compatibility %s', (template) => {
   const project = createProject(template);
-  it('conserve les projets et les mesures de la version HTML', () => {
+  it('preserves projects and measurements from the HTML version', () => {
     expect(project).toEqual(baseline[template].project);
     const samples = sampleTrack(project);
     expect(samples).toHaveLength(baseline[template].samples);
     expect(trackStats(samples)).toEqual(baseline[template].stats);
     expect(trackIssues(project, samples).errors).toEqual([]);
   });
-  it('conserve des maillages finis, orientés vers le haut et des indices KN5 valides', () => {
+  it('preserves finite, upward-facing meshes and valid KN5 indices', () => {
     const scene = buildScene(project);
     expect(
       scene.meshes.map((m) => ({
@@ -58,7 +58,7 @@ describe.each(['club', 'kart', 'mountain'] as const)('compatibilité du modèle 
     expect(scene.markers.map((m) => m.name)).toContain('AC_START_0');
     expect(scene.markers.map((m) => m.name)).toContain('AC_PIT_0');
   });
-  it.each(['ac', 'obj'] as const)('produit exactement la même archive %s', (format) => {
+  it.each(['ac', 'obj'] as const)('produces exactly the same %s archive', (format) => {
     const output = buildExport(project, format);
     expect(createHash('sha256').update(output.bytes).digest('hex')).toBe(
       baseline[template][format].sha256,
@@ -79,8 +79,8 @@ describe.each(['club', 'kart', 'mountain'] as const)('compatibilité du modèle 
   });
 });
 
-describe('validation et géométrie', () => {
-  it('importe un ancien projet sans marge de terrain sans modifier sa source', () => {
+describe('validation and geometry', () => {
+  it('imports a legacy project with no terrain margin without altering its source', () => {
     const { terrainMargin: _, ...legacy } = createProject();
     expect(validateProject(legacy).terrainMargin).toBe(150);
     expect(legacy).not.toHaveProperty('terrainMargin');
@@ -93,17 +93,17 @@ describe('validation et géométrie', () => {
     { ...createProject(), width: NaN },
     { ...createProject(), points: [null] },
     { ...createProject(), points: Array(LIMITS.points + 1).fill({ x: 0, y: 0, z: 0 }) },
-  ])('rejette un projet invalide', (value) => {
+  ])('rejects an invalid project', (value) => {
     expect(() => validateProject(value)).toThrow();
   });
-  it('gère la page blanche et refuse son export', () => {
+  it('handles the blank template and rejects its export', () => {
     const project = createProject('blank');
     expect(sampleTrack(project)).toEqual([]);
     expect(sampleAt([], 5)).toBeNull();
     expect(buildScene(project).meshes).toEqual([]);
     expect(() => buildExport(project)).toThrow('2 points');
   });
-  it('ferme les circuits et conserve les extrémités des routes ouvertes', () => {
+  it('closes circuits and preserves the ends of open roads', () => {
     const closed = sampleTrack(createProject('club'));
     expect([closed.at(-1)!.x, closed.at(-1)!.z]).toEqual([closed[0].x, closed[0].z]);
     const project = createProject('mountain'),
@@ -114,7 +114,7 @@ describe('validation et géométrie', () => {
     expect(bounds(open).minY).toBeGreaterThanOrEqual(0);
     expect(bounds(open).maxY).toBeLessThanOrEqual(145);
   });
-  it('détecte les croisements et points trop proches', () => {
+  it('detects crossings and points too close together', () => {
     const project = createProject('blank');
     project.points = [
       { x: -100, y: 0, z: -100 },
@@ -128,8 +128,8 @@ describe('validation et géométrie', () => {
   });
 });
 
-describe('historique', () => {
-  it('ignore les gestes sans changement, groupe un geste et invalide le rétablissement après une nouvelle modification', () => {
+describe('history', () => {
+  it('ignores no-op gestures, groups a gesture and invalidates redo after a new change', () => {
     const history = new ProjectHistory();
     history.remember('a', 'a');
     expect(history.canUndo).toBe(false);
@@ -140,7 +140,7 @@ describe('historique', () => {
     history.remember('a', 'c');
     expect(history.canRedo).toBe(false);
   });
-  it('limite la session aux 60 dernières modifications', () => {
+  it('limits the session to the last 60 changes', () => {
     const history = new ProjectHistory();
     for (let i = 0; i < 65; i++) history.remember(String(i), String(i + 1));
     for (let i = 65; i > 5; i--) expect(history.undo(String(i))).toBe(String(i - 1));
@@ -148,7 +148,7 @@ describe('historique', () => {
   });
 });
 
-describe('sauvegarde locale', () => {
+describe('local persistence', () => {
   const memory = (initial: string) => {
     const values = new Map([[STORAGE_KEY, initial]]);
     return {
@@ -159,14 +159,14 @@ describe('sauvegarde locale', () => {
       },
     };
   };
-  it('restaure et enregistre un projet valide', () => {
+  it('restores and saves a valid project', () => {
     const storage = memory(JSON.stringify(createProject('kart')));
     const restored = restoreProject(storage);
     expect(restored.project.name).toBe('Karting des Pins');
     expect(persistProject(storage, createProject(), false)).toBe('saved');
     expect(restoreProject(storage).project.name).toBe('Circuit des Collines');
   });
-  it('préserve le contenu corrompu avant toute nouvelle sauvegarde', () => {
+  it('preserves corrupted content before any new save', () => {
     const storage = memory('{invalid');
     const restored = restoreProject(storage);
     expect(restored.message).not.toBe('');
@@ -176,7 +176,7 @@ describe('sauvegarde locale', () => {
     expect(persistProject(storage, restored.project, false)).toBe('saved');
     expect([...storage.values.values()]).toContain('{invalid');
   });
-  it('interdit l’écrasement si la copie de récupération échoue', () => {
+  it('refuses to overwrite when the recovery copy fails', () => {
     const storage = {
       getItem: () => '{invalid',
       setItem: () => {
@@ -190,7 +190,7 @@ describe('sauvegarde locale', () => {
   });
 });
 
-it('écrit un ZIP avec CRC et refuse les chemins dangereux', () => {
+it('writes a ZIP with CRC and rejects dangerous paths', () => {
   const bytes = zipFiles({ 'été.txt': 'bonjour' });
   const view = new DataView(bytes.buffer);
   expect(view.getUint32(0, true)).toBe(0x04034b50);
@@ -199,8 +199,8 @@ it('écrit un ZIP avec CRC et refuse les chemins dangereux', () => {
   expect(() => zipFiles({ '../track.kn5': 'x' })).toThrow('Chemin ZIP invalide');
 });
 
-describe('localisation des virages trop serrés', () => {
-  it('rattache chaque refus à une portion entre deux points, même si le défaut se trouve entre les points de contrôle', () => {
+describe('locating overly tight turns', () => {
+  it('locates each rejection on a span between two points, even when it lies mid-span', () => {
     const project = validateProject(tightTurnFixture);
     const samples = sampleTrack(project);
     const issues = trackIssues(project, samples);
@@ -219,7 +219,7 @@ describe('localisation des virages trop serrés', () => {
     }
   });
 
-  it('utilise le premier point pour la fermeture du circuit, sans l’inventer sur une route ouverte', () => {
+  it('uses the first point to close the circuit, without inventing it on an open road', () => {
     const project = validateProject(tightTurnFixture);
     project.closed = true;
     const closing = trackIssues(project).tightTurns.find(
@@ -233,7 +233,7 @@ describe('localisation des virages trop serrés', () => {
     );
   });
 
-  it('retire les diagnostics après correction et autorise les deux exports', () => {
+  it('clears the diagnostics after a fix and allows both exports', () => {
     const project = validateProject(tightTurnFixture);
     project.width = 4;
     expect(trackIssues(project).tightTurns).toEqual([]);
@@ -249,7 +249,7 @@ describe('localisation des virages trop serrés', () => {
     expect(trackIssues(project).tightTurns).toEqual([]);
   });
 
-  it('ne produit pas de localisation invalide pour un tracé vide ou avec un seul point', () => {
+  it('produces no invalid location for an empty or single-point track', () => {
     const project = createProject('blank');
     expect(trackIssues(project).tightTurns).toEqual([]);
     project.points = [{ x: 0, y: 0, z: 0 }];
@@ -257,7 +257,7 @@ describe('localisation des virages trop serrés', () => {
   });
 });
 
-describe('barrières', () => {
+describe('barriers', () => {
   const region = (over: Partial<Barrier> = {}): Barrier => ({
     type: 'guardrail',
     side: 'right',
@@ -271,7 +271,7 @@ describe('barrières', () => {
     barriers,
   });
 
-  it('valide les tronçons, nettoie les champs inconnus et tolère le bouclage des circuits fermés', () => {
+  it('validates segments, strips unknown fields and tolerates wrapping on closed circuits', () => {
     const validated = validateProject(
       withBarriers([region({ type: 'wall', side: 'left', from: 7, to: 2, offset: 0.5 })]),
     );
@@ -292,11 +292,11 @@ describe('barrières', () => {
     [[{ type: 'wall', side: 'left', from: 1, to: 2 }]],
     [[null]],
     [Array<Barrier>(LIMITS.barriers + 1).fill(region())],
-  ])('rejette une liste de tronçons invalide', (barriers) => {
+  ])('rejects an invalid list of segments', (barriers) => {
     expect(() => validateProject(withBarriers(barriers))).toThrow();
   });
 
-  it('refuse un tronçon à contre-sens sur une route ouverte et sans tracé', () => {
+  it('rejects a backwards segment on an open road and without a track', () => {
     expect(() =>
       validateProject(
         withBarriers([region({ type: 'tires', side: 'left', from: 5, to: 2 })], 'mountain'),
@@ -307,7 +307,7 @@ describe('barrières', () => {
     );
   });
 
-  it('suit le sens du tracé et boucle avec le circuit fermé', () => {
+  it('follows the track direction and wraps around on a closed circuit', () => {
     const project = createProject('club');
     expect(barrierSegments(project, region({ from: 2, to: 5 }))).toEqual([2, 3, 4]);
     expect(barrierSegments(project, region({ from: 7, to: 2 }))).toEqual([7, 8, 0, 1]);
@@ -325,7 +325,7 @@ describe('barrières', () => {
     expect(line.every((p) => Number.isFinite(p.x) && Number.isFinite(p.z))).toBe(true);
   });
 
-  it('écarte le collider du bord de piste et le bride dans les virages serrés', () => {
+  it('offsets the collider from the track edge and clamps it in tight turns', () => {
     const project = createProject('club');
     const samples = sampleTrack(project);
     const straight = samples.find((s) => Math.abs(s.curvature) < 0.005)!;
@@ -333,7 +333,7 @@ describe('barrières', () => {
     expect(barrierLateral(project, straight, 'right', 1)).toBeCloseTo(base + 1, 5);
     expect(barrierLateral(project, straight, 'left', 1)).toBeCloseTo(-(base + 1), 5);
     expect(barrierLateral(project, straight, 'right', 10)).toBeCloseTo(base + 10, 5);
-    // Sur le tracé serré, le côté intérieur est bridé pour ne pas passer de l'autre côté.
+    // On the tight turn, the inner side is clamped so it does not cross to the other side.
     const tight = validateProject(tightTurnFixture);
     const tightBase = tight.width / 2 + (tight.kerbs ? 0.65 : 0);
     const curved = sampleTrack(tight).reduce((a, b) =>
@@ -343,12 +343,12 @@ describe('barrières', () => {
     const value = Math.abs(barrierLateral(tight, curved, side, 10));
     expect(value).toBeGreaterThanOrEqual(tightBase + 0.05);
     expect(value).toBeLessThan(tightBase + 10);
-    // Le côté extérieur garde son décalage complet.
+    // The outer side keeps its full offset.
     const outside = side === 'right' ? 'left' : 'right';
     expect(Math.abs(barrierLateral(tight, curved, outside, 10))).toBeCloseTo(tightBase + 10, 5);
   });
 
-  it('génère des colliders 1WALL invisibles, des décors visibles et des normales vers la piste', () => {
+  it('generates invisible 1WALL colliders, visible scenery and track-facing normals', () => {
     const project = createProject('club');
     project.barriers = [
       { type: 'guardrail', side: 'right', from: 1, to: 3, offset: 1 },
@@ -383,7 +383,7 @@ describe('barrières', () => {
       }
     }
     expect(inward / total).toBeGreaterThan(0.6);
-    // Le mur béton est visible : il sert lui-même de collider.
+    // The concrete wall is visible: it is its own collider.
     const beton = scene.meshes.filter((m) => m.name.startsWith('1WALL_beton'));
     expect(beton.length).toBeGreaterThanOrEqual(1);
     for (const mesh of beton) expect(mesh.renderable).not.toBe(false);
@@ -392,7 +392,7 @@ describe('barrières', () => {
     for (const mesh of decors) expect(mesh.renderable).not.toBe(false);
   });
 
-  it('garde le collider hors de la chaussée dans un virage très serré', () => {
+  it('keeps the collider off the roadway in a very tight turn', () => {
     const project = validateProject(tightTurnFixture);
     project.width = 4;
     project.barriers = [
@@ -412,13 +412,13 @@ describe('barrières', () => {
     expect(minimum).toBeGreaterThan(project.width / 2);
   });
 
-  it('ne crée aucun maillage de barrière sans tronçon', () => {
+  it('creates no barrier mesh without segments', () => {
     const scene = buildScene(createProject('club'));
     expect(scene.meshes.some((m) => m.name.startsWith('1WALL'))).toBe(false);
     expect(scene.meshes.every((m) => m.barrier === undefined)).toBe(true);
   });
 
-  it('exporte les barrières dans les deux formats sans toucher aux surfaces', () => {
+  it('exports barriers in both formats without touching the surfaces', () => {
     const project = createProject('club');
     project.barriers = [
       { type: 'guardrail', side: 'right', from: 1, to: 3, offset: 1 },
@@ -452,14 +452,14 @@ describe('barrières', () => {
     expect(obj.files['LIRE-MOI.txt']).toContain('1WALL');
   });
 
-  it('décale les ancres à l’insertion d’un point', () => {
+  it('shifts anchors when a point is inserted', () => {
     const b = region({ from: 2, to: 4 });
     expect(insertBarrierPoint([b], 2)).toEqual([region({ from: 3, to: 5 })]);
     expect(insertBarrierPoint([b], 3)).toEqual([region({ from: 2, to: 5 })]);
     expect(insertBarrierPoint([b], 5)).toEqual([b]);
   });
 
-  it('supprime un tronçon qui perd une ancre et décale les autres', () => {
+  it('removes a segment that loses an anchor and shifts the others', () => {
     const b = region({ from: 2, to: 4 });
     expect(removeBarrierPoint([b], 3, false)).toEqual([region({ from: 2, to: 3 })]);
     expect(removeBarrierPoint([b], 2, false)).toEqual([]);
@@ -467,7 +467,7 @@ describe('barrières', () => {
     expect(removeBarrierPoint([b], 0, false)).toEqual([region({ from: 1, to: 3 })]);
   });
 
-  it('rejoue les tronçons à l’envers, côté compris', () => {
+  it('replays segments in reverse, side included', () => {
     expect(reverseBarriers([region({ from: 2, to: 5 })], 9, false)).toEqual([
       region({ from: 3, to: 6, side: 'left' }),
     ]);
@@ -479,7 +479,7 @@ describe('barrières', () => {
     ]);
   });
 
-  it('scinde les tronçons qui bouclaient au passage en route ouverte', () => {
+  it('splits wrapping segments when switching to an open road', () => {
     expect(splitWrappingBarriers([region({ from: 7, to: 2 })], 9)).toEqual([
       region({ from: 7, to: 8 }),
       region({ from: 0, to: 2 }),

@@ -17,7 +17,7 @@ export interface Barrier {
   to: number;
   offset: number;
 }
-/** Tronçon en cours de tracé : point de départ, côté et type choisis. */
+/** Span being drawn: start point, side and type chosen. */
 export interface BarrierDraft {
   from: number;
   side: BarrierSide;
@@ -78,9 +78,9 @@ export interface Mesh {
   vertices: Vertex[];
   indices: number[];
   terrain?: boolean;
-  /** Maillage de barrière : faces verticales, exclus du contrôle de repli. */
+  /** Barrier mesh: vertical faces, excluded from the fold-back check. */
   barrier?: boolean;
-  /** false dans le KN5 : collision conservée, rien n'est dessiné en jeu. */
+  /** false in the KN5: collision kept, nothing is drawn in game. */
   renderable?: boolean;
 }
 export interface Marker {

@@ -57,7 +57,7 @@ function pointer(type: string, x: number, y: number, extra: MouseEventInit = {})
     new MouseEvent(type, { clientX: x, clientY: y, button: 0, bubbles: true, ...extra }),
   );
 }
-/** Clic sur la chaussée, à 2 m du point de contrôle, du côté demandé. */
+/** Click on the roadway, 2 m from the control point, on the requested side. */
 function roadClick(type: string, index: number, side: 'left' | 'right') {
   const point = renderer.project.points[index];
   const sample = renderer.samples.find((s) => s.segment === index && s.t === 0)!;
@@ -196,8 +196,8 @@ afterEach(() => {
   document.body.innerHTML = '';
 });
 
-describe('interface Vue (DOM et canvas simulés)', () => {
-  it('affiche les valeurs initiales, actualise le rendu et groupe les réglages dans l’historique', async () => {
+describe('Vue interface (simulated DOM and canvas)', () => {
+  it('displays initial values, updates the render and groups settings in the history', async () => {
     await mount();
     expect($('point-count').textContent).toBe('09 POINTS');
     expect(drawCalls).toBeGreaterThan(0);
@@ -216,7 +216,7 @@ describe('interface Vue (DOM et canvas simulés)', () => {
     expect((await saved()).points[0].y).toBe(42);
     expect($<HTMLInputElement>('point-altitude').value).toBe('42');
   });
-  it('laisse saisir un nom vide ou avec espaces avant de le normaliser à la sortie du champ', async () => {
+  it('allows typing an empty or padded name before normalizing it on blur', async () => {
     await mount();
     await input('project-name', '');
     expect($<HTMLInputElement>('project-name').value).toBe('');
@@ -230,7 +230,7 @@ describe('interface Vue (DOM et canvas simulés)', () => {
     expect($<HTMLInputElement>('project-name').value).toBe('Circuit des Collines');
   });
 
-  it('gère la page blanche, les gestes, la grille, la suppression et les raccourcis', async () => {
+  it('handles the blank template, gestures, the grid, deletion and shortcuts', async () => {
     await mount();
     await click('new-project');
     expect($<HTMLDialogElement>('new-dialog').open).toBe(true);
@@ -267,7 +267,7 @@ describe('interface Vue (DOM et canvas simulés)', () => {
     await flush();
     expect(downloads.at(-1)!.name).toMatch(/\.roadbuilder\.json$/);
   });
-  it('insère un point sur la route par double-clic et permet de choisir un point par le profil', async () => {
+  it('inserts a point on the road by double-click and picks a point via the profile', async () => {
     await mount();
     const sample = renderer.samples[Math.floor(renderer.samples.length / 4)],
       p = renderer.screen(sample);
@@ -280,7 +280,7 @@ describe('interface Vue (DOM et canvas simulés)', () => {
     await flush();
     expect($('point-badge').textContent).toBe('POINT 01');
   });
-  it('change de vue, tourne, zoome et nettoie les ressources au démontage', async () => {
+  it('switches views, rotates, zooms and cleans up resources on unmount', async () => {
     await mount();
     await click('view-3d');
     expect($('view-3d').getAttribute('aria-pressed')).toBe('true');
@@ -301,7 +301,7 @@ describe('interface Vue (DOM et canvas simulés)', () => {
     expect(disconnect).toHaveBeenCalledOnce();
     expect(vi.getTimerCount()).toBe(0);
   });
-  it('importe les anciens projets, conserve le projet en cas d’erreur et restaure au remontage', async () => {
+  it('imports legacy projects, keeps the project on error and restores on remount', async () => {
     await mount();
     const { terrainMargin: _, ...legacy } = createProject('mountain');
     await openFile(legacy);
@@ -317,7 +317,7 @@ describe('interface Vue (DOM et canvas simulés)', () => {
     await mount();
     expect($<HTMLInputElement>('project-name').value).toBe(legacy.name);
   });
-  it('préserve la sauvegarde corrompue et permet de télécharger sans stockage', async () => {
+  it('preserves the corrupted save and allows downloading without storage', async () => {
     localStorage.setItem(STORAGE_KEY, '{corrompu');
     vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => {
       throw new Error('quota');
@@ -331,7 +331,7 @@ describe('interface Vue (DOM et canvas simulés)', () => {
     const savedProject = JSON.parse(await downloads[0].blob.text()) as Project;
     expect(savedProject.name).toBe('Mon nouveau tracé');
   });
-  it('exporte les deux formats via les dialogues et bloque une géométrie invalide', async () => {
+  it('exports both formats via the dialogs and blocks invalid geometry', async () => {
     await mount();
     await click('export-project');
     await input('export-author', 'Pilote');
@@ -353,7 +353,7 @@ describe('interface Vue (DOM et canvas simulés)', () => {
     await click('export-project');
     expect($<HTMLButtonElement>('download-export').disabled).toBe(true);
   });
-  it('montre les portions trop serrées avant l’export, permet de les retrouver et actualise tous les diagnostics après correction', async () => {
+  it('shows tight portions before export, locates them and refreshes diagnostics', async () => {
     await mount();
     await openFile(tightTurnFixture);
     expect($('validation-status').textContent).toContain('points 3 et 4');
@@ -415,7 +415,7 @@ describe('interface Vue (DOM et canvas simulés)', () => {
     expect($('point-issues')).toBeNull();
   });
 
-  it('localise la fermeture d’un circuit depuis l’export et retire ses repères lors d’un autre import', async () => {
+  it('locates a circuit closure from the export and clears its markers on reimport', async () => {
     await mount();
     await openFile({ ...tightTurnFixture, closed: true });
     await click('export-project');
@@ -429,7 +429,7 @@ describe('interface Vue (DOM et canvas simulés)', () => {
     expect($('locate-tight-turn')).toBeNull();
   });
 
-  it('ignore le résultat d’un import en cours lorsqu’un nouveau projet le remplace', async () => {
+  it('ignores the result of an in-flight import when a new project replaces it', async () => {
     await mount();
     let resolve!: (value: string) => void;
     Object.defineProperty($('file-input'), 'files', {
@@ -453,7 +453,7 @@ describe('interface Vue (DOM et canvas simulés)', () => {
     expect((await saved()).name).toBe('Mon nouveau tracé');
   });
 
-  it('trace une barrière en deux clics, l’affiche, la sélectionne et la persiste', async () => {
+  it('draws a barrier in two clicks, shows it, selects it and persists it', async () => {
     await mount();
     await click('tool-barrier');
     expect($('tool-barrier').getAttribute('aria-pressed')).toBe('true');
@@ -497,7 +497,7 @@ describe('interface Vue (DOM et canvas simulés)', () => {
     expect(drawCalls).toBeGreaterThan(0);
   });
 
-  it('refuse un tronçon qui démarre et s’arrête sur le même point', async () => {
+  it('rejects a segment that starts and ends on the same point', async () => {
     await mount();
     await click('barrier-draw');
     roadClick('pointerdown', 2, 'right');
@@ -511,7 +511,7 @@ describe('interface Vue (DOM et canvas simulés)', () => {
     expect($('barrier-empty')).not.toBeNull();
   });
 
-  it('modifie, inverse, supprime et répare les tronçons avec l’historique', async () => {
+  it('edits, reverses, deletes and repairs segments with the history', async () => {
     await mount();
     await click('tool-barrier');
     await traceBarrier(1, 4);
@@ -548,7 +548,7 @@ describe('interface Vue (DOM et canvas simulés)', () => {
     expect((await saved()).barriers).toEqual([]);
   });
 
-  it('rejoue les barrières à l’envers et les scinde au passage en route ouverte', async () => {
+  it('replays barriers in reverse and splits them when switching to an open road', async () => {
     await mount();
     await openFile({
       ...createProject('club'),
@@ -568,7 +568,7 @@ describe('interface Vue (DOM et canvas simulés)', () => {
     ]);
   });
 
-  it('trace au clavier, annule le tracé en cours puis quitte l’outil avec Échap', async () => {
+  it('draws with the keyboard, cancels the trace and exits the tool with Escape', async () => {
     await mount();
     key('b');
     await flush();
@@ -587,7 +587,7 @@ describe('interface Vue (DOM et canvas simulés)', () => {
     expect((await saved()).barriers ?? []).toEqual([]);
   });
 
-  it('ouvre un projet ancien sans barrières, normalise le sens de tracé et retrouve les tronçons au remontage', async () => {
+  it('opens a legacy project, normalizes direction and keeps segments on remount', async () => {
     await mount();
     await openFile(createProject('mountain'));
     expect($('barrier-empty')).not.toBeNull();

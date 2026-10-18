@@ -2,10 +2,10 @@ import type { Barrier, BarrierSide, BarrierType, Mesh, Point, Project, Sample } 
 import { BARRIER_MATERIALS, newMesh, addQuad } from './mesh';
 
 /**
- * Barrières : un tronçon suit la chaussée entre deux points de contrôle.
- * Le collider est un ruban vertical nommé 1WALL_*, invisible en jeu
- * (renderable = false), comme les murs de collision des circuits Kunos.
- * Les décors (glissière, pneus, blocs TecPro, mur) sont dessinés à part.
+ * Barriers: a span follows the roadway between two control points.
+ * The collider is a vertical ribbon named 1WALL_*, invisible in game
+ * (renderable = false), like the collision walls of Kunos circuits.
+ * Decor (guardrail, tires, TecPro blocks, wall) is drawn separately.
  */
 const BARRIER_SIZES = {
   guardrail: { collider: 0.78, railBottom: 0.44, railTop: 0.78, postTop: 0.72, capWidth: 0.45 },
@@ -20,7 +20,7 @@ const BARRIER_TYPE_LABELS: Record<BarrierType, string> = {
   tecpro: 'TecPro',
   wall: 'Mur béton',
 };
-/** Position, base locale et courbure d'un point du ruban. */
+/** Position, local frame and curvature of a ribbon point. */
 type Frame = Pick<Sample, 'x' | 'y' | 'z' | 'nx' | 'nz' | 's' | 'curvature'>;
 const frame = (sample: Sample): Frame => ({
   x: sample.x,
@@ -31,7 +31,7 @@ const frame = (sample: Sample): Frame => ({
   s: sample.s,
   curvature: sample.curvature,
 });
-/** Repère translaté le long de la tangente locale, pour les poteaux. */
+/** Frame translated along the local tangent, for the posts. */
 const along = (p: Frame, distance: number): Frame => ({
   ...p,
   x: p.x + p.nz * distance,
@@ -60,7 +60,7 @@ export function barrierSegments(project: Project, barrier: Barrier): number[] {
   return segments;
 }
 
-/** Échantillons couvrant le tronçon, dans le sens du tracé, sans doublon. */
+/** Samples covering the span, in track direction, without duplicates. */
 export function barrierSamples(project: Project, samples: Sample[], barrier: Barrier): Sample[] {
   if (samples.length < 2) return [];
   const path: Sample[] = [];
@@ -69,8 +69,8 @@ export function barrierSamples(project: Project, samples: Sample[], barrier: Bar
     if (previous && Math.hypot(sample.x - previous.x, sample.z - previous.z) < 0.0001) return;
     path.push(sample);
   };
-  // Les segments sont parcourus dans l'ordre du tronçon : un circuit fermé
-  // peut boucler (7 → 8 → 0 → 1) sans repartir du premier échantillon.
+  // Segments are walked in span order: a closed circuit can wrap around
+  // (7 → 8 → 0 → 1) without restarting from the first sample.
   for (const segment of barrierSegments(project, barrier))
     for (const sample of samples) if (sample.segment === segment) push(sample);
   const end = samples.find((sample) => sample.segment === barrier.to && sample.t === 0);
@@ -79,9 +79,9 @@ export function barrierSamples(project: Project, samples: Sample[], barrier: Bar
 }
 
 /**
- * Position latérale du collider : un mètre au-delà du vibreur par défaut.
- * Le bridage reprend celui des accotements pour éviter que le ruban ne se
- * replie vers l'intérieur du virage (0,8 / courbure).
+ * Lateral position of the collider: one meter beyond the kerb by default.
+ * Clamping reuses the shoulder rule so the ribbon does not fold back
+ * toward the inside of the corner (0.8 / curvature).
  */
 export function barrierLateral(
   project: Project,
@@ -97,7 +97,7 @@ export function barrierLateral(
   return sign * Math.min(half + kerb + offsetValue, limit);
 }
 
-/** Ligne du collider au sol, pour l'affichage 2D, la carte et le cadrage. */
+/** Collider line on the ground, for the 2D view, the map and framing. */
 export function barrierPath(project: Project, samples: Sample[], barrier: Barrier): Point[] {
   return barrierSamples(project, samples, barrier).map((sample) => {
     const lateral = barrierLateral(project, sample, barrier.side, barrier.offset);
@@ -105,7 +105,7 @@ export function barrierPath(project: Project, samples: Sample[], barrier: Barrie
   });
 }
 
-/** Promène un pas régulier le long du ruban (poteaux, pneus). */
+/** Walks a regular step along the ribbon (posts, tires). */
 function walk(path: Sample[], spacing: number, phase = 0) {
   const steps: { frame: Frame; s: number }[] = [];
   let distance = 0,
@@ -138,9 +138,9 @@ function walk(path: Sample[], spacing: number, phase = 0) {
 }
 
 /**
- * Face verticale le long du ruban. Les sommets sont ordonnés pour que la
- * normale soit tournée vers la piste : c'est indispensable pour que les
- * voitures ne traversent pas le mur.
+ * Vertical face along the ribbon. Vertices are ordered so that the normal
+ * points toward the track: essential to keep the cars from driving
+ * through the wall.
  */
 function wallQuad(
   mesh: Mesh,
@@ -165,7 +165,7 @@ function wallQuad(
   }
   addQuad(mesh, positions, uvs);
 }
-/** Face horizontale (dessus), normale vers le haut quelle que soit la rive. */
+/** Horizontal face (top), normal pointing up no matter which side. */
 function topQuad(
   mesh: Mesh,
   a: Frame,
@@ -191,7 +191,7 @@ function topQuad(
     edgeUvs(a.s, b.s, 0, 1),
   );
 }
-/** Retour d'extrémité, perpendiculaire à la piste. direction : 1 vers l'avant. */
+/** End cap, perpendicular to the track. direction: 1 is forward. */
 function capQuad(
   mesh: Mesh,
   p: Frame,
@@ -211,7 +211,7 @@ function capQuad(
   }
   addQuad(mesh, positions, uvs);
 }
-/** Anneau de pneu : cylindre ouvert d'axe vertical, 6 facettes. */
+/** Tire ring: open cylinder with a vertical axis, 6 facets. */
 function tireRing(
   mesh: Mesh,
   base: Frame,
@@ -382,9 +382,9 @@ function buildBarrierMeshes(project: Project, samples: Sample[]): Mesh[] {
   return meshes;
 }
 
-// --- Entretien des tronçons quand les points changent ------------------------
+// --- Span maintenance when points change ------------------------------------
 
-/** Insertion d'un point à l'indice k : les ancres glissent après lui. */
+/** Inserting a point at index k: anchors after it slide forward. */
 export function insertBarrierPoint(barriers: Barrier[], index: number): Barrier[] {
   return barriers.map((barrier) => ({
     ...barrier,
@@ -393,7 +393,7 @@ export function insertBarrierPoint(barriers: Barrier[], index: number): Barrier[
   }));
 }
 
-/** Suppression d'un point : un tronçon qui perd une ancre disparaît. */
+/** Removing a point: a span that loses an anchor disappears. */
 export function removeBarrierPoint(barriers: Barrier[], index: number, closed: boolean): Barrier[] {
   return barriers.flatMap((barrier): Barrier[] => {
     if (barrier.from === index || barrier.to === index) return [];
@@ -405,7 +405,7 @@ export function removeBarrierPoint(barriers: Barrier[], index: number, closed: b
   });
 }
 
-/** Sens inversé : le tronçon se rejoue de l'arrivée vers le départ. */
+/** Reversed direction: the span replays from the end back to the start. */
 export function reverseBarriers(barriers: Barrier[], count: number, closed: boolean): Barrier[] {
   const map = (i: number) => (closed ? (i === 0 ? 0 : count - i) : count - 1 - i);
   return barriers.map((barrier) => ({
@@ -416,7 +416,7 @@ export function reverseBarriers(barriers: Barrier[], count: number, closed: bool
   }));
 }
 
-/** Passage en route ouverte : un tronçon qui bouclait devient deux tronçons. */
+/** Switching to open route: a wrapping span becomes two spans. */
 export function splitWrappingBarriers(barriers: Barrier[], count: number): Barrier[] {
   return barriers.flatMap((barrier): Barrier[] => {
     if (barrier.from < barrier.to) return [barrier];

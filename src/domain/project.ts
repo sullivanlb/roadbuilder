@@ -109,7 +109,7 @@ function validateProject(input: unknown): Project {
       z: number(p.z, -LIMITS.coordinate, LIMITS.coordinate, 'Position Z'),
     };
   });
-  // Les barrières restent un champ optionnel : un ancien projet n'en reçoit pas.
+  // Barriers stay an optional field: an old project receives none.
   const barriers = validateBarriers(value.barriers, points.length, value.closed === true);
   return {
     format: 'assetto-roadbuilder',
@@ -139,7 +139,7 @@ function validateBarriers(
     throw new Error(`Maximum ${LIMITS.barriers} tronçons de barrière.`);
   if (input.length && pointCount < 2)
     throw new Error('Les barrières nécessitent au moins deux points de tracé.');
-  // Un tronçon ne peut boucler que si le circuit est réellement fermé.
+  // A span can only wrap when the circuit is actually closed.
   const wrapping = closed && pointCount > 2;
   return input.map((raw): Barrier => {
     if (!raw || typeof raw !== 'object') throw new Error('Barrière invalide.');

@@ -217,7 +217,7 @@ class TrackRenderer {
     }
     return best;
   }
-  /** Point de contrôle le plus proche du clic, avec la rive visée. */
+  /** Control point nearest the click, along with the targeted side. */
   hitRoadPoint(x: number, y: number) {
     const road = this.hitRoad(x, y);
     const count = this.project.points.length;
@@ -232,7 +232,7 @@ class TrackRenderer {
       (world.x - road.x) * road.nx + (world.z - road.z) * road.nz >= 0 ? 'right' : 'left';
     return { index, side };
   }
-  /** Tronçon de barrière le plus proche du clic, dans la limite de 8 px. */
+  /** Barrier segment nearest the click, within the 8 px limit. */
   hitBarrier(x: number, y: number) {
     let best = -1,
       bestDistance = 8;
@@ -557,7 +557,7 @@ class TrackRenderer {
     const ctx = this.ctx,
       faces = [];
     for (const mesh of this.scene.meshes) {
-      // Les colliders de barrière restent invisibles en jeu : on ne les dessine pas.
+      // Barrier colliders stay invisible in game: they are not drawn here.
       if (mesh.renderable === false) continue;
       const color = MATERIALS[mesh.material].color;
       for (let i = 0; i < mesh.indices.length; i += 3) {

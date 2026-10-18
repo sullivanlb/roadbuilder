@@ -125,7 +125,7 @@ function buildScene(project: Project, samples = sampleTrack(project)): Scene {
   timing(0, start);
   timing(1, at(samples, project.closed ? length / 3 : length / 2));
   timing(2, at(samples, project.closed ? (2 * length) / 3 : length - 12));
-  // Barrières : colliders 1WALL invisibles + décors visibles, sur les mêmes échantillons que la piste.
+  // Barriers: invisible 1WALL colliders + visible decors, on the same samples as the track.
   const meshes = [];
   for (const mesh of [road, grass, red, white, paint, pit, ...buildBarrierMeshes(project, samples)])
     meshes.push(...splitMesh(mesh));

@@ -11,8 +11,8 @@ const MATERIALS = [
   { name: 'tecpro_white', color: [226, 224, 214], texture: 'tecpro_white.png' },
   { name: 'concrete', color: [186, 184, 176], texture: 'concrete.png' },
 ];
-// Les cinq premiers matériaux sont toujours écrits dans les exports : les projets
-// sans barrière restent identiques octet par octet aux versions précédentes.
+// The first five materials are always written in exports: projects
+// without barriers stay byte-for-byte identical to earlier versions.
 const BASE_MATERIALS = 5;
 const BARRIER_MATERIALS = { metal: 5, tire: 6, tecproRed: 7, tecproWhite: 8, concrete: 9 } as const;
 

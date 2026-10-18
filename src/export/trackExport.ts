@@ -8,9 +8,9 @@ import { BinaryWriter, zipFiles, texturePng, encodePng, utf8 } from './binary';
 const IDENTITY = [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1];
 
 /**
- * Matériaux réellement écrits : les cinq de base, toujours présents pour que
- * les projets sans barrière restent identiques aux exports précédents, plus
- * les matériaux de barrière utilisés, dans l'ordre du catalogue.
+ * Materials actually written: the five base ones, always present so that
+ * projects without barriers stay identical to previous exports, plus the
+ * barrier materials in use, in catalogue order.
  */
 function usedMaterialIndexes(scene: Scene) {
   const used = new Set(scene.meshes.map((mesh) => mesh.material));
@@ -72,8 +72,8 @@ function encodeKn5(scene: Scene) {
       .f32(100000)
       .floats(center)
       .f32(radius)
-      // IsRenderable=0 : le maillage garde sa collision mais n'est pas dessiné,
-      // comme les murs de collision des circuits officiels.
+      // IsRenderable=0: the mesh keeps its collision but is not drawn,
+      // like the collision walls of the official tracks.
       .u8(mesh.renderable === false ? 0 : 1);
   }
   for (const marker of scene.markers)
@@ -202,7 +202,7 @@ function buildExport(project: Project, format: ExportFormat = 'ac') {
     stats = trackStats(samples),
     slug = slugify(project.name);
   for (const mesh of scene.meshes) {
-    // Les faces verticales des barrières n'ont pas d'aire au sol : hors contrôle.
+    // Vertical barrier faces have no ground area: excluded from the check.
     if (mesh.barrier) continue;
     for (let i = 0; i < mesh.indices.length; i += 3) {
       const [a, b, c] = mesh.indices.slice(i, i + 3).map((index) => mesh.vertices[index].position);
@@ -228,7 +228,7 @@ function buildExport(project: Project, format: ExportFormat = 'ac') {
         : '');
   } else {
     const root = `content/tracks/${slug}/`;
-    // Textes conditionnels : sans barrière, l'archive reste identique aux exports précédents.
+    // Conditional text: without barriers, the archive stays identical to previous exports.
     const barrierCount = project.barriers?.length ?? 0;
     const map = makeMap(project, samples),
       preview = makeMap(project, samples, true);
