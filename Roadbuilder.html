@@ -1,0 +1,95 @@
+<!doctype html>
+<html lang="fr">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Roadbuilder — Reprendre votre projet</title>
+    <style>
+      :root {
+        color-scheme: dark;
+        font:
+          16px/1.6 system-ui,
+          sans-serif;
+        color: #e9eeeb;
+        background: #141b1e;
+      }
+      main {
+        max-width: 620px;
+        margin: 10vh auto;
+        padding: 24px;
+      }
+      h1 {
+        line-height: 1.2;
+      }
+      p {
+        color: #aebdb6;
+      }
+      button,
+      a {
+        display: inline-block;
+        border: 0;
+        border-radius: 6px;
+        padding: 12px 18px;
+        font: inherit;
+      }
+      button {
+        background: #d3f47d;
+        color: #1b2714;
+        cursor: pointer;
+      }
+      a {
+        color: #d3f47d;
+      }
+      button:disabled {
+        opacity: 0.4;
+        cursor: default;
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1>Votre atelier a déménagé.</h1>
+      <p>
+        Lancez désormais Roadbuilder avec <strong>Demarrer.bat</strong>. Pour reprendre un ancien
+        tracé, téléchargez sa sauvegarde ci-dessous, puis utilisez <strong>Ouvrir</strong> dans la
+        nouvelle application.
+      </p>
+      <button id="recover" disabled>Télécharger l’ancienne sauvegarde</button>
+      <p id="status" role="status"></p>
+      <a href="http://127.0.0.1:5173/">Ouvrir l’atelier déjà lancé</a>
+      <p>
+        La récupération fonctionne avec le même navigateur et le même emplacement que l’ancien
+        fichier. Vos fichiers .roadbuilder.json restent également importables.
+      </p>
+    </main>
+    <script>
+      // Keep this file at its original path: file:// storage can be path-specific.
+      // Recovery is read-only and preserves even malformed data for manual repair.
+      const button = document.getElementById('recover');
+      const status = document.getElementById('status');
+      let saved = null;
+      try {
+        saved = localStorage.getItem('roadbuilder.project.v1');
+        button.disabled = saved === null;
+        status.textContent =
+          saved === null
+            ? 'Aucune ancienne sauvegarde trouvée ici.'
+            : 'Une ancienne sauvegarde est disponible. Elle restera conservée après le téléchargement.';
+      } catch {
+        status.textContent =
+          'Le navigateur ne permet pas de lire la sauvegarde locale. Utilisez votre dernier fichier projet enregistré.';
+      }
+      button.addEventListener('click', () => {
+        if (saved === null) return;
+        const url = URL.createObjectURL(new Blob([saved], { type: 'application/json' }));
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = 'ancien-projet.roadbuilder.json';
+        document.body.append(link);
+        link.click();
+        link.remove();
+        setTimeout(() => URL.revokeObjectURL(url), 30000);
+      });
+    </script>
+  </body>
+</html>

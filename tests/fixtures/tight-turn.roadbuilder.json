@@ -1,0 +1,48 @@
+{
+  "format": "assetto-roadbuilder",
+  "version": 1,
+  "name": "Virage à localiser",
+  "author": "",
+  "closed": false,
+  "width": 24,
+  "shoulder": 2,
+  "kerbs": false,
+  "terrainMargin": 150,
+  "points": [
+    {
+      "x": -150,
+      "y": 0,
+      "z": 0
+    },
+    {
+      "x": -50,
+      "y": 0,
+      "z": 0
+    },
+    {
+      "x": 0,
+      "y": 0,
+      "z": 0
+    },
+    {
+      "x": 10,
+      "y": 0,
+      "z": 10
+    },
+    {
+      "x": 0,
+      "y": 0,
+      "z": 20
+    },
+    {
+      "x": -50,
+      "y": 0,
+      "z": 20
+    },
+    {
+      "x": -150,
+      "y": 0,
+      "z": 20
+    }
+  ]
+}
