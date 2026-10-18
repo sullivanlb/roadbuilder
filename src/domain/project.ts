@@ -1,8 +1,21 @@
-import type { Point, Project, Template } from './types';
-const LIMITS = { points: 160, coordinate: 10000, minAltitude: -100, maxAltitude: 1000 };
+import type { Barrier, BarrierSide, BarrierType, Point, Project, Template } from './types';
+const LIMITS = {
+  points: 160,
+  coordinate: 10000,
+  minAltitude: -100,
+  maxAltitude: 1000,
+  barriers: 120,
+};
+export const BARRIER_TYPES: readonly BarrierType[] = ['guardrail', 'tires', 'tecpro', 'wall'];
+export const BARRIER_SIDES: readonly BarrierSide[] = ['left', 'right'];
 const clamp = (value: number, min: number, max: number) => Math.min(max, Math.max(min, value));
 const clone = <T>(value: T): T => JSON.parse(JSON.stringify(value));
 const distance = (a: Point, b: Point) => Math.hypot(a.x - b.x, a.y - b.y, a.z - b.z);
+const number = (v: unknown, min: number, max: number, label: string): number => {
+  if (typeof v !== 'number' || !Number.isFinite(v) || v < min || v > max)
+    throw new Error(`${label} : valeur attendue entre ${min} et ${max}.`);
+  return v;
+};
 const DEFAULT_TERRAIN_MARGIN = 150;
 
 function createProject(template: Template = 'club'): Project {
@@ -85,11 +98,6 @@ function validateProject(input: unknown): Project {
     throw new Error('Auteur invalide (80 caractères maximum).');
   if (typeof value.closed !== 'boolean' || typeof value.kerbs !== 'boolean')
     throw new Error('Options du tracé invalides.');
-  const number = (v: unknown, min: number, max: number, label: string): number => {
-    if (typeof v !== 'number' || !Number.isFinite(v) || v < min || v > max)
-      throw new Error(`${label} : valeur attendue entre ${min} et ${max}.`);
-    return v;
-  };
   if (!Array.isArray(value.points) || value.points.length > LIMITS.points)
     throw new Error(`Maximum ${LIMITS.points} points.`);
   const points = value.points.map((input: unknown): Point => {
@@ -101,6 +109,8 @@ function validateProject(input: unknown): Project {
       z: number(p.z, -LIMITS.coordinate, LIMITS.coordinate, 'Position Z'),
     };
   });
+  // Les barrières restent un champ optionnel : un ancien projet n'en reçoit pas.
+  const barriers = validateBarriers(value.barriers, points.length, value.closed === true);
   return {
     format: 'assetto-roadbuilder',
     version: 1,
@@ -114,8 +124,52 @@ function validateProject(input: unknown): Project {
       value.terrainMargin === undefined
         ? DEFAULT_TERRAIN_MARGIN
         : number(value.terrainMargin, 50, 500, 'Marge du terrain'),
+    ...(barriers === undefined ? {} : { barriers }),
     points,
   };
+}
+
+function validateBarriers(
+  input: unknown,
+  pointCount: number,
+  closed: boolean,
+): Barrier[] | undefined {
+  if (input === undefined) return undefined;
+  if (!Array.isArray(input) || input.length > LIMITS.barriers)
+    throw new Error(`Maximum ${LIMITS.barriers} tronçons de barrière.`);
+  if (input.length && pointCount < 2)
+    throw new Error('Les barrières nécessitent au moins deux points de tracé.');
+  // Un tronçon ne peut boucler que si le circuit est réellement fermé.
+  const wrapping = closed && pointCount > 2;
+  return input.map((raw): Barrier => {
+    if (!raw || typeof raw !== 'object') throw new Error('Barrière invalide.');
+    const item = raw as Record<string, unknown>;
+    const type = item.type;
+    if (typeof type !== 'string' || !BARRIER_TYPES.includes(type as BarrierType))
+      throw new Error('Type de barrière inconnu.');
+    const side = item.side;
+    if (typeof side !== 'string' || !BARRIER_SIDES.includes(side as BarrierSide))
+      throw new Error('Côté de barrière invalide.');
+    const index = (v: unknown, label: string): number => {
+      if (typeof v !== 'number' || !Number.isInteger(v) || v < 0 || v >= pointCount)
+        throw new Error(`${label} : indice de point hors du tracé.`);
+      return v;
+    };
+    const from = index(item.from, 'Début de barrière');
+    const to = index(item.to, 'Fin de barrière');
+    if (from === to) throw new Error('Une barrière doit couvrir au moins deux points.');
+    if (!wrapping && from > to)
+      throw new Error('Sur une route ouverte, une barrière doit suivre le sens du tracé.');
+    if (typeof item.offset !== 'number')
+      throw new Error('Décalage de barrière : valeur attendue entre 0 et 10.');
+    return {
+      type: type as BarrierType,
+      side: side as BarrierSide,
+      from,
+      to,
+      offset: number(item.offset, 0, 10, 'Décalage de barrière'),
+    };
+  });
 }
 
 function slugify(name: string) {

@@ -2,21 +2,38 @@ import type { Project, Scene, Sample, ExportFiles, ExportFormat } from '../domai
 import { validateProject, slugify } from '../domain/project';
 import { sampleTrack, trackStats, trackIssues, bounds } from '../domain/geometry';
 import { buildScene } from '../domain/scene';
-import { MATERIALS } from '../domain/mesh';
+import { barrierPath } from '../domain/barriers';
+import { MATERIALS, BASE_MATERIALS } from '../domain/mesh';
 import { BinaryWriter, zipFiles, texturePng, encodePng, utf8 } from './binary';
 const IDENTITY = [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1];
+
+/**
+ * Matériaux réellement écrits : les cinq de base, toujours présents pour que
+ * les projets sans barrière restent identiques aux exports précédents, plus
+ * les matériaux de barrière utilisés, dans l'ordre du catalogue.
+ */
+function usedMaterialIndexes(scene: Scene) {
+  const used = new Set(scene.meshes.map((mesh) => mesh.material));
+  return MATERIALS.map((_, index) => index).filter(
+    (index) => index < BASE_MATERIALS || used.has(index),
+  );
+}
 
 // KN5 v5 field layout independently implemented from the public AcTools format.
 // Reference: github.com/gro-ove/actools/blob/master/AcTools/Kn5File/Kn5Writer.cs
 function encodeKn5(scene: Scene) {
   const writer = new BinaryWriter(1024 * 1024);
-  writer.raw(utf8('sc6969')).u32(5).u32(MATERIALS.length);
-  for (const material of MATERIALS) {
+  const indexes = usedMaterialIndexes(scene);
+  const remap = new Map(indexes.map((material, position) => [material, position]));
+  writer.raw(utf8('sc6969')).u32(5).u32(indexes.length);
+  for (const index of indexes) {
+    const material = MATERIALS[index];
     const texture = texturePng(material.color, material.name === 'grass' ? 25 : 12);
     writer.u32(1).string(material.texture).u32(texture.length).raw(texture);
   }
-  writer.u32(MATERIALS.length);
-  for (const material of MATERIALS) {
+  writer.u32(indexes.length);
+  for (const index of indexes) {
+    const material = MATERIALS[index];
     writer.string(material.name).string('ksPerPixel').u8(0).u8(0).u32(0);
     const properties = {
       ksAmbient: 0.35,
@@ -48,7 +65,16 @@ function encodeKn5(scene: Scene) {
     );
     const center = [(bb.minX + bb.maxX) / 2, (bb.minY + bb.maxY) / 2, (bb.minZ + bb.maxZ) / 2];
     const radius = Math.hypot(bb.maxX - bb.minX, bb.maxY - bb.minY, bb.maxZ - bb.minZ) / 2;
-    writer.u32(mesh.material).u32(0).f32(0).f32(100000).floats(center).f32(radius).u8(1);
+    writer
+      .u32(remap.get(mesh.material)!)
+      .u32(0)
+      .f32(0)
+      .f32(100000)
+      .floats(center)
+      .f32(radius)
+      // IsRenderable=0 : le maillage garde sa collision mais n'est pas dessiné,
+      // comme les murs de collision des circuits officiels.
+      .u8(mesh.renderable === false ? 0 : 1);
   }
   for (const marker of scene.markers)
     writer.u32(1).string(marker.name).u32(0).u8(1).floats(marker.transform);
@@ -73,10 +99,12 @@ function encodeObj(scene: Scene) {
       );
     offset += mesh.vertices.length;
   }
-  const mtl = MATERIALS.map(
-    (m) =>
-      `newmtl ${m.name}\nKa 0.35 0.35 0.35\nKd 1 1 1\nKs 0.05 0.05 0.05\nmap_Kd texture/${m.texture}\n`,
-  ).join('\n');
+  const mtl = usedMaterialIndexes(scene)
+    .map(
+      (index) =>
+        `newmtl ${MATERIALS[index].name}\nKa 0.35 0.35 0.35\nKd 1 1 1\nKs 0.05 0.05 0.05\nmap_Kd texture/${MATERIALS[index].texture}\n`,
+    )
+    .join('\n');
   return { obj: lines.join('\n') + '\n', mtl };
 }
 
@@ -135,6 +163,23 @@ function makeMap(project: Project, samples: Sample[], preview = false) {
       );
     }
   }
+  for (const barrier of project.barriers ?? []) {
+    const path = barrierPath(project, samples, barrier);
+    for (let i = 1; i < path.length; i++) {
+      const a = path[i - 1],
+        b = path[i];
+      const count = Math.max(1, Math.ceil(Math.hypot(b.x - a.x, b.z - a.z) * scale));
+      for (let j = 0; j <= count; j++) {
+        const t = j / count;
+        dot(
+          (a.x + (b.x - a.x) * t + xOffset) * scale,
+          (a.z + (b.z - a.z) * t + zOffset) * scale,
+          Math.max(1, (project.width * scale) / 8),
+          [226, 226, 219, 255],
+        );
+      }
+    }
+  }
   if (preview && samples.length)
     dot(
       (samples[0].x + xOffset) * scale,
@@ -157,6 +202,8 @@ function buildExport(project: Project, format: ExportFormat = 'ac') {
     stats = trackStats(samples),
     slug = slugify(project.name);
   for (const mesh of scene.meshes) {
+    // Les faces verticales des barrières n'ont pas d'aire au sol : hors contrôle.
+    if (mesh.barrier) continue;
     for (let i = 0; i < mesh.indices.length; i += 3) {
       const [a, b, c] = mesh.indices.slice(i, i + 3).map((index) => mesh.vertices[index].position);
       const areaY = (b[2] - a[2]) * (c[0] - a[0]) - (b[0] - a[0]) * (c[2] - a[2]);
@@ -172,12 +219,17 @@ function buildExport(project: Project, format: ExportFormat = 'ac') {
     files['track.obj'] = obj;
     files['track.mtl'] = mtl;
     files['markers.json'] = JSON.stringify(scene.markers, null, 2);
-    for (const material of MATERIALS)
-      files[`texture/${material.texture}`] = texturePng(material.color);
+    for (const index of usedMaterialIndexes(scene))
+      files[`texture/${MATERIALS[index].texture}`] = texturePng(MATERIALS[index].color);
     files['LIRE-MOI.txt'] =
-      'Roadbuilder — sources 3D\n\nImportez track.obj dans Blender (axe vertical Y, avant -Z, échelle 1 m).\nLes textures se trouvent dans texture/. Les transformations des repères Assetto Corsa sont dans markers.json (matrices 4×4, translation sur la dernière ligne).\nOBJ ne conserve pas les repères AC : recréez-les si vous passez par Blender/ksEditor.\nPour un export KN5 direct, utilisez Exporter > Assetto Corsa dans Roadbuilder.\n';
+      'Roadbuilder — sources 3D\n\nImportez track.obj dans Blender (axe vertical Y, avant -Z, échelle 1 m).\nLes textures se trouvent dans texture/. Les transformations des repères Assetto Corsa sont dans markers.json (matrices 4×4, translation sur la dernière ligne).\nOBJ ne conserve pas les repères AC : recréez-les si vous passez par Blender/ksEditor.\nPour un export KN5 direct, utilisez Exporter > Assetto Corsa dans Roadbuilder.\n' +
+      (project.barriers?.length
+        ? 'Les maillages 1WALL_* sont les colliders du jeu (invisibles sur la piste) ; les décors des barrières n’ont pas de préfixe.\n'
+        : '');
   } else {
     const root = `content/tracks/${slug}/`;
+    // Textes conditionnels : sans barrière, l'archive reste identique aux exports précédents.
+    const barrierCount = project.barriers?.length ?? 0;
     const map = makeMap(project, samples),
       preview = makeMap(project, samples, true);
     files[`${root}${slug}.kn5`] = encodeKn5(scene);
@@ -216,7 +268,15 @@ function buildExport(project: Project, format: ExportFormat = 'ac') {
       2,
     );
     files['INSTALLATION.txt'] =
-      `ROADBUILDER — ${project.name}\n\nEXPORT KN5 EXPÉRIMENTAL, À VÉRIFIER EN JEU\n\n1. Décompressez cette archive dans un dossier temporaire.\n2. Copiez content/tracks/${slug} dans assettocorsa/content/tracks/.\n   Si ce nom existe déjà, conservez une copie de votre ancienne version avant de la remplacer.\n3. Dans Content Manager ou Assetto Corsa, sélectionnez ${project.name}.\n4. Lancez des ESSAIS LIBRES, avec une seule voiture et sans adversaires.\n\nINCLUS\nChaussée avec collisions, accotements, vibreurs optionnels, textures intégrées au KN5,\nrepères de départ/stand et chronométrage, surfaces, plan et aperçu.\nTerrain en herbe avec collisions, à l’intérieur et autour du tracé, raccordé à son relief.\nMarge extérieure du terrain : ${project.terrainMargin} m au-delà des limites des accotements.\nLe point 1 définit le début du tracé ; la ligne de départ est placée après le stand.\n\nLIMITES DE CETTE VERSION\nLa compatibilité en jeu n’a pas été vérifiée automatiquement.\nUn emplacement de stand seulement, sans véritable voie des stands.\nPas de trajectoires IA : les courses contre l’IA ne sont pas prises en charge.\nRoutes ouvertes : essais libres uniquement ; chronométrage point-à-point non validé.\nLe terrain s’arrête au rectangle en pointillés visible dans l’éditeur.\nAu-delà de ce bord extérieur, une chute reste possible. Augmentez la marge si nécessaire.\nPas de barrières, de ponts ou de décor ; le relief du terrain est interpolé automatiquement.\nLes chevauchements de bords de route/accotements ne sont pas tous détectés.\nPour un circuit destiné à la compétition, vérifiez et complétez le modèle dans un outil 3D.\n\nLe fichier projet.roadbuilder.json permet de reprendre le travail dans l’éditeur.\n${issues.warnings.length ? '\nAVERTISSEMENTS\n' + issues.warnings.join('\n') : ''}\n`;
+      `ROADBUILDER — ${project.name}\n\nEXPORT KN5 EXPÉRIMENTAL, À VÉRIFIER EN JEU\n\n1. Décompressez cette archive dans un dossier temporaire.\n2. Copiez content/tracks/${slug} dans assettocorsa/content/tracks/.\n   Si ce nom existe déjà, conservez une copie de votre ancienne version avant de la remplacer.\n3. Dans Content Manager ou Assetto Corsa, sélectionnez ${project.name}.\n4. Lancez des ESSAIS LIBRES, avec une seule voiture et sans adversaires.\n\nINCLUS\n${
+        barrierCount
+          ? `Barrières : ${barrierCount} tronçon${barrierCount > 1 ? 's' : ''} avec collision (glissières, pneus, TecPro ou murs).\n`
+          : ''
+      }Chaussée avec collisions, accotements, vibreurs optionnels, textures intégrées au KN5,\nrepères de départ/stand et chronométrage, surfaces, plan et aperçu.\nTerrain en herbe avec collisions, à l’intérieur et autour du tracé, raccordé à son relief.\nMarge extérieure du terrain : ${project.terrainMargin} m au-delà des limites des accotements.\nLe point 1 définit le début du tracé ; la ligne de départ est placée après le stand.\n\nLIMITES DE CETTE VERSION\nLa compatibilité en jeu n’a pas été vérifiée automatiquement.\nUn emplacement de stand seulement, sans véritable voie des stands.\nPas de trajectoires IA : les courses contre l’IA ne sont pas prises en charge.\nRoutes ouvertes : essais libres uniquement ; chronométrage point-à-point non validé.\nLe terrain s’arrête au rectangle en pointillés visible dans l’éditeur.\nAu-delà de ce bord extérieur, une chute reste possible. Augmentez la marge si nécessaire.\n${
+        barrierCount
+          ? 'Les barrières sont des colliders simples : vérifiez les impacts en jeu.\nLe relief du terrain est interpolé automatiquement.\n'
+          : 'Pas de barrières, de ponts ou de décor ; le relief du terrain est interpolé automatiquement.\n'
+      }Les chevauchements de bords de route/accotements ne sont pas tous détectés.\nPour un circuit destiné à la compétition, vérifiez et complétez le modèle dans un outil 3D.\n\nLe fichier projet.roadbuilder.json permet de reprendre le travail dans l’éditeur.\n${issues.warnings.length ? '\nAVERTISSEMENTS\n' + issues.warnings.join('\n') : ''}\n`;
   }
   files['projet.roadbuilder.json'] = JSON.stringify(project, null, 2);
   return {

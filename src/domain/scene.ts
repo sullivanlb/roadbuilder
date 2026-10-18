@@ -2,9 +2,29 @@ import type { Project, Sample, Scene, Mesh, Marker } from './types';
 import { distance } from './project';
 import { sampleTrack, sampleAt } from './geometry';
 import { newMesh, offsetPoint, addQuad } from './mesh';
+import { buildBarrierMeshes } from './barriers';
 import { buildTerrain } from './terrain';
 // Scene construction requires at least two samples; checked at the entry point.
 const at = (samples: Sample[], s: number): Sample => sampleAt(samples, s)!;
+// KN5 uses uint16 vertex indices; split large meshes on quad boundaries.
+function splitMesh(mesh: Mesh): Mesh[] {
+  const pieces: Mesh[] = [];
+  for (let begin = 0; begin < mesh.vertices.length; begin += 60000) {
+    const vertices = mesh.vertices.slice(begin, begin + 60000);
+    const indices = mesh.indices
+      .slice((begin / 4) * 6, ((begin + vertices.length) / 4) * 6)
+      .map((i) => i - begin);
+    pieces.push({
+      name: `${mesh.name}_${begin / 60000}`,
+      material: mesh.material,
+      vertices,
+      indices,
+      barrier: mesh.barrier,
+      renderable: mesh.renderable,
+    });
+  }
+  return pieces;
+}
 function buildScene(project: Project, samples = sampleTrack(project)): Scene {
   if (samples.length < 2) return { meshes: [], markers: [], samples };
   const road = newMesh('1ROAD_main', 0),
@@ -105,22 +125,18 @@ function buildScene(project: Project, samples = sampleTrack(project)): Scene {
   timing(0, start);
   timing(1, at(samples, project.closed ? length / 3 : length / 2));
   timing(2, at(samples, project.closed ? (2 * length) / 3 : length - 12));
-  // KN5 uses uint16 vertex indices; split large meshes on quad boundaries.
+  // Barrières : colliders 1WALL invisibles + décors visibles, sur les mêmes échantillons que la piste.
   const meshes = [];
-  for (const mesh of [road, grass, red, white, paint, pit]) {
-    for (let begin = 0; begin < mesh.vertices.length; begin += 60000) {
-      const vertices = mesh.vertices.slice(begin, begin + 60000);
-      const indices = mesh.indices
-        .slice((begin / 4) * 6, ((begin + vertices.length) / 4) * 6)
-        .map((i) => i - begin);
-      meshes.push({
-        name: `${mesh.name}_${begin / 60000}`,
-        material: mesh.material,
-        vertices,
-        indices,
-      });
-    }
-  }
+  for (const mesh of [
+    road,
+    grass,
+    red,
+    white,
+    paint,
+    pit,
+    ...buildBarrierMeshes(project, samples),
+  ])
+    meshes.push(...splitMesh(mesh));
   const terrain = buildTerrain(project, samples, [road, grass, red, white, pit]);
   meshes.push(...terrain.meshes);
   return { meshes, markers, samples, terrainBounds: terrain.bounds ?? undefined };

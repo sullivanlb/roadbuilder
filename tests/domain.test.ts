@@ -3,10 +3,21 @@ import { describe, expect, it } from 'vitest';
 import { createProject, validateProject, LIMITS } from '../src/domain/project';
 import { bounds, sampleAt, sampleTrack, trackIssues, trackStats } from '../src/domain/geometry';
 import { buildScene } from '../src/domain/scene';
+import {
+  barrierLateral,
+  barrierPath,
+  barrierSamples,
+  barrierSegments,
+  insertBarrierPoint,
+  removeBarrierPoint,
+  reverseBarriers,
+  splitWrappingBarriers,
+} from '../src/domain/barriers';
 import { buildExport } from '../src/export/trackExport';
 import { crc32, zipFiles } from '../src/export/binary';
 import { ProjectHistory } from '../src/domain/history';
 import { persistProject, restoreProject, STORAGE_KEY } from '../src/domain/storage';
+import type { Barrier } from '../src/domain/types';
 import baseline from './fixtures/legacy-baseline.json';
 import tightTurnFixture from './fixtures/tight-turn.roadbuilder.json';
 
@@ -243,5 +254,239 @@ describe('localisation des virages trop serrés', () => {
     expect(trackIssues(project).tightTurns).toEqual([]);
     project.points = [{ x: 0, y: 0, z: 0 }];
     expect(trackIssues(project).tightTurns).toEqual([]);
+  });
+});
+
+describe('barrières', () => {
+  const region = (over: Partial<Barrier> = {}): Barrier => ({
+    type: 'guardrail',
+    side: 'right',
+    from: 1,
+    to: 4,
+    offset: 1,
+    ...over,
+  });
+  const withBarriers = (barriers: Barrier[], template: 'club' | 'mountain' = 'club') => ({
+    ...createProject(template),
+    barriers,
+  });
+
+  it('valide les tronçons, nettoie les champs inconnus et tolère le bouclage des circuits fermés', () => {
+    const validated = validateProject(
+      withBarriers([region({ type: 'wall', side: 'left', from: 7, to: 2, offset: 0.5 })]),
+    );
+    expect(validated.barriers).toEqual([
+      { type: 'wall', side: 'left', from: 7, to: 2, offset: 0.5 },
+    ]);
+    expect(validateProject(withBarriers([])).barriers).toEqual([]);
+    expect(validateProject(createProject('club'))).not.toHaveProperty('barriers');
+  });
+
+  it.each([
+    [region({ type: 'pneu' as never })],
+    [region({ side: 'middle' as never })],
+    [region({ from: 2, to: 2 })],
+    [region({ from: -1 })],
+    [{ ...region(), to: 9 }],
+    [region({ offset: 12 })],
+    [{ type: 'wall', side: 'left', from: 1, to: 2 } as unknown as Barrier],
+    [null as unknown as Barrier],
+    Array(LIMITS.barriers + 1).fill(region()),
+  ])('rejette un tronçon invalide', (barriers) => {
+    expect(() => validateProject(withBarriers(barriers))).toThrow();
+  });
+
+  it('refuse un tronçon à contre-sens sur une route ouverte et sans tracé', () => {
+    expect(() =>
+      validateProject(
+        withBarriers([region({ type: 'tires', side: 'left', from: 5, to: 2 })], 'mountain'),
+      ),
+    ).toThrow('sens du tracé');
+    expect(() =>
+      validateProject({ ...createProject('blank'), barriers: [region()] }),
+    ).toThrow('deux points');
+  });
+
+  it('suit le sens du tracé et boucle avec le circuit fermé', () => {
+    const project = createProject('club');
+    expect(barrierSegments(project, region({ from: 2, to: 5 }))).toEqual([2, 3, 4]);
+    expect(barrierSegments(project, region({ from: 7, to: 2 }))).toEqual([7, 8, 0, 1]);
+    const samples = sampleTrack(project);
+    const path = barrierSamples(project, samples, region({ from: 7, to: 2 }));
+    expect([path[0].x, path[0].z]).toEqual([project.points[7].x, project.points[7].z]);
+    const last = path.at(-1)!;
+    expect([last.x, last.z]).toEqual([project.points[2].x, project.points[2].z]);
+    for (let i = 1; i < path.length; i++)
+      expect(Math.hypot(path[i].x - path[i - 1].x, path[i].z - path[i - 1].z)).toBeGreaterThan(
+        0.0001,
+      );
+    const line = barrierPath(project, samples, region({ from: 2, to: 4, offset: 1 }));
+    expect(line.length).toBeGreaterThan(1);
+    expect(line.every((p) => Number.isFinite(p.x) && Number.isFinite(p.z))).toBe(true);
+  });
+
+  it('écarte le collider du bord de piste et le bride dans les virages serrés', () => {
+    const project = createProject('club');
+    const samples = sampleTrack(project);
+    const straight = samples.find((s) => Math.abs(s.curvature) < 0.005)!;
+    const base = project.width / 2 + (project.kerbs ? 0.65 : 0);
+    expect(barrierLateral(project, straight, 'right', 1)).toBeCloseTo(base + 1, 5);
+    expect(barrierLateral(project, straight, 'left', 1)).toBeCloseTo(-(base + 1), 5);
+    expect(barrierLateral(project, straight, 'right', 10)).toBeCloseTo(base + 10, 5);
+    // Sur le tracé serré, le côté intérieur est bridé pour ne pas passer de l'autre côté.
+    const tight = validateProject(tightTurnFixture);
+    const tightBase = tight.width / 2 + (tight.kerbs ? 0.65 : 0);
+    const curved = sampleTrack(tight).reduce((a, b) =>
+      Math.abs(b.curvature) > Math.abs(a.curvature) ? b : a,
+    );
+    const side = curved.curvature > 0 ? 'right' : 'left';
+    const value = Math.abs(barrierLateral(tight, curved, side, 10));
+    expect(value).toBeGreaterThanOrEqual(tightBase + 0.05);
+    expect(value).toBeLessThan(tightBase + 10);
+    // Le côté extérieur garde son décalage complet.
+    const outside = side === 'right' ? 'left' : 'right';
+    expect(Math.abs(barrierLateral(tight, curved, outside, 10))).toBeCloseTo(tightBase + 10, 5);
+  });
+
+  it('génère des colliders 1WALL invisibles, des décors visibles et des normales vers la piste', () => {
+    const project = createProject('club');
+    project.barriers = [
+      { type: 'guardrail', side: 'right', from: 1, to: 3, offset: 1 },
+      { type: 'tires', side: 'left', from: 3, to: 5, offset: 1.5 },
+      { type: 'tecpro', side: 'right', from: 5, to: 7, offset: 1 },
+      { type: 'wall', side: 'left', from: 7, to: 2, offset: 0.5 },
+    ];
+    const samples = sampleTrack(project);
+    const scene = buildScene(project, samples);
+    const walls = scene.meshes.filter((m) => m.name.startsWith('1WALL'));
+    const colliders = walls.filter((m) => !m.name.startsWith('1WALL_beton'));
+    expect(colliders.length).toBeGreaterThanOrEqual(3);
+    expect(walls.length).toBeGreaterThan(colliders.length);
+    let inward = 0,
+      total = 0;
+    for (const mesh of colliders) {
+      expect(mesh.renderable).toBe(false);
+      expect(mesh.vertices.length).toBeGreaterThan(0);
+      expect(mesh.vertices.length).toBeLessThanOrEqual(65535);
+      for (const v of mesh.vertices) {
+        const [x, , z] = v.position;
+        const nearest = samples.reduce((a, b) =>
+          Math.hypot(a.x - x, a.z - z) < Math.hypot(b.x - x, b.z - z) ? a : b,
+        );
+        const dx = nearest.x - x,
+          dz = nearest.z - z,
+          length = Math.hypot(dx, dz) || 1;
+        const dot = v.normal[0] * (dx / length) + v.normal[2] * (dz / length);
+        expect(dot).toBeGreaterThan(-0.25);
+        if (dot > 0.9) inward++;
+        total++;
+      }
+    }
+    expect(inward / total).toBeGreaterThan(0.6);
+    // Le mur béton est visible : il sert lui-même de collider.
+    const beton = scene.meshes.filter((m) => m.name.startsWith('1WALL_beton'));
+    expect(beton.length).toBeGreaterThanOrEqual(1);
+    for (const mesh of beton) expect(mesh.renderable).not.toBe(false);
+    const decors = scene.meshes.filter((m) => m.barrier && !m.name.startsWith('1WALL'));
+    expect(decors.length).toBeGreaterThanOrEqual(3);
+    for (const mesh of decors) expect(mesh.renderable).not.toBe(false);
+  });
+
+  it('garde le collider hors de la chaussée dans un virage très serré', () => {
+    const project = validateProject(tightTurnFixture);
+    project.width = 4;
+    project.barriers = [
+      { type: 'guardrail', side: 'right', from: 0, to: 6, offset: 1 },
+      { type: 'guardrail', side: 'left', from: 0, to: 6, offset: 1 },
+    ];
+    const samples = sampleTrack(project);
+    const scene = buildScene(project, samples);
+    const colliders = scene.meshes.filter((m) => m.name.startsWith('1WALL'));
+    expect(colliders.length).toBeGreaterThanOrEqual(2);
+    let minimum = Infinity;
+    for (const mesh of colliders)
+      for (const v of mesh.vertices) {
+        const [x, , z] = v.position;
+        for (const s of samples) minimum = Math.min(minimum, Math.hypot(s.x - x, s.z - z));
+      }
+    expect(minimum).toBeGreaterThan(project.width / 2);
+  });
+
+  it('ne crée aucun maillage de barrière sans tronçon', () => {
+    const scene = buildScene(createProject('club'));
+    expect(scene.meshes.some((m) => m.name.startsWith('1WALL'))).toBe(false);
+    expect(scene.meshes.every((m) => m.barrier === undefined)).toBe(true);
+  });
+
+  it('exporte les barrières dans les deux formats sans toucher aux surfaces', () => {
+    const project = createProject('club');
+    project.barriers = [
+      { type: 'guardrail', side: 'right', from: 1, to: 3, offset: 1 },
+      { type: 'tires', side: 'left', from: 3, to: 5, offset: 1.5 },
+      { type: 'tecpro', side: 'right', from: 5, to: 7, offset: 1 },
+      { type: 'wall', side: 'left', from: 7, to: 2, offset: 0.5 },
+    ];
+    const ac = buildExport(project, 'ac');
+    const path = Object.keys(ac.files).find((p) => p.endsWith('.kn5'))!;
+    const kn5 = ac.files[path] as Uint8Array;
+    expect(new DataView(kn5.buffer, kn5.byteOffset).getUint32(10, true)).toBe(10);
+    const installation = ac.files['INSTALLATION.txt'] as string;
+    expect(installation).toContain('Barrières : 4 tronçons avec collision');
+    expect(installation).toContain('colliders simples');
+    expect(installation).not.toContain('Pas de barrières, de ponts ou de décor');
+    const surfaces = Object.entries(ac.files).find(([p]) => p.endsWith('surfaces.ini'))![1] as string;
+    expect(surfaces).not.toContain('KEY=WALL');
+    expect(
+      (JSON.parse(ac.files['projet.roadbuilder.json'] as string) as { barriers: unknown[] })
+        .barriers,
+    ).toHaveLength(4);
+
+    const obj = buildExport(project, 'obj');
+    expect(obj.files['track.obj']).toContain('o 1WALL_guardrail_0_0');
+    expect(obj.files['track.obj']).toContain('usemtl tecpro_red');
+    expect(obj.files['track.obj']).toContain('usemtl concrete');
+    expect(obj.files['texture/metal.png']).toBeTruthy();
+    expect(obj.files['texture/concrete.png']).toBeTruthy();
+    expect(obj.files['LIRE-MOI.txt']).toContain('1WALL');
+  });
+
+  it('décale les ancres à l’insertion d’un point', () => {
+    const b = region({ from: 2, to: 4 });
+    expect(insertBarrierPoint([b], 2)).toEqual([region({ from: 3, to: 5 })]);
+    expect(insertBarrierPoint([b], 3)).toEqual([region({ from: 2, to: 5 })]);
+    expect(insertBarrierPoint([b], 5)).toEqual([b]);
+  });
+
+  it('supprime un tronçon qui perd une ancre et décale les autres', () => {
+    const b = region({ from: 2, to: 4 });
+    expect(removeBarrierPoint([b], 3, false)).toEqual([region({ from: 2, to: 3 })]);
+    expect(removeBarrierPoint([b], 2, false)).toEqual([]);
+    expect(removeBarrierPoint([b], 4, false)).toEqual([]);
+    expect(removeBarrierPoint([b], 0, false)).toEqual([region({ from: 1, to: 3 })]);
+  });
+
+  it('rejoue les tronçons à l’envers, côté compris', () => {
+    expect(reverseBarriers([region({ from: 2, to: 5 })], 9, false)).toEqual([
+      region({ from: 3, to: 6, side: 'left' }),
+    ]);
+    expect(reverseBarriers([region({ from: 2, to: 5 })], 9, true)).toEqual([
+      region({ from: 4, to: 7, side: 'left' }),
+    ]);
+    expect(reverseBarriers([region({ from: 7, to: 2 })], 9, true)).toEqual([
+      region({ from: 7, to: 2, side: 'left' }),
+    ]);
+  });
+
+  it('scinde les tronçons qui bouclaient au passage en route ouverte', () => {
+    expect(splitWrappingBarriers([region({ from: 7, to: 2 })], 9)).toEqual([
+      region({ from: 7, to: 8 }),
+      region({ from: 0, to: 2 }),
+    ]);
+    expect(splitWrappingBarriers([region({ from: 8, to: 1 })], 9)).toEqual([
+      region({ from: 0, to: 1 }),
+    ]);
+    expect(splitWrappingBarriers([region({ from: 2, to: 5 })], 9)).toEqual([
+      region({ from: 2, to: 5 }),
+    ]);
   });
 });

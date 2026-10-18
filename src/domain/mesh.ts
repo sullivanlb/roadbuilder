@@ -5,7 +5,16 @@ const MATERIALS = [
   { name: 'kerb_red', color: [184, 57, 48], texture: 'kerb_red.png' },
   { name: 'paint', color: [224, 225, 211], texture: 'paint.png' },
   { name: 'pit', color: [87, 91, 91], texture: 'pit.png' },
+  { name: 'metal', color: [168, 174, 176], texture: 'metal.png' },
+  { name: 'tire', color: [38, 40, 42], texture: 'tire.png' },
+  { name: 'tecpro_red', color: [172, 48, 40], texture: 'tecpro_red.png' },
+  { name: 'tecpro_white', color: [226, 224, 214], texture: 'tecpro_white.png' },
+  { name: 'concrete', color: [186, 184, 176], texture: 'concrete.png' },
 ];
+// Les cinq premiers matériaux sont toujours écrits dans les exports : les projets
+// sans barrière restent identiques octet par octet aux versions précédentes.
+const BASE_MATERIALS = 5;
+const BARRIER_MATERIALS = { metal: 5, tire: 6, tecproRed: 7, tecproWhite: 8, concrete: 9 } as const;
 
 function newMesh(name: string, material: number): Mesh {
   return { name, material, vertices: [], indices: [] };
@@ -42,4 +51,4 @@ function addQuad(mesh: Mesh, positions: number[][], uvs?: number[][]) {
 function offsetPoint(p: Sample, offset: number, height = 0) {
   return [p.x + p.nx * offset, p.y + height, p.z + p.nz * offset];
 }
-export { MATERIALS, newMesh, addQuad, offsetPoint };
+export { MATERIALS, BASE_MATERIALS, BARRIER_MATERIALS, newMesh, addQuad, offsetPoint };

@@ -5,9 +5,24 @@ export interface Point {
 }
 export type PlanPoint = Pick<Point, 'x' | 'z'>;
 export type Template = 'club' | 'kart' | 'mountain' | 'blank';
-export type Tool = 'select' | 'add' | 'pan';
+export type Tool = 'select' | 'add' | 'barrier' | 'pan';
 export type ViewMode = '2d' | '3d';
 export type ExportFormat = 'ac' | 'obj';
+export type BarrierType = 'guardrail' | 'tires' | 'tecpro' | 'wall';
+export type BarrierSide = 'left' | 'right';
+export interface Barrier {
+  type: BarrierType;
+  side: BarrierSide;
+  from: number;
+  to: number;
+  offset: number;
+}
+/** Tronçon en cours de tracé : point de départ, côté et type choisis. */
+export interface BarrierDraft {
+  from: number;
+  side: BarrierSide;
+  type: BarrierType;
+}
 export interface Project {
   format: 'assetto-roadbuilder';
   version: 1;
@@ -18,6 +33,7 @@ export interface Project {
   shoulder: number;
   kerbs: boolean;
   terrainMargin: number;
+  barriers?: Barrier[];
   points: Point[];
 }
 export interface Sample extends Point {
@@ -62,6 +78,10 @@ export interface Mesh {
   vertices: Vertex[];
   indices: number[];
   terrain?: boolean;
+  /** Maillage de barrière : faces verticales, exclus du contrôle de repli. */
+  barrier?: boolean;
+  /** false dans le KN5 : collision conservée, rien n'est dessiné en jeu. */
+  renderable?: boolean;
 }
 export interface Marker {
   name: string;
