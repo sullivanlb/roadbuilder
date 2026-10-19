@@ -9,6 +9,9 @@ export type ProjectErrorDetail =
   | { code: 'barrier-endpoint' }
   | { code: 'barrier-span' }
   | { code: 'barrier-direction' }
+  | { code: 'position-point' }
+  | { code: 'pit-lane-on-road' }
+  | { code: 'cars-without-pit-lane' }
   | { code: 'invalid-value'; path: string };
 
 /** Rejection raised when a project file cannot be opened. */

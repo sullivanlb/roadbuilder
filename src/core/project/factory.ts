@@ -8,6 +8,12 @@ import type { Template } from './templates';
 /** Builds a fresh project from one of the built-in templates. */
 export function createProject(template: Template, name: string): Project {
   const definition = TEMPLATE_DEFINITIONS[template];
+  const points = definition.points.map(([x, y, z]) => ({ id: createId(), x, y, z }));
+  const at = ([index, distance]: readonly [number, number]) => ({
+    point: points[index].id,
+    distance,
+  });
+  const pits = definition.pits;
   return {
     format: PROJECT_FORMAT,
     version: PROJECT_VERSION,
@@ -16,8 +22,18 @@ export function createProject(template: Template, name: string): Project {
     author: '',
     road: { ...definition.road, shoulder: DEFAULTS.shoulder },
     terrain: { margin: DEFAULTS.terrainMargin },
-    points: definition.points.map(([x, y, z]) => ({ id: createId(), x, y, z })),
+    points,
     barriers: [],
+    ...(points.length ? { startLine: { point: points[0].id, distance: DEFAULTS.startLine } } : {}),
+    pitLane: pits
+      ? {
+          side: pits.side,
+          entry: at(pits.entry),
+          exit: at(pits.exit),
+          width: DEFAULTS.pitLaneWidth,
+        }
+      : null,
+    cars: pits?.cars ?? 1,
   };
 }
 

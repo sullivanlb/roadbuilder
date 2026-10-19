@@ -10,15 +10,20 @@ import {
   pointRejection,
   removeBarrier,
   removePoint,
+  setPitLane,
   updateBarrier,
 } from '../core/project/edits';
 import { RULES } from '../core/project/rules';
+import { isCircuit } from '../core/project/schema';
 import type { BarrierType, Side } from '../core/project/schema';
+import { trackLength } from '../core/track/centerline';
+import { LAYOUT } from '../core/track/layout';
+import { positionAt } from '../core/track/positions';
 import { t } from '../i18n';
 import { useProjectStore } from './project';
 import { useUiStore } from './ui';
 
-export type ToolId = 'select' | 'add' | 'barrier' | 'pan';
+export type ToolId = 'select' | 'add' | 'barrier' | 'pits' | 'pan';
 export type ViewMode = '2d' | '3d';
 
 /** A barrier being laid: its first click is done, the second is awaited. */
@@ -30,6 +35,12 @@ export interface BarrierDraft {
 /** Where the pointer rests on the roadway while laying a barrier. */
 export interface RoadTarget {
   pointId: Id;
+  side: Side;
+}
+
+/** A place on the road and the side it points at, as a track distance. */
+export interface RoadSpot {
+  s: number;
   side: Side;
 }
 
@@ -46,6 +57,9 @@ export const useEditorStore = defineStore('editor', () => {
   const barrierDraft = ref<BarrierDraft | null>(null);
   const hoveredPointId = ref<Id | null>(null);
   const roadTarget = ref<RoadTarget | null>(null);
+  /** Entry of the pit lane being laid; the exit click is awaited. */
+  const pitDraft = ref<RoadSpot | null>(null);
+  const pitTarget = ref<RoadSpot | null>(null);
 
   const selectedIndex = computed(() =>
     selectedPointId.value === null ? -1 : (store.pointIndex.get(selectedPointId.value) ?? -1),
@@ -54,9 +68,11 @@ export const useEditorStore = defineStore('editor', () => {
   const selectedBarrier = computed(() =>
     store.project.barriers.find((barrier) => barrier.id === selectedBarrierId.value),
   );
-  const selectedTightTurns = computed(() =>
-    store.issues.tightTurns.filter(
-      (turn) => selectedPointId.value !== null && turn.pointIds.includes(selectedPointId.value),
+  /** Located issues around the selected control point. */
+  const selectedIssues = computed(() =>
+    store.issues.locations.filter(
+      (location) =>
+        selectedPointId.value !== null && location.pointIds.includes(selectedPointId.value),
     ),
   );
 
@@ -70,6 +86,7 @@ export const useEditorStore = defineStore('editor', () => {
       if (!project.barriers.some((barrier) => barrier.id === selectedBarrierId.value))
         selectedBarrierId.value = null;
       if (barrierDraft.value && !exists(barrierDraft.value.from)) barrierDraft.value = null;
+      if (!isCircuit(project)) pitDraft.value = null;
     },
   );
 
@@ -79,6 +96,10 @@ export const useEditorStore = defineStore('editor', () => {
     if (next !== 'barrier') {
       barrierDraft.value = null;
       roadTarget.value = null;
+    }
+    if (next !== 'pits') {
+      pitDraft.value = null;
+      pitTarget.value = null;
     }
   }
 
@@ -92,6 +113,7 @@ export const useEditorStore = defineStore('editor', () => {
     selectedPointId.value = store.project.points[0]?.id ?? null;
     selectedBarrierId.value = null;
     barrierDraft.value = null;
+    pitDraft.value = null;
     setTool(store.project.points.length ? 'select' : 'add');
   }
 
@@ -154,6 +176,35 @@ export const useEditorStore = defineStore('editor', () => {
     ui.notify(t('toast.barrierAdded'));
   }
 
+  /** First click of the pit lane: its entry. Pits only exist on circuits. */
+  function beginPitLane(spot: RoadSpot) {
+    if (!isCircuit(store.project)) return ui.notify(t('pits.roadOnly'), true);
+    pitDraft.value = spot;
+  }
+
+  function cancelPitLane() {
+    pitDraft.value = null;
+  }
+
+  /** Second click: the exit. The lane runs from the entry to the exit in track direction. */
+  function completePitLane(exit: number) {
+    const draft = pitDraft.value;
+    if (!draft) return;
+    const total = trackLength(store.samples);
+    const length = (((exit - draft.s) % total) + total) % total;
+    if (length < 2 * LAYOUT.pitLane.taper) return ui.notify(t('toast.pitLaneSamePlace'), true);
+    store.edit((project) =>
+      setPitLane(project, {
+        side: draft.side,
+        entry: positionAt(store.project, store.samples, draft.s),
+        exit: positionAt(store.project, store.samples, exit),
+      }),
+    );
+    pitDraft.value = null;
+    setTool('select');
+    ui.notify(t('toast.pitLaneAdded'));
+  }
+
   /** Chooses the type of the next barrier, and of the selected one if any. */
   function setBarrierType(type: BarrierType) {
     barrierType.value = type;
@@ -187,10 +238,12 @@ export const useEditorStore = defineStore('editor', () => {
     barrierDraft,
     hoveredPointId,
     roadTarget,
+    pitDraft,
+    pitTarget,
     selectedIndex,
     selectedPoint,
     selectedBarrier,
-    selectedTightTurns,
+    selectedIssues,
     setTool,
     setView,
     reset,
@@ -202,6 +255,9 @@ export const useEditorStore = defineStore('editor', () => {
     beginBarrier,
     cancelBarrier,
     completeBarrier,
+    beginPitLane,
+    cancelPitLane,
+    completePitLane,
     setBarrierType,
     swapSelectedBarrierSide,
     deleteSelectedBarrier,

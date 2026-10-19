@@ -18,7 +18,7 @@ const ui = useUiStore();
 const errors = computed(() =>
   store.issues.errors.map((issue) => ({
     text: formatTrackIssue(issue),
-    segment: store.issues.tightTurns.find((turn) => turn.issue === issue)?.segment,
+    location: store.issues.locations.find((location) => location.issue === issue),
   })),
 );
 const summary = computed(() =>
@@ -65,12 +65,12 @@ const summary = computed(() =>
       <p v-for="(error, index) in errors" :key="index" class="error">
         {{ error.text }}
         <AppButton
-          v-if="error.segment !== undefined"
+          v-if="error.location"
           class="locate"
           variant="secondary"
           small
-          :data-tight-turn="error.segment"
-          @click="viewport.focusTightTurn(error.segment)"
+          :data-locate="index"
+          @click="viewport.focusIssue(error.location)"
         >
           {{ t('editor.locateTurn') }}
         </AppButton>

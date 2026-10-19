@@ -29,6 +29,8 @@ const scene = computed<PlanScene>(() => ({
   selectedBarrierId: editor.selectedBarrierId,
   barrierDraft: editor.barrierDraft,
   roadTarget: editor.tool === 'barrier' ? editor.roadTarget : null,
+  pitDraft: editor.pitDraft && { entry: editor.pitDraft.s, side: editor.pitDraft.side },
+  pitTarget: editor.pitDraft ? editor.pitTarget : null,
   labels: { start: t('canvas.start'), finish: t('canvas.finish') },
 }));
 

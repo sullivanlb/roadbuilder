@@ -7,6 +7,8 @@ export interface InstallationParams {
   projectFile: string;
   terrainMargin: number;
   barrierCount: number;
+  /** Pit boxes along the pit lane, or null for a track with a single box and no lane. */
+  pitBoxes: number | null;
   warnings: readonly TrackIssue[];
 }
 

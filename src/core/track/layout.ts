@@ -6,14 +6,21 @@ import type { Sample } from './centerline';
 /** Fixed dimensions of the generated track, in metres. */
 export const LAYOUT = {
   kerbWidth: 0.65,
-  /** Depth of the pit box beside the kerb, on the left of the track. */
-  pitDepth: 4.2,
-  /** Length of the pit box, centred on the start position. */
-  pitLength: 16,
-  /** Track distance of the start position, before the start line. */
-  startPosition: 12,
-  /** Track distance of the start line. */
-  startLine: 28,
+  /** Pad beside the start position, on the left, used as the pit box without a pit lane. */
+  spawnPad: { depth: 4.2, length: 16 },
+  /** Distance between the start position and the start line. */
+  startBehindLine: 16,
+  /** Starting grid: gap behind the start line, then between consecutive places. */
+  grid: { front: 6, spacing: 8 },
+  pitLane: {
+    /** Length over which the lane widens at its entry and narrows at its exit. */
+    taper: 40,
+    /** Strip between the kerb and the lane that holds the pit wall. */
+    wallGap: 1.2,
+    wall: { thickness: 0.3, height: 1 },
+    /** Length of one pit box along the lane. */
+    boxSpacing: 10,
+  },
   /** Distance of the finish line before the end of a road. */
   finishBeforeEnd: 12,
   /** Edge lines painted inside the roadway: inset of their inner and outer edge. */
@@ -45,13 +52,16 @@ export function clampToBend(
 
 /** Extent of the terrain around the track. */
 export function terrainBounds(
-  project: Pick<Project, 'road' | 'terrain'>,
+  project: Pick<Project, 'road' | 'terrain' | 'pitLane'>,
   samples: readonly Sample[],
 ): Bounds {
+  const pitLane = project.pitLane
+    ? LAYOUT.pitLane.wallGap + project.pitLane.width + project.road.shoulder
+    : 0;
   return bounds(
     samples,
     roadEdge(project.road) +
-      Math.max(project.road.shoulder, LAYOUT.pitDepth) +
+      Math.max(project.road.shoulder, LAYOUT.spawnPad.depth, pitLane) +
       project.terrain.margin,
   );
 }

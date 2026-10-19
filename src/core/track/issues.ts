@@ -6,6 +6,8 @@ import { isCircuit } from '../project/schema';
 import type { Project } from '../project/schema';
 import { sampleTrack, trackStats } from './centerline';
 import type { Sample } from './centerline';
+import { LAYOUT } from './layout';
+import { pitBoxCapacity, pitLaneLayout } from './pitLane';
 
 /** Thresholds of the track checks. */
 export const CHECKS = {
@@ -27,7 +29,9 @@ export type TrackIssue =
   | { code: 'points-too-close'; min: number }
   | { code: 'steep-grade'; grade: number }
   | { code: 'tight-turn'; from: number; to: number }
-  | { code: 'track-crossing' };
+  | { code: 'track-crossing' }
+  | { code: 'pit-lane-too-short'; cars: number; capacity: number }
+  | { code: 'pit-lane-too-tight'; from: number; to: number };
 
 /** The worst bend of one segment that is too tight for the road width. */
 export interface TightTurn {
@@ -40,12 +44,21 @@ export interface TightTurn {
   issue: Extract<TrackIssue, { code: 'tight-turn' }>;
 }
 
+/** A problem that can be shown on the plan: where it is worst and the control points around it. */
+export interface IssueLocation {
+  issue: TrackIssue;
+  sampleIndex: number;
+  pointIds: Id[];
+}
+
 export interface TrackIssues {
   /** Problems that block the export. */
   errors: TrackIssue[];
   /** Problems worth knowing about that do not block the export. */
   warnings: TrackIssue[];
   tightTurns: TightTurn[];
+  /** The issues that have a place on the track, for the « show » buttons. */
+  locations: IssueLocation[];
 }
 
 /** Checks the centerline for problems that would make the track unusable in game. */
@@ -96,7 +109,63 @@ export function trackIssues(
   errors.push(...tightTurns.map((turn) => turn.issue));
 
   if (crossesItself(samples, circuit)) errors.push({ code: 'track-crossing' });
-  return { errors, warnings, tightTurns };
+  const locations: IssueLocation[] = tightTurns.map(({ issue, sampleIndex, pointIds }) => ({
+    issue,
+    sampleIndex,
+    pointIds,
+  }));
+  for (const location of pitLaneIssues(project, samples)) {
+    errors.push(location.issue);
+    if (location.sampleIndex >= 0) locations.push(location);
+  }
+  return { errors, warnings, tightTurns, locations };
+}
+
+/** The pit lane must hold every car and must not fold on the inside of a bend. */
+function pitLaneIssues(project: Project, samples: readonly Sample[]): IssueLocation[] {
+  if (!project.pitLane || samples.length < 2) return [];
+  const lane = pitLaneLayout(project, samples);
+  const capacity = lane ? pitBoxCapacity(lane) : 0;
+  const located: IssueLocation[] = [];
+  if (capacity < project.cars) {
+    const middle = lane
+      ? samples.findIndex((sample) => (lane.along(sample.s) ?? -1) >= lane.length / 2)
+      : -1;
+    located.push({
+      issue: { code: 'pit-lane-too-short', cars: project.cars, capacity },
+      sampleIndex: middle,
+      pointIds: [],
+    });
+  }
+  if (!lane) return located;
+  const points = project.points;
+  let first = -1,
+    last = -1,
+    worst = -1,
+    worstExcess = 0;
+  samples.forEach((sample, i) => {
+    const profile = lane.profile(sample.s);
+    const curvature = sample.curvature * lane.sign;
+    if (!profile || curvature <= 0) return;
+    const excess = profile.outer - LAYOUT.curveClearance / curvature;
+    if (excess <= 0) return;
+    if (first < 0) first = i;
+    last = i;
+    if (excess > worstExcess) {
+      worstExcess = excess;
+      worst = i;
+    }
+  });
+  if (worst >= 0) {
+    const from = samples[first].segment,
+      to = (samples[last].segment + 1) % points.length;
+    located.push({
+      issue: { code: 'pit-lane-too-tight', from, to },
+      sampleIndex: worst,
+      pointIds: [points[from].id, points[to].id],
+    });
+  }
+  return located;
 }
 
 /** Whether two non-neighbouring parts of the centerline cross (bridges are not supported). */

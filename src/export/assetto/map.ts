@@ -1,6 +1,7 @@
 import { bounds } from '../../core/math';
 import type { Project } from '../../core/project/schema';
 import { barrierPath } from '../../core/scene/barriers';
+import { pitLaneLayout } from '../../core/track/pitLane';
 import type { Sample } from '../../core/track/centerline';
 import { encodePng } from '../binary/png';
 
@@ -46,6 +47,26 @@ export function makeMap(project: Project, samples: readonly Sample[], preview = 
       );
     }
   }
+  // The pit lane, drawn along its middle.
+  const lane = pitLaneLayout(project, samples);
+  if (lane)
+    for (let i = 1; i < samples.length; i++) {
+      const a = samples[i - 1],
+        b = samples[i];
+      const pa = lane.profile(a.s),
+        pb = lane.profile(b.s);
+      if (!pa || !pb || lane.along(b.s)! < lane.along(a.s)!) continue;
+      for (let j = 0; j <= 4; j++) {
+        const t = j / 4,
+          lateral = lane.sign * (pa.center + (pb.center - pa.center) * t);
+        dot(
+          (a.x + (b.x - a.x) * t + (a.nx + (b.nx - a.nx) * t) * lateral + xOffset) * scale,
+          (a.z + (b.z - a.z) * t + (a.nz + (b.nz - a.nz) * t) * lateral + zOffset) * scale,
+          Math.max(1, (lane.width * pa.t * scale) / 2),
+          preview ? [150, 170, 110, 255] : [190, 190, 190, 255],
+        );
+      }
+    }
   for (const barrier of project.barriers) {
     const path = barrierPath(project, samples, barrier);
     for (let i = 1; i < path.length; i++) {

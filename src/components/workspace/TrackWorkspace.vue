@@ -84,11 +84,11 @@ const statusDetails = computed(() =>
         ><i class="dot"></i>{{ status }}</span
       >
       <AppButton
-        v-if="store.issues.tightTurns.length"
+        v-if="store.issues.locations.length"
         id="locate-tight-turn"
         variant="secondary"
         small
-        @click="viewport.focusTightTurn(store.issues.tightTurns[0].segment)"
+        @click="viewport.focusIssue(store.issues.locations[0])"
       >
         {{ t('editor.locateTurn') }}
       </AppButton>

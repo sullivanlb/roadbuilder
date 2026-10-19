@@ -103,6 +103,14 @@ Le contour en pointillés du plan 2D montre la limite extérieure. L’aperçu 3
 
 Pour ajouter le terrain à un circuit déjà installé, ouvrez son projet, exportez un nouveau ZIP et remplacez son dossier dans le jeu après avoir sauvegardé l’ancienne version.
 
+### Stands et grille de départ
+
+Sur un circuit fermé, l’outil **P** ou le bouton **Tracer la voie** de la section **Les stands** pose la voie des stands en deux clics : l’entrée, puis la sortie, sur la rive cliquée. La voie longe la piste derrière un muret en béton, avec un biseau de 40 m à l’entrée et à la sortie. Réglez ensuite le **nombre de voitures** (jusqu’à 24), la largeur de la voie, son côté et la position de l’entrée et de la sortie (un point plus une distance en mètres).
+
+Le nombre de voitures fixe les emplacements de stand, répartis tous les 10 m le long de la voie, et la grille de départ, en quinconce derrière la ligne de départ. La ligne de départ se déplace dans **Le tracé**. Une voie trop courte pour ses voitures, ou trop serrée à l’intérieur d’un virage, bloque l’export ; le bouton **Voir** la montre sur le plan. Sans voie des stands, et sur une route ouverte, le tracé accueille une seule voiture.
+
+Les barrières posées du même côté que la voie sont repoussées derrière elle.
+
 ### Barrières et collisions
 
 Les tronçons se posent avec l’outil **B** ou le bouton **Tracer sur le plan** : un premier clic fixe le point de départ sur la rive cliquée, un second le point d’arrivée. L’aperçu suit la piste entre les deux points. Échap annule le tracé en cours ; les tronçons se règlent ensuite dans **Les barrières** (écartement de 0 à 10 m au-delà du vibreur, changement de côté, suppression). Maximum **120 tronçons**.
@@ -115,6 +123,7 @@ L’inversion du sens du tracé retourne les tronçons, la suppression d’un po
 | ----------------------------------------- | ----------------------------------- |
 | Sélection / ajout / déplacement de la vue | V / A / H                           |
 | Tracer une barrière                       | B                                   |
+| Tracer la voie des stands                 | P                                   |
 | Navigation temporaire                     | Espace + glisser, ou bouton central |
 | Cadrer le tracé                           | F                                   |
 | Grille de 5 m pendant un déplacement      | Maj                                 |
@@ -138,11 +147,11 @@ Conservez une copie de l’ancienne version si vous remplacez un circuit existan
 
 Les cases cochées indiquent les fonctionnalités livrées. Les autres restent à réaliser.
 
-Prochaines priorités : **stands → trajectoires IA → dévers**.
+Prochaines priorités : **trajectoires IA → dévers**.
 
 - [x] **Terrain complet** : sol continu à l’intérieur et autour du tracé, marge réglable, adaptation au relief, aperçu 2D/3D et export avec collisions.
 - [x] **Barrières et murs** : glissières, pneus, TecPro et murs en béton tracés en deux clics, avec colliders invisibles dans Assetto Corsa.
-- [ ] **Vrais stands** : créer une voie d’entrée et de sortie, plusieurs emplacements et une grille de départ.
+- [x] **Vrais stands** : voie des stands avec entrée, sortie et muret, plusieurs emplacements et une grille de départ (à valider en jeu).
 - [ ] **Trajectoires IA** : permettre aux adversaires de parcourir le circuit et de rejoindre les stands.
 - [ ] **Largeur variable** : régler la largeur par portion pour élargir une ligne droite ou resserrer un passage.
 - [ ] **Dévers et virages relevés** : incliner la chaussée dans les courbes.
@@ -162,7 +171,7 @@ Prochaines priorités : **stands → trajectoires IA → dévers**.
 
 L’import dans Assetto Corsa a été confirmé par l’utilisateur pour la version précédente. L’ajout du terrain a été testé sur la géométrie et les exports, mais reste à vérifier en jeu. L’export reste expérimental et vise les essais libres en solo ; cela ne valide pas tous les tracés ni toutes les configurations du jeu.
 
-- Un emplacement de départ et un stand, sans véritable voie des stands.
+- Voie des stands et grille de départ encore à vérifier en jeu.
 - Pas de trajectoires IA ni de courses avec des adversaires.
 - Chronométrage à vérifier, particulièrement sur les routes ouvertes, prévues pour le roulage libre.
 - Le terrain reste limité au rectangle visible dans l’éditeur ; posez des barrières aux endroits risqués, sinon une chute reste possible au-delà.

@@ -1,7 +1,9 @@
 import type { Vec3 } from '../math';
 import type { Barrier, Project, Side } from '../project/schema';
 import type { Sample } from '../track/centerline';
-import { clampToBend, roadEdge } from '../track/layout';
+import { clampToBend } from '../track/layout';
+import { pitLaneLayout, sideEdge } from '../track/pitLane';
+import type { PitLaneLayout } from '../track/pitLane';
 import { spanSamples } from '../track/spans';
 import { addQuad, createMesh } from './mesh';
 import type { Mesh, Pair, Triple } from './mesh';
@@ -24,19 +26,25 @@ export const BARRIER_SIZES = {
 const COLLIDER_BOTTOM = -0.4;
 
 /** Position, local frame and curvature of a point along a barrier. */
-type Frame = Pick<Sample, 'x' | 'y' | 'z' | 'nx' | 'nz' | 's' | 'curvature'>;
+export type Frame = Pick<Sample, 'x' | 'y' | 'z' | 'nx' | 'nz' | 's' | 'curvature'>;
 
 const sideSign = (side: Side): 1 | -1 => (side === 'right' ? 1 : -1);
 
-/** Signed lateral position of a barrier: its offset beyond the kerb, kept clear of the centre of tight bends. */
+/**
+ * Signed lateral position of a barrier: its offset beyond the kerb, or beyond the
+ * pit lane where the lane runs on that side, kept clear of the centre of tight bends.
+ */
 export function barrierLateral(
   project: Project,
-  point: Pick<Sample, 'curvature'>,
+  lane: PitLaneLayout | null,
+  point: Pick<Sample, 'curvature' | 's'>,
   side: Side,
   offset: number,
 ): number {
   const sign = sideSign(side);
-  return sign * clampToBend(project.road, point, sign, roadEdge(project.road) + offset);
+  return (
+    sign * clampToBend(project.road, point, sign, sideEdge(project, lane, point, side) + offset)
+  );
 }
 
 /** The barrier line on the ground, for the plan, the map and hit tests. */
@@ -45,8 +53,9 @@ export function barrierPath(
   samples: readonly Sample[],
   barrier: Pick<Barrier, 'from' | 'to' | 'side' | 'offset'>,
 ): Vec3[] {
+  const lane = pitLaneLayout(project, samples);
   return spanSamples(project, samples, barrier).map((sample) => {
-    const lateral = barrierLateral(project, sample, barrier.side, barrier.offset);
+    const lateral = barrierLateral(project, lane, sample, barrier.side, barrier.offset);
     return { x: sample.x + sample.nx * lateral, y: sample.y, z: sample.z + sample.nz * lateral };
   });
 }
@@ -57,7 +66,7 @@ const along = (p: Frame, distance: number): Frame => ({
   x: p.x + p.nz * distance,
   z: p.z - p.nx * distance,
 });
-const at = (p: Frame, lateral: number, height: number): Triple => [
+export const at = (p: Frame, lateral: number, height: number): Triple => [
   p.x + p.nx * lateral,
   p.y + height,
   p.z + p.nz * lateral,
@@ -69,8 +78,8 @@ const edgeUvs = (a: number, b: number, low: number, high: number): Pair[] => [
   [b / 4, low / 4],
 ];
 
-/** Evenly spaced frames along a path (posts, tyres). */
-function walk(path: readonly Frame[], spacing: number, phase = 0): Frame[] {
+/** Evenly spaced frames along a path (posts, tyres), with their track distance. */
+export function walk(path: readonly Frame[], spacing: number, phase = 0): Frame[] {
   const steps: Frame[] = [];
   let travelled = 0,
     next = spacing / 2 + phase;
@@ -81,6 +90,8 @@ function walk(path: readonly Frame[], spacing: number, phase = 0): Frame[] {
     if (length < 0.0001) continue;
     const start = travelled;
     travelled += length;
+    // Track distance of b, unwrapped when the path runs through the start of a circuit.
+    const sb = b.s < a.s ? a.s + length : b.s;
     for (; next <= travelled; next += spacing) {
       const t = (next - start) / length;
       steps.push({
@@ -89,7 +100,7 @@ function walk(path: readonly Frame[], spacing: number, phase = 0): Frame[] {
         z: a.z + (b.z - a.z) * t,
         nx: a.nx,
         nz: a.nz,
-        s: next,
+        s: a.s + (sb - a.s) * t,
         curvature: a.curvature,
       });
     }
@@ -101,7 +112,7 @@ function walk(path: readonly Frame[], spacing: number, phase = 0): Frame[] {
  * Vertical face along the barrier. The winding makes its normal face the track:
  * essential to stop cars driving through it.
  */
-function wallQuad(
+export function wallQuad(
   mesh: Mesh,
   a: Frame,
   b: Frame,
@@ -126,7 +137,7 @@ function wallQuad(
 }
 
 /** Horizontal top face, facing up whatever the side. */
-function topQuad(
+export function topQuad(
   mesh: Mesh,
   a: Frame,
   b: Frame,
@@ -147,7 +158,7 @@ function topQuad(
 }
 
 /** End cap across the barrier; `direction` 1 closes the far end, -1 the near end. */
-function capQuad(
+export function capQuad(
   mesh: Mesh,
   p: Frame,
   lateralA: number,
@@ -208,12 +219,13 @@ function tire(
 
 /** Colliders and decor of every barrier of the project. */
 export function buildBarriers(project: Project, samples: readonly Sample[]): Mesh[] {
+  const lane = pitLaneLayout(project, samples);
   const meshes: Mesh[] = [];
   project.barriers.forEach((barrier, index) => {
     const path = spanSamples(project, samples, barrier);
     if (path.length < 2) return;
     const sign = sideSign(barrier.side);
-    const lateral = (p: Frame) => barrierLateral(project, p, barrier.side, barrier.offset);
+    const lateral = (p: Frame) => barrierLateral(project, lane, p, barrier.side, barrier.offset);
     const collider = (material: Mesh['material']) =>
       createMesh(`1WALL_${barrier.type}_${index}`, material, 'barrier', false);
     const decor = (name: string, material: Mesh['material']) =>

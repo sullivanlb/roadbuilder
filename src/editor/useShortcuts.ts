@@ -35,13 +35,18 @@ export function useShortcuts() {
     { key: 'v', run: tool('select') },
     { key: 'a', run: tool('add') },
     { key: 'b', run: tool('barrier') },
+    { key: 'p', run: tool('pits') },
     { key: 'h', run: tool('pan') },
     { key: 'f', run: viewport.fit },
     { key: 'delete', run: editor.deleteSelectedPoint },
     { key: 'backspace', run: editor.deleteSelectedPoint },
     {
       key: 'escape',
-      run: () => (editor.barrierDraft ? editor.cancelBarrier() : editor.setTool('select')),
+      run: () => {
+        if (editor.barrierDraft) editor.cancelBarrier();
+        else if (editor.pitDraft) editor.cancelPitLane();
+        else editor.setTool('select');
+      },
     },
     { key: '?', shift: 'any', run: () => ui.openDialog('help') },
   ];

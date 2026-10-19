@@ -8,6 +8,7 @@ import { useProjectStore } from '../../stores/project';
 import { useUiStore } from '../../stores/ui';
 import AppIcon from '../ui/AppIcon.vue';
 import BarrierSection from './BarrierSection.vue';
+import PitSection from './PitSection.vue';
 import PointSection from './PointSection.vue';
 import RoadSection from './RoadSection.vue';
 import TerrainSection from './TerrainSection.vue';
@@ -66,7 +67,8 @@ function onNameDone() {
     <RoadSection :index="2" />
     <TerrainSection :index="3" />
     <BarrierSection :index="4" />
-    <PointSection :index="5" />
+    <PitSection :index="5" />
+    <PointSection :index="6" />
 
     <div class="tip">
       <AppIcon class="tip-icon" name="cursor" />

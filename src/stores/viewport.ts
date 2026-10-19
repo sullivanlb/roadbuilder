@@ -3,6 +3,7 @@ import { defineStore } from 'pinia';
 import { computed, ref } from 'vue';
 import { bounds } from '../core/math';
 import type { PlanPoint } from '../core/math';
+import type { IssueLocation } from '../core/track/issues';
 import { terrainBounds } from '../core/track/layout';
 import { frameCamera, PlanProjection, zoomCamera } from '../rendering/plan/projection';
 import type { PlanCamera, ScreenPoint, ViewportSize } from '../rendering/plan/projection';
@@ -69,16 +70,14 @@ export const useViewportStore = defineStore('viewport', () => {
     };
   }
 
-  /** Shows a tight turn on the plan: closes any dialog, frames the turn and selects its first point. */
-  function focusTightTurn(segment: number) {
-    const turn = store.issues.tightTurns.find((candidate) => candidate.segment === segment);
-    if (!turn) return;
+  /** Shows a located issue on the plan: closes any dialog, frames the spot and selects its first point. */
+  function focusIssue(location: IssueLocation) {
     ui.closeDialog();
     editor.setView('2d');
     editor.setTool('select');
-    editor.selectPoint(turn.pointIds[0]);
-    const points = store.project.points.filter((point) => turn.pointIds.includes(point.id));
-    focus([store.samples[turn.sampleIndex], ...points]);
+    if (location.pointIds[0]) editor.selectPoint(location.pointIds[0]);
+    const points = store.project.points.filter((point) => location.pointIds.includes(point.id));
+    focus([store.samples[location.sampleIndex], ...points]);
     focusRequest.value++;
   }
 
@@ -96,7 +95,7 @@ export const useViewportStore = defineStore('viewport', () => {
     onPreviewCommand: preview.on,
     fit,
     focus,
-    focusTightTurn,
+    focusIssue,
     zoom,
     pan,
     resize,

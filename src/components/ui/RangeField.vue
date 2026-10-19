@@ -11,10 +11,12 @@ const props = defineProps<{
   value: number;
   rule: NumericRule;
   minLabel?: string;
+  /** Unit shown after the value; metres by default. */
+  unit?: string;
 }>();
 defineEmits<{ input: [value: number]; commit: [] }>();
 
-const metres = (value: number) => `${formatNumber(value, value % 1 ? 1 : 0)} m`;
+const metres = (value: number) => `${formatNumber(value, value % 1 ? 1 : 0)} ${props.unit ?? 'm'}`;
 const fill = computed(
   () => ((props.value - props.rule.min) / (props.rule.max - props.rule.min)) * 100,
 );

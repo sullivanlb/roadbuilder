@@ -29,9 +29,9 @@ function preview(axis: 'x' | 'y' | 'z', value: number) {
       }}</span>
     </template>
     <div v-if="point" id="point-editor">
-      <div v-if="editor.selectedTightTurns.length" id="point-issues" class="issues" role="status">
-        <p v-for="turn in editor.selectedTightTurns" :key="turn.segment">
-          {{ formatTrackIssue(turn.issue) }}
+      <div v-if="editor.selectedIssues.length" id="point-issues" class="issues" role="status">
+        <p v-for="(location, position) in editor.selectedIssues" :key="position">
+          {{ formatTrackIssue(location.issue) }}
         </p>
       </div>
       <div class="altitude">

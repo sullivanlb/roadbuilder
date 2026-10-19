@@ -12,6 +12,8 @@ const PICK = { point: 15, road: 20, barrier: 8 };
 /** A position on the centerline under the cursor. */
 export interface RoadHit extends Vec3 {
   segment: number;
+  /** Track distance of the hit. */
+  s: number;
   nx: number;
   nz: number;
 }
@@ -22,6 +24,12 @@ function toSegment(p: ScreenPoint, a: ScreenPoint, b: ScreenPoint) {
     dy = b.y - a.y;
   const t = clamp(((p.x - a.x) * dx + (p.y - a.y) * dy) / (dx * dx + dy * dy || 1), 0, 1);
   return { t, distance: Math.hypot(p.x - a.x - dx * t, p.y - a.y - dy * t) };
+}
+
+/** The side of the road the cursor is on, relative to the track direction. */
+function sideOf(view: PlanProjection, road: RoadHit, at: ScreenPoint): Side {
+  const world = view.toWorld(at);
+  return (world.x - road.x) * road.nx + (world.z - road.z) * road.nz >= 0 ? 'right' : 'left';
 }
 
 /** The control point under the cursor, or null. */
@@ -59,6 +67,7 @@ export function findRoad(
       y: p.y + (q.y - p.y) * t,
       z: p.z + (q.z - p.z) * t,
       segment: p.segment,
+      s: p.s + (q.s - p.s) * t,
       nx: p.nx,
       nz: p.nz,
     };
@@ -82,10 +91,20 @@ export function findRoadSide(
     const p = view.toScreen(point);
     return Math.hypot(p.x - at.x, p.y - at.y);
   };
-  const world = view.toWorld(at);
-  const side: Side =
-    (world.x - road.x) * road.nx + (world.z - road.z) * road.nz >= 0 ? 'right' : 'left';
+  const side = sideOf(view, road, at);
   return { pointId: distanceTo(a) <= distanceTo(b) ? a.id : b.id, side };
+}
+
+/** The track distance under the cursor, with the side of the road it points at. */
+export function findRoadPosition(
+  view: PlanProjection,
+  project: Project,
+  samples: readonly Sample[],
+  at: ScreenPoint,
+): { s: number; side: Side } | null {
+  const road = findRoad(view, project, samples, at);
+  if (!road) return null;
+  return { s: road.s, side: sideOf(view, road, at) };
 }
 
 /** The barrier under the cursor, or null. */

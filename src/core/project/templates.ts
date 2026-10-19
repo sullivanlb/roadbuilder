@@ -1,11 +1,15 @@
-import type { RoadSettings } from './schema';
+import type { RoadSettings, Side } from './schema';
 
 export const TEMPLATES = ['club', 'kart', 'mountain', 'blank'] as const;
 export type Template = (typeof TEMPLATES)[number];
 
+/** A place given as the position of a control point in the track plus a distance after it. */
+type TemplatePosition = readonly [point: number, distance: number];
+
 interface TemplateDefinition {
   road: Omit<RoadSettings, 'shoulder'>;
   points: readonly (readonly [x: number, y: number, z: number])[];
+  pits?: { side: Side; entry: TemplatePosition; exit: TemplatePosition; cars: number };
 }
 
 /** Built-in starting tracks; their names come from the interface language. */
@@ -23,6 +27,8 @@ export const TEMPLATE_DEFINITIONS: Record<Template, TemplateDefinition> = {
       [-260, 1, -140],
       [-340, 0, 0],
     ],
+    // Along the main straight, on the outside, around the start line.
+    pits: { side: 'right', entry: [8, 120], exit: [0, 250], cars: 10 },
   },
   kart: {
     road: { closed: true, width: 7, kerbs: true },

@@ -107,6 +107,12 @@ export function formatProjectError(detail: ProjectErrorDetail, target?: Locale):
       return tr('projectError.barrierDirection');
     case 'invalid-value':
       return tr('projectError.invalidValue', { path: detail.path });
+    case 'position-point':
+      return tr('projectError.positionPoint');
+    case 'pit-lane-on-road':
+      return tr('projectError.pitLaneOnRoad');
+    case 'cars-without-pit-lane':
+      return tr('projectError.carsWithoutPitLane');
   }
 }
 
@@ -128,6 +134,10 @@ export function formatTrackIssue(issue: TrackIssue, target?: Locale): string {
       return tr('trackIssue.tightTurn', { from: issue.from + 1, to: issue.to + 1 });
     case 'track-crossing':
       return tr('trackIssue.trackCrossing');
+    case 'pit-lane-too-short':
+      return tr('trackIssue.pitLaneTooShort', { cars: issue.cars, capacity: issue.capacity });
+    case 'pit-lane-too-tight':
+      return tr('trackIssue.pitLaneTooTight', { from: issue.from + 1, to: issue.to + 1 });
   }
 }
 
@@ -150,8 +160,11 @@ export function documentTexts(target: Locale): DocumentTexts {
       }),
     objReadme: (barrierCount) =>
       tr('documents.objReadme') + (barrierCount ? tr('documents.objReadmeBarriers') : ''),
-    installation: ({ name, slug, projectFile, terrainMargin, barrierCount, warnings }) =>
+    installation: ({ name, slug, projectFile, terrainMargin, barrierCount, pitBoxes, warnings }) =>
       tr('documents.installationHead', { name, slug }) +
+      (pitBoxes === null
+        ? tr('documents.installationSpawnPit')
+        : tr('documents.installationPitLane', { count: pitBoxes })) +
       (barrierCount
         ? tr('documents.installationBarriers', { count: barrierCount }, barrierCount) + '\n'
         : '') +

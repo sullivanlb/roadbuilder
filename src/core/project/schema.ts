@@ -32,6 +32,16 @@ const barrier = z.object({
   offset: ranged(RULES.barrierOffset),
 });
 
+/** A place on the track: a control point plus a distance along the track after it (docs/adr/0006). */
+const trackPosition = z.object({ point: id, distance: ranged(RULES.positionDistance) });
+
+const pitLane = z.object({
+  side: z.enum(SIDES),
+  entry: trackPosition,
+  exit: trackPosition,
+  width: ranged(RULES.pitLaneWidth),
+});
+
 const projectShape = z.object({
   format: z.literal(PROJECT_FORMAT),
   version: z.literal(PROJECT_VERSION),
@@ -47,6 +57,10 @@ const projectShape = z.object({
   terrain: z.object({ margin: ranged(RULES.terrainMargin) }),
   points: z.array(controlPoint).max(RULES.points.max),
   barriers: z.array(barrier).max(RULES.barriers.max),
+  /** Absent until set: the start line then sits a little after the first control point. */
+  startLine: trackPosition.optional(),
+  pitLane: pitLane.nullable().default(null),
+  cars: z.number().int().min(RULES.cars.min).max(RULES.cars.max).default(1),
 });
 
 type ProjectShape = z.output<typeof projectShape>;
@@ -71,6 +85,15 @@ function checkReferences(project: ProjectShape, ctx: z.RefinementCtx<ProjectShap
     // Only a circuit lets a span run through the start.
     if (!circuit && from > to) fail('barrier-direction', ['barriers', index]);
   });
+  const positions = [
+    ['startLine', project.startLine],
+    ['pitLane', project.pitLane?.entry],
+    ['pitLane', project.pitLane?.exit],
+  ] as const;
+  for (const [field, position] of positions)
+    if (position && !order.has(position.point)) return fail('position-point', [field]);
+  if (project.pitLane && !circuit) return fail('pit-lane-on-road', ['pitLane']);
+  if (project.cars > 1 && !project.pitLane) fail('cars-without-pit-lane', ['cars']);
 }
 
 const projectSchema = projectShape.superRefine(checkReferences);
@@ -82,6 +105,8 @@ export type Barrier = Project['barriers'][number];
 export type BarrierType = Barrier['type'];
 export type Side = Barrier['side'];
 export type RoadSettings = Project['road'];
+export type TrackPosition = NonNullable<Project['startLine']>;
+export type PitLane = NonNullable<Project['pitLane']>;
 
 /** A circuit needs three control points to close; with fewer it is driven as a road. */
 export const isCircuit = (project: Pick<Project, 'road' | 'points'>) =>

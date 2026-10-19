@@ -12,6 +12,7 @@ const shortcuts: { label: MessageKey; key: () => string }[] = [
   { label: 'help.shortcutSelect', key: () => 'V' },
   { label: 'help.shortcutAdd', key: () => 'A' },
   { label: 'help.shortcutBarrier', key: () => 'B' },
+  { label: 'help.shortcutPits', key: () => 'P' },
   { label: 'help.shortcutPan', key: () => 'H' },
   { label: 'help.shortcutFit', key: () => 'F' },
   { label: 'help.shortcutUndo', key: () => t('help.keyCtrlZ') },

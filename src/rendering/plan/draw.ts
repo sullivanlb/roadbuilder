@@ -4,11 +4,14 @@ import { DEFAULTS } from '../../core/project/rules';
 import { isCircuit } from '../../core/project/schema';
 import type { Project, Side } from '../../core/project/schema';
 import { barrierPath } from '../../core/scene/barriers';
+import { gridPlaces, pitBoxPlaces } from '../../core/scene/markers';
+import type { Place } from '../../core/scene/markers';
 import { startLine } from '../../core/scene/road';
 import { sampleAt, trackLength } from '../../core/track/centerline';
 import type { Sample } from '../../core/track/centerline';
 import type { TightTurn } from '../../core/track/issues';
-import { kerbWidth, terrainBounds } from '../../core/track/layout';
+import { kerbWidth, LAYOUT, roadEdge, terrainBounds } from '../../core/track/layout';
+import { pitLaneLayout } from '../../core/track/pitLane';
 import { BARRIER_STYLE, COLORS } from '../theme';
 import type { PlanProjection } from './projection';
 
@@ -24,6 +27,10 @@ export interface PlanScene {
   barrierDraft: { from: Id; side: Side } | null;
   /** Where the next barrier click would land. */
   roadTarget: { pointId: Id; side: Side } | null;
+  /** Entry of the pit lane being laid, as a track distance. */
+  pitDraft: { entry: number; side: Side } | null;
+  /** Where the next pit lane click would land. */
+  pitTarget: { s: number; side: Side } | null;
   labels: { start: string; finish: string };
 }
 
@@ -143,7 +150,7 @@ function drawTrack(ctx: Context, view: PlanProjection, scene: PlanScene) {
 
 /** Chequered start line and the start/finish labels. */
 function drawStart(ctx: Context, view: PlanProjection, scene: PlanScene) {
-  const start = startLine(scene.samples);
+  const start = startLine(scene.project, scene.samples);
   const p = view.toScreen(start),
     half = (scene.project.road.width * view.camera.scale) / 2;
   ctx.save();
@@ -163,6 +170,79 @@ function drawStart(ctx: Context, view: PlanProjection, scene: PlanScene) {
   if (!scene.project.road.closed) {
     const end = view.toScreen(scene.samples.at(-1)!);
     ctx.fillText(scene.labels.finish, end.x + 13, end.y + 21);
+  }
+}
+
+/** Pit lane surface, wall, boxes and starting grid; the lane being laid as a dashed line. */
+function drawPits(ctx: Context, view: PlanProjection, scene: PlanScene) {
+  const { project, samples } = scene;
+  const lane = pitLaneLayout(project, samples);
+  const edge = roadEdge(project.road);
+  const beside = (sample: Sample, lateral: number) =>
+    view.toScreen({ x: sample.x + sample.nx * lateral, z: sample.z + sample.nz * lateral });
+  if (lane) {
+    ctx.fillStyle = COLORS.pits.lane;
+    ctx.strokeStyle = COLORS.pits.lane;
+    ctx.lineWidth = 0.5;
+    for (let i = 1; i < samples.length; i++) {
+      const a = samples[i - 1],
+        b = samples[i];
+      const pa = lane.profile(a.s),
+        pb = lane.profile(b.s);
+      if (!pa || !pb || lane.along(b.s)! < lane.along(a.s)!) continue;
+      const corners = [
+        beside(a, lane.sign * edge),
+        beside(a, lane.sign * pa.outer),
+        beside(b, lane.sign * pb.outer),
+        beside(b, lane.sign * edge),
+      ];
+      ctx.beginPath();
+      corners.forEach((p, k) => (k ? ctx.lineTo(p.x, p.y) : ctx.moveTo(p.x, p.y)));
+      ctx.closePath();
+      ctx.fill();
+      ctx.stroke();
+    }
+    ctx.strokeStyle = COLORS.pits.wall;
+    ctx.lineWidth = Math.max(1, LAYOUT.pitLane.wall.thickness * view.camera.scale);
+    ctx.beginPath();
+    let drawing = false;
+    for (const sample of samples) {
+      const along = lane.along(sample.s);
+      const inWall = along !== null && along >= lane.taper && along <= lane.length - lane.taper;
+      const p = beside(sample, lane.sign * (edge + LAYOUT.pitLane.wallGap / 2));
+      if (inWall && drawing) ctx.lineTo(p.x, p.y);
+      else if (inWall) ctx.moveTo(p.x, p.y);
+      drawing = inWall;
+    }
+    ctx.stroke();
+  }
+  const mark = (places: Place[], color: string) => {
+    ctx.fillStyle = color;
+    const size = Math.max(2, 1.6 * view.camera.scale);
+    for (const { sample, lateral } of places) {
+      const p = beside(sample, lateral);
+      ctx.fillRect(p.x - size / 2, p.y - size / 2, size, size);
+    }
+  };
+  mark(pitBoxPlaces(project, samples), COLORS.pits.box);
+  mark(gridPlaces(project, samples), COLORS.pits.grid);
+
+  const draft = scene.pitDraft,
+    target = scene.pitTarget;
+  if (draft && target) {
+    const total = trackLength(samples);
+    const span = (((target.s - draft.entry) % total) + total) % total;
+    const sign = draft.side === 'right' ? 1 : -1;
+    const lateral = sign * (edge + LAYOUT.pitLane.wallGap + DEFAULTS.pitLaneWidth / 2);
+    ctx.beginPath();
+    for (let d = 0; d <= span; d += 3) {
+      const p = beside(sampleAt(samples, (draft.entry + d) % total)!, lateral);
+      if (d === 0) ctx.moveTo(p.x, p.y);
+      else ctx.lineTo(p.x, p.y);
+    }
+    ctx.strokeStyle = COLORS.accent;
+    ctx.lineWidth = 3;
+    dashed(ctx, [6, 5], () => ctx.stroke());
   }
 }
 
@@ -303,6 +383,7 @@ export function drawPlan(ctx: Context, view: PlanProjection, scene: PlanScene, d
   drawBackground(ctx, view);
   if (scene.samples.length > 1) {
     drawTrack(ctx, view, scene);
+    drawPits(ctx, view, scene);
     drawStart(ctx, view, scene);
     drawTightTurns(ctx, view, scene);
     drawBarriers(ctx, view, scene);

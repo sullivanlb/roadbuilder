@@ -29,6 +29,7 @@ export const frMessages = {
   'editor.selectAria': 'Sélectionner (V)',
   'editor.addTitle': 'Ajouter des points (A)',
   'editor.barrierTitle': 'Tracer une barrière (B)',
+  'editor.pitsTitle': 'Tracer la voie des stands (P)',
   'editor.panTitle': 'Déplacer la vue (H)',
   'editor.undoTitle': 'Annuler (Ctrl+Z)',
   'editor.redoTitle': 'Rétablir (Ctrl+Maj+Z)',
@@ -53,6 +54,9 @@ export const frMessages = {
   'canvas.hintBarrier': 'Cliquez le point de départ du tronçon · Échap quitte l’outil',
   'canvas.hintAdd': 'Cliquez pour ajouter après le point sélectionné · Échap pour terminer',
   'canvas.hintPan': 'Glissez pour déplacer le plan · Molette pour zoomer',
+  'canvas.hintPits':
+    'Cliquez l’entrée de la voie des stands, sur la rive voulue · Échap quitte l’outil',
+  'canvas.hintPitsDraft': 'Cliquez la sortie de la voie des stands · Échap annule',
   'canvas.hintSelect': 'Glissez un point · Molette pour zoomer · Espace + glisser pour naviguer',
   'canvas.start': 'DÉPART',
   'canvas.finish': 'ARRIVÉE',
@@ -87,6 +91,7 @@ export const frMessages = {
   'sidebar.closedNote': 'Une boucle continue. À vous de trouver la trajectoire idéale.',
   'sidebar.openNote': 'Un départ, une arrivée. Imaginez une route qui donne envie de rouler.',
   'sidebar.reverse': 'Inverser le sens',
+  'sidebar.startLine': 'Ligne de départ',
   'sidebar.road': 'La chaussée',
   'sidebar.width': 'Largeur de la route',
   'sidebar.shoulder': 'Accotements',
@@ -138,6 +143,23 @@ export const frMessages = {
   'barriers.empty':
     'Aucune barrière pour l’instant. Le tracé se sécurise en deux clics : départ puis arrivée.',
 
+  'pits.title': 'Les stands',
+  'pits.roadOnly':
+    'Les stands sont réservés aux circuits fermés : une route ouverte accueille une seule voiture.',
+  'pits.empty': 'Pas encore de voie des stands : une seule voiture, qui part de la ligne.',
+  'pits.draw': 'Tracer la voie',
+  'pits.statusTool': 'Cliquez l’entrée de la voie sur la piste, du côté voulu. Échap annule.',
+  'pits.statusDraft': 'Cliquez maintenant la sortie de la voie.',
+  'pits.cars': 'Nombre de voitures',
+  'pits.carsUnit': 'voitures',
+  'pits.width': 'Largeur de la voie',
+  'pits.entry': 'Entrée',
+  'pits.exit': 'Sortie',
+  'pits.sideRight': 'Voie à droite de la piste',
+  'pits.sideLeft': 'Voie à gauche de la piste',
+  'pits.delete': 'Supprimer la voie',
+  'position.point': 'Point',
+  'position.distance': 'm après',
   'point.title': 'Le relief',
   'point.badge': 'POINT {index}',
   'point.altitude': 'Altitude du point',
@@ -209,6 +231,7 @@ export const frMessages = {
   'help.shortcutAdd': 'Ajouter un point',
   'help.shortcutBarrier': 'Tracer une barrière',
   'help.shortcutPan': 'Déplacer la vue',
+  'help.shortcutPits': 'Tracer les stands',
   'help.shortcutFit': 'Tout cadrer',
   'help.shortcutUndo': 'Annuler',
   'help.shortcutRedo': 'Rétablir',
@@ -225,6 +248,9 @@ export const frMessages = {
   'toast.barrierSamePoint': 'Choisissez un point d’arrivée différent du point de départ.',
   'toast.barriersLimit': 'Maximum {max} tronçons de barrière.',
   'toast.barrierAdded': 'Barrière ajoutée. Échap pour terminer le tracé.',
+  'toast.pitLaneAdded':
+    'Voie des stands ajoutée. Réglez le nombre de voitures dans « Les stands ».',
+  'toast.pitLaneSamePlace': 'Choisissez une sortie éloignée de l’entrée.',
   'toast.pointTooClose': 'Placez ce point à au moins {min} mètres des autres.',
   'toast.pointsLimit': 'Maximum {max} points par tracé.',
   'toast.projectDownloaded': 'Projet téléchargé. Gardez ce fichier pour reprendre votre travail.',
@@ -252,6 +278,9 @@ export const frMessages = {
   'projectError.barrierSpan': 'Une barrière doit relier deux points différents.',
   'projectError.barrierDirection':
     'Sur une route ouverte, une barrière doit suivre le sens du tracé.',
+  'projectError.positionPoint': 'Un repère de piste s’appuie sur un point qui n’existe pas.',
+  'projectError.pitLaneOnRoad': 'Une route ouverte ne peut pas avoir de voie des stands.',
+  'projectError.carsWithoutPitLane': 'Plusieurs voitures nécessitent une voie des stands.',
   'projectError.invalidValue': 'Valeur invalide dans le projet : {path}.',
 
   'trackIssue.pointsMinimumClosed': 'Ajoutez au moins {min} points pour fermer le circuit.',
@@ -265,6 +294,10 @@ export const frMessages = {
   'trackIssue.trackCrossing':
     'Le tracé se croise : déplacez les points concernés. Les ponts ne sont pas pris en charge.',
 
+  'trackIssue.pitLaneTooShort':
+    'La voie des stands n’accueille que {capacity} voitures sur {cars} : allongez-la ou réduisez le nombre de voitures.',
+  'trackIssue.pitLaneTooTight':
+    'La voie des stands est trop serrée entre les points {from} et {to} : placez-la à l’extérieur du virage ou réduisez sa largeur.',
   'exportError.foldedSurface':
     'Un bord de route ou de stand se replie dans un virage. Écartez les points, réduisez la largeur ou déplacez le début du tracé vers une ligne droite.',
 
@@ -279,8 +312,12 @@ export const frMessages = {
     'ROADBUILDER — {name}\n\nEXPORT KN5 EXPÉRIMENTAL, À VÉRIFIER EN JEU\n\n1. Décompressez cette archive dans un dossier temporaire.\n2. Copiez content/tracks/{slug} dans assettocorsa/content/tracks/.\n   Si ce nom existe déjà, conservez une copie de votre ancienne version avant de la remplacer.\n3. Dans Content Manager ou Assetto Corsa, sélectionnez {name}.\n4. Lancez des ESSAIS LIBRES, avec une seule voiture et sans adversaires.\n\nINCLUS\n',
   'documents.installationBarriers':
     'Barrières : {count} tronçon avec collision (glissières, pneus, TecPro ou murs).|Barrières : {count} tronçons avec collision (glissières, pneus, TecPro ou murs).',
+  'documents.installationPitLane':
+    'Voie des stands avec muret, {count} emplacements et grille de départ de {count} places.\n',
+  'documents.installationSpawnPit':
+    'Un seul emplacement de stand, à côté du départ, sans voie des stands.\n',
   'documents.installationBody':
-    'Chaussée avec collisions, accotements, vibreurs optionnels, textures intégrées au KN5,\nrepères de départ/stand et chronométrage, surfaces, plan et aperçu.\nTerrain en herbe avec collisions, à l’intérieur et autour du tracé, raccordé à son relief.\nMarge extérieure du terrain : {terrainMargin} m au-delà des limites des accotements.\nLe point 1 définit le début du tracé ; la ligne de départ est placée après le stand.\n\nLIMITES DE CETTE VERSION\nLa compatibilité en jeu n’a pas été vérifiée automatiquement.\nUn emplacement de stand seulement, sans véritable voie des stands.\nPas de trajectoires IA : les courses contre l’IA ne sont pas prises en charge.\nRoutes ouvertes : essais libres uniquement ; chronométrage point-à-point non validé.\nLe terrain s’arrête au rectangle en pointillés visible dans l’éditeur.\nAu-delà de ce bord extérieur, une chute reste possible. Augmentez la marge si nécessaire.\n',
+    'Chaussée avec collisions, accotements, vibreurs optionnels, textures intégrées au KN5,\nrepères de départ/stands et chronométrage, surfaces, plan et aperçu.\nTerrain en herbe avec collisions, à l’intérieur et autour du tracé, raccordé à son relief.\nMarge extérieure du terrain : {terrainMargin} m au-delà des limites des accotements.\nLe point 1 définit le début du tracé ; la ligne de départ est placée après le stand.\n\nLIMITES DE CETTE VERSION\nLa compatibilité en jeu n’a pas été vérifiée automatiquement.\nPas de trajectoires IA : les courses contre l’IA ne sont pas prises en charge.\nRoutes ouvertes : essais libres uniquement ; chronométrage point-à-point non validé.\nLe terrain s’arrête au rectangle en pointillés visible dans l’éditeur.\nAu-delà de ce bord extérieur, une chute reste possible. Augmentez la marge si nécessaire.\n',
   'documents.installationBarrierLimits':
     'Les barrières sont des colliders simples : vérifiez les impacts en jeu.\nLe relief du terrain est interpolé automatiquement.\n',
   'documents.installationNoBarrierLimits':

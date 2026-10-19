@@ -65,8 +65,8 @@ describe('barriers', () => {
     const project = template('club');
     const straight = sampleTrack(project).find((s) => Math.abs(s.curvature) < 0.005)!;
     const edge = roadEdge(project.road);
-    expect(barrierLateral(project, straight, 'right', 1)).toBeCloseTo(edge + 1, 5);
-    expect(barrierLateral(project, straight, 'left', 10)).toBeCloseTo(-(edge + 10), 5);
+    expect(barrierLateral(project, null, straight, 'right', 1)).toBeCloseTo(edge + 1, 5);
+    expect(barrierLateral(project, null, straight, 'left', 10)).toBeCloseTo(-(edge + 10), 5);
 
     const tight = tightTurnProject();
     const tightEdge = roadEdge(tight.road);
@@ -75,10 +75,10 @@ describe('barriers', () => {
     );
     const inside = bend.curvature > 0 ? 'right' : 'left';
     const outside = inside === 'right' ? 'left' : 'right';
-    const clamped = Math.abs(barrierLateral(tight, bend, inside, 10));
+    const clamped = Math.abs(barrierLateral(tight, null, bend, inside, 10));
     expect(clamped).toBeGreaterThanOrEqual(tightEdge + 0.05);
     expect(clamped).toBeLessThan(tightEdge + 10);
-    expect(Math.abs(barrierLateral(tight, bend, outside, 10))).toBeCloseTo(tightEdge + 10, 5);
+    expect(Math.abs(barrierLateral(tight, null, bend, outside, 10))).toBeCloseTo(tightEdge + 10, 5);
   });
 
   it('produce invisible colliders facing the track and visible decor', () => {

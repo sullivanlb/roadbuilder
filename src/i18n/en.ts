@@ -24,6 +24,7 @@ export const enMessages: Record<MessageKey, string> = {
   'editor.selectAria': 'Select (V)',
   'editor.addTitle': 'Add points (A)',
   'editor.barrierTitle': 'Draw a barrier (B)',
+  'editor.pitsTitle': 'Draw the pit lane (P)',
   'editor.panTitle': 'Pan the view (H)',
   'editor.undoTitle': 'Undo (Ctrl+Z)',
   'editor.redoTitle': 'Redo (Ctrl+Shift+Z)',
@@ -48,6 +49,8 @@ export const enMessages: Record<MessageKey, string> = {
   'canvas.hintBarrier': 'Click the start point of the span · Escape leaves the tool',
   'canvas.hintAdd': 'Click to add after the selected point · Escape to finish',
   'canvas.hintPan': 'Drag to move the plan · Scroll to zoom',
+  'canvas.hintPits': 'Click the pit lane entry, on the side you want · Escape leaves the tool',
+  'canvas.hintPitsDraft': 'Click the pit lane exit · Escape cancels',
   'canvas.hintSelect': 'Drag a point · Scroll to zoom · Space + drag to pan',
   'canvas.start': 'START',
   'canvas.finish': 'FINISH',
@@ -82,6 +85,7 @@ export const enMessages: Record<MessageKey, string> = {
   'sidebar.closedNote': 'One continuous loop. Finding the ideal line is up to you.',
   'sidebar.openNote': 'A start, a finish. Picture a road that makes you want to drive.',
   'sidebar.reverse': 'Reverse direction',
+  'sidebar.startLine': 'Start line',
   'sidebar.road': 'The road',
   'sidebar.width': 'Road width',
   'sidebar.shoulder': 'Shoulders',
@@ -126,6 +130,22 @@ export const enMessages: Record<MessageKey, string> = {
   'barriers.delete': 'Delete',
   'barriers.empty': 'No barrier yet. Two clicks make the track safer: start, then finish.',
 
+  'pits.title': 'The pits',
+  'pits.roadOnly': 'Pits are for closed circuits: an open road hosts a single car.',
+  'pits.empty': 'No pit lane yet: a single car, starting at the line.',
+  'pits.draw': 'Draw the lane',
+  'pits.statusTool': 'Click the lane entry on the track, on the side you want. Escape cancels.',
+  'pits.statusDraft': 'Now click the lane exit.',
+  'pits.cars': 'Number of cars',
+  'pits.carsUnit': 'cars',
+  'pits.width': 'Lane width',
+  'pits.entry': 'Entry',
+  'pits.exit': 'Exit',
+  'pits.sideRight': 'Lane on the right of the track',
+  'pits.sideLeft': 'Lane on the left of the track',
+  'pits.delete': 'Delete the lane',
+  'position.point': 'Point',
+  'position.distance': 'm after',
   'point.title': 'Elevation',
   'point.badge': 'POINT {index}',
   'point.altitude': 'Point altitude',
@@ -195,6 +215,7 @@ export const enMessages: Record<MessageKey, string> = {
   'help.shortcutAdd': 'Add a point',
   'help.shortcutBarrier': 'Draw a barrier',
   'help.shortcutPan': 'Pan the view',
+  'help.shortcutPits': 'Draw the pits',
   'help.shortcutFit': 'Fit everything',
   'help.shortcutUndo': 'Undo',
   'help.shortcutRedo': 'Redo',
@@ -211,6 +232,8 @@ export const enMessages: Record<MessageKey, string> = {
   'toast.barrierSamePoint': 'Pick an end point different from the start point.',
   'toast.barriersLimit': 'Maximum {max} barrier spans.',
   'toast.barrierAdded': 'Barrier added. Escape to finish drawing.',
+  'toast.pitLaneAdded': 'Pit lane added. Set the number of cars in “The pits”.',
+  'toast.pitLaneSamePlace': 'Pick an exit away from the entry.',
   'toast.pointTooClose': 'Place this point at least {min} meters from the others.',
   'toast.pointsLimit': 'Maximum {max} points per track.',
   'toast.projectDownloaded': 'Project downloaded. Keep this file to resume your work.',
@@ -236,6 +259,9 @@ export const enMessages: Record<MessageKey, string> = {
   'projectError.barrierEndpoint': 'A barrier rests on a point that does not exist.',
   'projectError.barrierSpan': 'A barrier must join two different points.',
   'projectError.barrierDirection': 'On an open road, a barrier must follow the track direction.',
+  'projectError.positionPoint': 'A track position rests on a point that does not exist.',
+  'projectError.pitLaneOnRoad': 'An open road cannot have a pit lane.',
+  'projectError.carsWithoutPitLane': 'Several cars need a pit lane.',
   'projectError.invalidValue': 'Invalid value in the project: {path}.',
 
   'trackIssue.pointsMinimumClosed': 'Add at least {min} points to close the circuit.',
@@ -248,6 +274,10 @@ export const enMessages: Record<MessageKey, string> = {
   'trackIssue.trackCrossing':
     'The track crosses itself: move the points involved. Bridges are not supported.',
 
+  'trackIssue.pitLaneTooShort':
+    'The pit lane only fits {capacity} of {cars} cars: lengthen it or reduce the number of cars.',
+  'trackIssue.pitLaneTooTight':
+    'The pit lane is too tight between points {from} and {to}: put it on the outside of the bend or make it narrower.',
   'exportError.foldedSurface':
     'A road or pit edge folds inside a corner. Spread the points, reduce the width or move the start of the track to a straight.',
 
@@ -261,8 +291,11 @@ export const enMessages: Record<MessageKey, string> = {
     'ROADBUILDER — {name}\n\nEXPERIMENTAL KN5 EXPORT, TO BE CHECKED IN GAME\n\n1. Unzip this archive into a temporary folder.\n2. Copy content/tracks/{slug} into assettocorsa/content/tracks/.\n   If this name already exists, keep a copy of your previous version before replacing it.\n3. In Content Manager or Assetto Corsa, select {name}.\n4. Start a FREE PRACTICE session, with a single car and no opponents.\n\nINCLUDED\n',
   'documents.installationBarriers':
     'Barriers: {count} span with collision (guardrails, tyres, TecPro or walls).|Barriers: {count} spans with collision (guardrails, tyres, TecPro or walls).',
+  'documents.installationPitLane':
+    'Pit lane with a pit wall, {count} pit boxes and a {count}-car starting grid.\n',
+  'documents.installationSpawnPit': 'A single pit box beside the start, without a pit lane.\n',
   'documents.installationBody':
-    'Road with collisions, shoulders, optional kerbs, textures embedded in the KN5,\nstart/pit markers and timing, surfaces, map and preview.\nGrass terrain with collisions, inside and around the track, joined to its relief.\nOuter terrain margin: {terrainMargin} m beyond the shoulder limits.\nPoint 1 sets the start of the track; the start line is placed after the pit.\n\nLIMITS OF THIS VERSION\nIn-game compatibility has not been verified automatically.\nOne pit box only, without a real pit lane.\nNo AI lines: races against the AI are not supported.\nOpen roads: free practice only; point-to-point timing not validated.\nThe terrain stops at the dotted rectangle visible in the editor.\nBeyond this outer edge, a fall is still possible. Increase the margin if needed.\n',
+    'Road with collisions, shoulders, optional kerbs, textures embedded in the KN5,\nstart/pit markers and timing, surfaces, map and preview.\nGrass terrain with collisions, inside and around the track, joined to its relief.\nOuter terrain margin: {terrainMargin} m beyond the shoulder limits.\nPoint 1 sets the start of the track; the start line is placed after the pit.\n\nLIMITS OF THIS VERSION\nIn-game compatibility has not been verified automatically.\nNo AI lines: races against the AI are not supported.\nOpen roads: free practice only; point-to-point timing not validated.\nThe terrain stops at the dotted rectangle visible in the editor.\nBeyond this outer edge, a fall is still possible. Increase the margin if needed.\n',
   'documents.installationBarrierLimits':
     'Barriers are simple colliders: check impacts in game.\nThe terrain relief is interpolated automatically.\n',
   'documents.installationNoBarrierLimits':

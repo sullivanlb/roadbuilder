@@ -76,8 +76,8 @@ describe('Assetto Corsa archive', () => {
     const kn5 = Object.entries(archive.files).find(([path]) =>
       path.endsWith('.kn5'),
     )![1] as Uint8Array;
-    // Base surfaces (asphalt, grass, kerb red, paint, pit) plus the two TecPro colours.
-    expect(new DataView(kn5.buffer, kn5.byteOffset).getUint32(10, true)).toBe(7);
+    // Base surfaces (asphalt, grass, kerb red, paint, pit), the pit wall's concrete and the two TecPro colours.
+    expect(new DataView(kn5.buffer, kn5.byteOffset).getUint32(10, true)).toBe(8);
     expect(archive.files['INSTALLATION.txt']).toContain('Barrières : 1 tronçon avec collision');
   });
 });

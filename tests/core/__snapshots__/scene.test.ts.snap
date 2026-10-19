@@ -28,14 +28,19 @@ exports[`scene > builds the club template 1`] = `
     "vertices": 4764,
   },
   {
-    "indices": 6,
-    "name": "1PIT_spawn_0",
-    "vertices": 4,
+    "indices": 642,
+    "name": "1PIT_lane_0",
+    "vertices": 428,
   },
   {
-    "indices": 45960,
+    "indices": 1506,
+    "name": "1WALL_pitwall_0",
+    "vertices": 1004,
+  },
+  {
+    "indices": 46842,
     "name": "1GRASS_terrain_0",
-    "vertices": 8489,
+    "vertices": 8646,
   },
 ]
 `;

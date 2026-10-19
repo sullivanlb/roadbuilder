@@ -65,6 +65,7 @@ export function buildArchive(input: Project, format: ExportFormat, texts: Docume
       projectFile,
       terrainMargin: project.terrain.margin,
       barrierCount: project.barriers.length,
+      pitBoxes: project.pitLane ? project.cars : null,
       warnings: issues.warnings,
     });
   }

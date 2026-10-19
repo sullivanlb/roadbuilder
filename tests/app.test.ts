@@ -8,7 +8,7 @@ import App from '../src/App.vue';
 import type { PlanPoint } from '../src/core/math';
 import { serializeProject } from '../src/core/project/schema';
 import { barrierPath } from '../src/core/scene/barriers';
-import { controlPointSample } from '../src/core/track/centerline';
+import { controlPointSample, sampleAt } from '../src/core/track/centerline';
 import { i18n, setLocale } from '../src/i18n';
 import { installPlatform } from '../src/platform/platform';
 import { useEditorStore } from '../src/stores/editor';
@@ -76,6 +76,13 @@ const screen = (point: PlanPoint) => stores().viewport.projection.toScreen(point
 function roadSide(index: number, side: 'left' | 'right') {
   const { project } = stores();
   const sample = controlPointSample(project.samples, index)!;
+  const sign = side === 'right' ? 2 : -2;
+  return screen({ x: sample.x + sample.nx * sign, z: sample.z + sample.nz * sign });
+}
+
+/** A spot on the road 2 m beside the centerline, at track distance `s`. */
+function trackSpot(s: number, side: 'left' | 'right') {
+  const sample = sampleAt(stores().project.samples, s)!;
   const sign = side === 'right' ? 2 : -2;
   return screen({ x: sample.x + sample.nx * sign, z: sample.z + sample.nz * sign });
 }
@@ -351,8 +358,8 @@ describe('editor interface', () => {
     await click('view-3d');
     await click('export-project');
     expect($<HTMLButtonElement>('download-export').disabled).toBe(true);
-    expect(document.querySelectorAll('#export-issues [data-tight-turn]')).toHaveLength(2);
-    document.querySelector<HTMLButtonElement>('[data-tight-turn="2"]')!.click();
+    expect(document.querySelectorAll('#export-issues [data-locate]')).toHaveLength(2);
+    document.querySelector<HTMLButtonElement>('[data-locate="0"]')!.click();
     await settle();
     expect($<HTMLDialogElement>('export-dialog').open).toBe(false);
     expect($('view-2d').getAttribute('aria-pressed')).toBe('true');
@@ -434,6 +441,29 @@ describe('editor interface', () => {
     await settle();
     expect($('tool-select').getAttribute('aria-pressed')).toBe('true');
     expect(stores().project.project.barriers).toEqual([]);
+  });
+
+  it('draws a pit lane with the P tool and sets its number of cars', async () => {
+    await mountApp();
+    await click('pit-delete');
+    expect($('pits-empty')).not.toBeNull();
+    press('p');
+    await settle();
+    expect($('tool-pits').getAttribute('aria-pressed')).toBe('true');
+    await clickPlan(trackSpot(400, 'right'));
+    expect($('pits-status').textContent).toContain('sortie');
+    pointer('pointermove', trackSpot(700, 'right'));
+    await settle();
+    await clickPlan(trackSpot(700, 'right'));
+    expect($('pit-editor')).not.toBeNull();
+    await type('pit-cars-count', '6');
+    expect($('pit-cars').textContent).toContain('6');
+    const { pitLane, cars } = await saved();
+    expect(pitLane).toMatchObject({ side: 'right', width: 7 });
+    expect(cars).toBe(6);
+    await click('mode-open');
+    expect($('pits-road')).not.toBeNull();
+    expect((await saved()).pitLane).toBeNull();
   });
 
   it('switches the whole interface to English and remembers it', async () => {

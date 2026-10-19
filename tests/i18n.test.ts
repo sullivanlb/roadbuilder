@@ -17,7 +17,12 @@ import { template } from './helpers';
 
 const tooClose = new ExportError({
   code: 'invalid-track',
-  issues: { errors: [{ code: 'points-too-close', min: 2 }], warnings: [], tightTurns: [] },
+  issues: {
+    errors: [{ code: 'points-too-close', min: 2 }],
+    warnings: [],
+    tightTurns: [],
+    locations: [],
+  },
 });
 
 describe('French catalogue', () => {
@@ -135,9 +140,10 @@ describe('English catalogue', () => {
         projectFile: 'circuit_test.roadbuilder.json',
         terrainMargin: 300,
         barrierCount: 2,
+        pitBoxes: 12,
         warnings: [],
       }),
-    ).toContain('EXPERIMENTAL KN5 EXPORT, TO BE CHECKED IN GAME');
+    ).toContain('Pit lane with a pit wall, 12 pit boxes and a 12-car starting grid.');
     expect(
       documents.installation({
         name: 'Circuit test',
@@ -145,6 +151,7 @@ describe('English catalogue', () => {
         projectFile: 'circuit_test.roadbuilder.json',
         terrainMargin: 300,
         barrierCount: 2,
+        pitBoxes: null,
         warnings: [{ code: 'steep-grade', grade: 18.2 }],
       }),
     ).toContain('WARNINGS\nMaximum grade of 18 %');

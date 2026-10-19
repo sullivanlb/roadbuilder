@@ -117,6 +117,22 @@ describe('editor', () => {
     expect(project.project.barriers).toHaveLength(1);
   });
 
+  it('lays a pit lane in two clicks on a circuit, never on a road', () => {
+    const { project, editor, ui } = stores();
+    project.replace(template('kart'));
+    editor.setTool('pits');
+    editor.beginPitLane({ s: 20, side: 'left' });
+    editor.completePitLane(30);
+    expect(ui.notification?.error).toBe(true);
+    editor.completePitLane(220);
+    expect(project.project.pitLane).toMatchObject({ side: 'left', width: 7 });
+    expect(editor.tool).toBe('select');
+    project.replace(template('mountain'));
+    editor.beginPitLane({ s: 20, side: 'left' });
+    expect(editor.pitDraft).toBeNull();
+    expect(ui.notification?.message).toContain('circuits');
+  });
+
   it('leaves the 3D view for every tool but panning', () => {
     const { editor } = stores();
     editor.setView('3d');

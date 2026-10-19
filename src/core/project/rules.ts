@@ -22,6 +22,10 @@ export const RULES = {
   shoulder: { min: 2, max: 20, step: 0.5 },
   terrainMargin: { min: 50, max: 500, step: 10 },
   barrierOffset: { min: 0, max: 10, step: 0.5 },
+  /** Distance of a track position after its control point. */
+  positionDistance: { min: 0, max: 10000, step: 1 },
+  pitLaneWidth: { min: 5, max: 12, step: 0.5 },
+  cars: { min: 1, max: 24, step: 1 },
 } as const satisfies Record<string, NumericRule | { max: number } | number>;
 
 /** Values given to the settings a new project does not choose itself. */
@@ -29,6 +33,9 @@ export const DEFAULTS = {
   shoulder: 6,
   terrainMargin: 150,
   barrierOffset: 1,
+  pitLaneWidth: 7,
+  /** Distance of the start line after the first control point. */
+  startLine: 28,
 } as const;
 
 /** Imported project files larger than this are refused before parsing. */

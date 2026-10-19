@@ -77,7 +77,7 @@ export function uiTrackJson(
       city: '',
       length: `${Math.round(stats.length)} m`,
       width: `${project.road.width} m`,
-      pitboxes: '1',
+      pitboxes: String(project.cars),
       run: circuit ? (isClockwise(samples) ? 'clockwise' : 'counter-clockwise') : 'point-to-point',
       author: project.author || 'Roadbuilder',
       version: '1.0',

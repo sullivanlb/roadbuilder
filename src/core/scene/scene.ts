@@ -5,6 +5,7 @@ import { buildBarriers } from './barriers';
 import { buildMarkers } from './markers';
 import type { Marker } from './markers';
 import { splitMesh } from './mesh';
+import { buildPitWall } from './pits';
 import type { Mesh } from './mesh';
 import { buildRoad } from './road';
 import { buildTerrain } from './terrain';
@@ -31,7 +32,11 @@ export function buildScene(
     road.markings,
     road.pit,
   ];
-  const meshes = [...surfaces, ...buildBarriers(project, samples)].flatMap(splitMesh);
+  const meshes = [
+    ...surfaces,
+    ...buildPitWall(project, samples),
+    ...buildBarriers(project, samples),
+  ].flatMap(splitMesh);
   meshes.push(...buildTerrain(project, samples, ground));
   return { meshes, markers: buildMarkers(project, samples) };
 }
