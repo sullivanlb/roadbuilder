@@ -85,7 +85,10 @@ describe('barriers', () => {
     const project = allBarrierTypes(template('club'));
     const samples = sampleTrack(project);
     const scene = buildScene(project, samples);
-    const colliders = scene.meshes.filter((mesh) => mesh.name.startsWith('1WALL') && !mesh.visible);
+    // Ribbon colliders face the track; solid blocks (concrete, pit wall) are checked for depth below.
+    const colliders = scene.meshes.filter(
+      (mesh) => /^1WALL_(guardrail|tires|tecpro)_/.test(mesh.name) && !mesh.visible,
+    );
     expect(colliders).toHaveLength(3);
     let inward = 0,
       total = 0;
@@ -106,16 +109,29 @@ describe('barriers', () => {
       }
     }
     expect(inward / total).toBeGreaterThan(0.6);
-    // The concrete wall is its own collider and stays visible.
+    // The concrete wall is drawn by its decor; its collider is invisible like the others.
     expect(
-      scene.meshes
-        .filter((mesh) => mesh.name.startsWith('1WALL_concrete'))
-        .every((mesh) => mesh.visible),
+      scene.meshes.some((mesh) => mesh.name.startsWith('concrete_decor') && mesh.visible),
     ).toBe(true);
     expect(
       scene.meshes.filter((mesh) => mesh.kind === 'barrier' && !mesh.name.startsWith('1WALL'))
         .length,
     ).toBeGreaterThanOrEqual(4);
+  });
+
+  it('give solid walls a collider a metre deep, so cars cannot slip through', () => {
+    const project = allBarrierTypes(template('club'));
+    const samples = sampleTrack(project);
+    const scene = buildScene(project, samples);
+    for (const name of ['1WALL_wall_3_0', '1WALL_pitwall_0']) {
+      const mesh = scene.meshes.find((candidate) => candidate.name === name)!;
+      const distances = [];
+      for (let i = 0; i < vertexCount(mesh); i++) {
+        const [x, z] = [mesh.positions[i * 3], mesh.positions[i * 3 + 2]];
+        distances.push(Math.min(...samples.map((s) => Math.hypot(s.x - x, s.z - z))));
+      }
+      expect(Math.max(...distances) - Math.min(...distances), name).toBeGreaterThanOrEqual(0.95);
+    }
   });
 
   it('keep the collider off the roadway in a very tight bend', () => {

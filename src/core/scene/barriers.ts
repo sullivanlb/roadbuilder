@@ -22,6 +22,13 @@ export const BARRIER_SIZES = {
   wall: { collider: 1.1, thickness: 0.25, capWidth: 0.25 },
 } as const;
 
+/**
+ * Depth of solid colliders (concrete wall, pit wall). A thin slab lets cars
+ * through: once a car sinks into the front face, the back face, turned the other
+ * way, pushes it across. A deep block keeps the faces apart.
+ */
+export const SOLID_COLLIDER_DEPTH = 1;
+
 /** Colliders reach below the ground so cars cannot slip under them on uneven terrain. */
 const COLLIDER_BOTTOM = -0.4;
 
@@ -178,6 +185,33 @@ export function capQuad(
   addQuad(mesh, corners, uvs);
 }
 
+/**
+ * A closed block along a path, between two signed lateral offsets: front face
+ * at `front`, back face at `back`, top and end caps. `sign` is the side of the
+ * track the block stands on, so the front face looks at the track.
+ */
+export function solidWall(
+  mesh: Mesh,
+  path: readonly Frame[],
+  front: (p: Frame) => number,
+  back: (p: Frame) => number,
+  low: number,
+  high: number,
+  sign: number,
+) {
+  for (let i = 1; i < path.length; i++) {
+    const a = path[i - 1],
+      b = path[i];
+    wallQuad(mesh, a, b, front(a), front(b), low, high, sign);
+    topQuad(mesh, a, b, [front(a), back(a)], [front(b), back(b)], high);
+    wallQuad(mesh, a, b, back(a), back(b), low, high, -sign);
+  }
+  const first = path[0],
+    last = path[path.length - 1];
+  capQuad(mesh, first, front(first), back(first), low, high, -1);
+  capQuad(mesh, last, front(last), back(last), low, high, 1);
+}
+
 /** One tyre: an open six-sided cylinder with a vertical axis. */
 function tire(
   mesh: Mesh,
@@ -331,35 +365,13 @@ export function buildBarriers(project: Project, samples: readonly Sample[]): Mes
       }
       case 'wall': {
         const size = BARRIER_SIZES.wall;
-        const wall = createMesh(`1WALL_concrete_${index}`, 'concrete', 'barrier');
-        for (const [a, b] of pairs) {
-          const latA = lateral(a),
-            latB = lateral(b),
-            backA = latA + sign * size.thickness,
-            backB = latB + sign * size.thickness;
-          wallQuad(wall, a, b, latA, latB, COLLIDER_BOTTOM, size.collider, sign);
-          topQuad(wall, a, b, [latA, backA], [latB, backB], size.collider);
-          wallQuad(wall, a, b, backA, backB, COLLIDER_BOTTOM, size.collider, -sign);
-        }
-        capQuad(
-          wall,
-          first,
-          lateral(first),
-          lateral(first) + sign * size.thickness,
-          COLLIDER_BOTTOM,
-          size.collider,
-          -1,
-        );
-        capQuad(
-          wall,
-          last,
-          lateral(last),
-          lateral(last) + sign * size.thickness,
-          COLLIDER_BOTTOM,
-          size.collider,
-          1,
-        );
-        meshes.push(wall);
+        const back = (p: Frame) => lateral(p) + sign * size.thickness;
+        const behind = (p: Frame) => lateral(p) + sign * SOLID_COLLIDER_DEPTH;
+        const wall = decor('concrete_decor', 'concrete');
+        solidWall(wall, path, lateral, back, COLLIDER_BOTTOM, size.collider, sign);
+        const block = collider('concrete');
+        solidWall(block, path, lateral, behind, COLLIDER_BOTTOM, size.collider, sign);
+        meshes.push(block, wall);
         break;
       }
     }

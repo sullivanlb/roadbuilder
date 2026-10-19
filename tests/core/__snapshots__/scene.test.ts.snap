@@ -38,6 +38,11 @@ exports[`scene > builds the club template 1`] = `
     "vertices": 1004,
   },
   {
+    "indices": 1506,
+    "name": "pitwall_decor_0",
+    "vertices": 1004,
+  },
+  {
     "indices": 46842,
     "name": "1GRASS_terrain_0",
     "vertices": 8646,
