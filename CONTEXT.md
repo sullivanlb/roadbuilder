@@ -51,6 +51,10 @@ _Avoid_: region, range, section
 Distance travelled along the centerline from the first control point.
 _Avoid_: chainage, offset, s
 
+**Track position** (repère de piste):
+A precise place on the track: a control point plus a distance in metres along the track after it. It moves with its control point when the track is edited elsewhere.
+_Avoid_: anchor, marker, chainage
+
 ### Road surfaces
 
 **Roadway** (chaussée):
@@ -98,6 +102,24 @@ _Avoid_: validation error, problem
 **Tight turn** (virage trop serré):
 A part of the centerline that bends too sharply for the roadway width.
 _Avoid_: hairpin, sharp corner
+
+### Pits and start
+
+**Pit lane** (voie des stands):
+The lane beside a circuit, from its entry to its exit, where cars slow down to reach their pit box. A circuit has at most one; a road has none.
+_Avoid_: pitlane, pit road, allée des stands
+
+**Pit box** (emplacement de stand):
+The spot along the pit lane where one car stops.
+_Avoid_: garage, box, pit stall
+
+**Starting grid** (grille de départ):
+The staggered places behind the start line where cars line up for a race; on a road, a single start position.
+_Avoid_: grid slots, start positions (except on a road)
+
+**Car count** (nombre de voitures):
+How many cars the track hosts; it sets the number of pit boxes and of grid places.
+_Avoid_: capacity, pitboxes
 
 ### Output
 
