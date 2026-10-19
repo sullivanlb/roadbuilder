@@ -16,7 +16,7 @@ Add to this file every time a test in game teaches something, and update the sta
 
 **`WALL` works without an entry in `surfaces.ini`.** Our `surfaces.ini` only declares `ROAD`, `GRASS`, `KERB` and `PIT`, and `1WALL_*` meshes still stop cars. _Confirmed in game._
 
-**`IS_PITLANE=1` on the `PIT` surface marks the pit lane** (`1PIT_lane`, or `1PIT_spawn` without a lane). _Assumed_ to drive the pit limiter and the pit state; not checked in game yet.
+**`IS_PITLANE=1` on the `PIT` surface marks the pit lane** (`1PIT_lane`, or `1PIT_spawn` without a lane): the pit limiter works along `1PIT_lane`. _Confirmed in game._
 
 ## Colliders
 
@@ -55,6 +55,5 @@ Empty nodes read by the game, each a 4×4 transform with local Y up and local -Z
 
 ## Still unknown
 
-- Whether the pit limiter engages along `1PIT_lane` and releases at its exit.
 - Whether timing works on open roads (point-to-point sessions).
 - How the game reads `ai/fast_lane.ai` and `ai/pit_lane.ai` (needed for AI lines).
