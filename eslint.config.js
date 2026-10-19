@@ -33,6 +33,12 @@ const layerGuards = [
     message: 'The platform port knows nothing of the editor.',
   },
   {
+    files: ['src/workers/**/*.ts'],
+    forbidden: ['app', 'components', 'editor', 'platform', 'rendering', 'stores'],
+    packages: ['pinia', '@vueuse/*', 'three', 'three/*'],
+    message: 'Workers run jobs on the core and the export layer, away from the UI.',
+  },
+  {
     files: ['src/stores/**/*.ts', 'src/editor/**/*.ts', 'src/i18n/**/*.ts'],
     forbidden: ['app', 'components'],
     packages: [],

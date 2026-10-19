@@ -1,11 +1,11 @@
 import { defineStore } from 'pinia';
-import { ref } from 'vue';
+import { onScopeDispose, ref } from 'vue';
 import { setAuthor } from '../core/project/edits';
-import { buildArchive } from '../export/archive';
 import type { ExportFormat } from '../export/archive';
 import { ExportError } from '../export/errors';
-import { documentTexts, formatExportError, locale, t } from '../i18n';
+import { formatExportError, locale, t } from '../i18n';
 import { usePlatform } from '../platform/platform';
+import { createExporter } from '../workers/exporter';
 import { useProjectStore } from './project';
 import { useUiStore } from './ui';
 
@@ -18,6 +18,8 @@ export const useExportStore = defineStore('export', () => {
   const author = ref('');
   const format = ref<ExportFormat>('assetto');
   const exporting = ref(false);
+  const exporter = createExporter();
+  onScopeDispose(exporter.dispose);
 
   function open() {
     store.commit();
@@ -29,23 +31,22 @@ export const useExportStore = defineStore('export', () => {
     if (exporting.value || store.issues.errors.length) return;
     exporting.value = true;
     try {
-      // Let the dialog show its busy state before the main thread is taken.
-      await new Promise((resolve) => setTimeout(resolve, 40));
       if (author.value.trim() !== store.project.author)
         store.edit((draft) => setAuthor(draft, author.value));
-      const archive = buildArchive(store.project, format.value, documentTexts(locale.value));
+      const result = await exporter.run(store.project, format.value, locale.value);
+      if (!result.ok) {
+        const reason = formatExportError(new ExportError(result.detail));
+        return ui.notify(t('toast.exportFailed', { reason }), true);
+      }
       await platform.saveFile({
-        name: archive.filename,
+        name: result.filename,
         type: 'application/zip',
-        data: archive.bytes,
+        data: result.bytes,
       });
       ui.closeDialog();
       ui.notify(
         format.value === 'assetto' ? t('toast.archiveDownloaded') : t('toast.sourcesDownloaded'),
       );
-    } catch (error) {
-      if (!(error instanceof ExportError)) throw error;
-      ui.notify(t('toast.exportFailed', { reason: formatExportError(error) }), true);
     } finally {
       exporting.value = false;
     }

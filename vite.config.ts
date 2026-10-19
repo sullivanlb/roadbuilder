@@ -7,6 +7,8 @@ export default defineConfig({
   server: { port: 5173, strictPort: true },
   // Three.js (~550 kB) is split into the lazily loaded 3D preview chunk.
   build: { chunkSizeWarningLimit: 600 },
+  // The export worker is an ES module, like the app, so it can share chunks with it.
+  worker: { format: 'es' },
   define: {
     // vue-i18n feature flags: full install, no deprecated options API, no devtools in production.
     __VUE_I18N_FULL_INSTALL__: true,

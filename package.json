@@ -21,6 +21,7 @@
   },
   "dependencies": {
     "@vueuse/core": "^15.0.0",
+    "comlink": "^4.4.2",
     "immer": "^11.1.21",
     "pinia": "^4.0.3",
     "three": "^0.186.1",

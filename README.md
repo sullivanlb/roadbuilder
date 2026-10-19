@@ -35,13 +35,14 @@ Le vocabulaire du domaine est défini dans [`CONTEXT.md`](CONTEXT.md) et les dé
 - `src/core/` : le domaine, sans framework. `project/` contient le format v2 (schéma zod, règles et bornes, modèles, opérations d’édition immer), `track/` l’axe du tracé, les tronçons et les diagnostics, `scene/` la construction de la scène (chaussée, terrain, barrières, repères).
 - `src/export/` : archives Assetto Corsa (KN5, fichiers ini, carte) et OBJ, encodeurs binaires PNG/ZIP. Les textes des documents exportés sont fournis par l’appelant.
 - `src/rendering/` : dessin du plan 2D et du profil (Canvas 2D), aperçu 3D (Three.js, chargé à la demande), palette de couleurs.
+- `src/workers/` : construction des archives dans un Web Worker (Comlink), pour que l’éditeur reste fluide pendant un export ; repli sur le thread principal si les workers ne sont pas disponibles.
 - `src/platform/` : accès au stockage et aux fichiers derrière une interface ; implémentation web aujourd’hui, Tauri ensuite.
 - `src/stores/` : état Pinia — projet et historique, éditeur (sélection, outil, barrière en cours), vue, fichiers et sauvegarde automatique, export, interface.
 - `src/editor/` : outils du plan (un module par outil), interactions au pointeur et raccourcis clavier.
 - `src/components/` : composants Vue avec styles scoped — `layout/`, `sidebar/`, `workspace/`, `dialogs/` et `ui/` (primitives partagées).
 - `src/i18n/` : vue-i18n avec catalogues français et anglais typés.
 - `src/styles/` : jetons de design et styles de base uniquement.
-- `tests/` : Vitest — `core/` et `export/` sans DOM, `stores.test.ts` pour la logique de l’éditeur, `app.test.ts` pour l’interface (DOM et canvas simulés).
+- `tests/` : Vitest — `core/` et `export/` sans DOM, `stores.test.ts` pour la logique de l’éditeur, `workers.test.ts` pour l’export en arrière-plan, `app.test.ts` pour l’interface (DOM et canvas simulés).
 
 Le projet est une valeur immuable : chaque modification produit un nouveau projet, l’historique conserve les versions précédentes et les calculs dérivés (échantillons, diagnostics, scène) se refont uniquement quand le projet change.
 
