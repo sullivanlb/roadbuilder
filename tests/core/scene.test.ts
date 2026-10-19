@@ -134,6 +134,17 @@ describe('barriers', () => {
     }
   });
 
+  it('build colliders from vertical faces only, like the ribbons proven in game', () => {
+    const scene = buildScene(allBarrierTypes(template('club')));
+    const colliders = scene.meshes.filter((mesh) => mesh.name.startsWith('1WALL'));
+    expect(colliders.map((mesh) => mesh.name)).toEqual(
+      expect.arrayContaining(['1WALL_pitwall_0', '1WALL_wall_3_0']),
+    );
+    for (const mesh of colliders)
+      for (let i = 1; i < mesh.normals.length; i += 3)
+        expect(Math.abs(mesh.normals[i]), mesh.name).toBeLessThan(0.5);
+  });
+
   it('keep the collider off the roadway in a very tight bend', () => {
     let project = produce(tightTurnProject(), (draft) => setRoad(draft, { width: 4 }));
     project = barrier(barrier(project, 'guardrail', 'right', 0, 6), 'guardrail', 'left', 0, 6);

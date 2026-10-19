@@ -19,9 +19,9 @@ const COLLIDER_MARGIN = 0.05;
 /**
  * The concrete pit wall between the track and the pit lane, along the parallel
  * part of the lane. The thin visible wall is decor only; collisions come from an
- * invisible block filling the strip between the kerb and the lane, about a metre
- * deep, so no car goes through it (a thin slab lets cars across, see
- * SOLID_COLLIDER_DEPTH).
+ * invisible, open-topped block filling the strip between the kerb and the lane:
+ * one vertical face for the track, one for the lane, a metre apart (see
+ * solidWall and SOLID_COLLIDER_DEPTH).
  */
 export function buildPitWall(project: Project, samples: readonly Sample[]): Mesh[] {
   const lane = pitLaneLayout(project, samples);
@@ -56,6 +56,7 @@ export function buildPitWall(project: Project, samples: readonly Sample[]): Mesh
     BOTTOM,
     wall.height,
     sign,
+    false,
   );
   return [collider, decor];
 }

@@ -23,9 +23,9 @@ export const BARRIER_SIZES = {
 } as const;
 
 /**
- * Depth of solid colliders (concrete wall, pit wall). A thin slab lets cars
- * through: once a car sinks into the front face, the back face, turned the other
- * way, pushes it across. A deep block keeps the faces apart.
+ * Depth of the colliders of walls that can be hit from both sides or that are
+ * solid (concrete wall, pit wall): their two faces stay far enough apart that a
+ * car touching one never reaches the other.
  */
 export const SOLID_COLLIDER_DEPTH = 1;
 
@@ -186,9 +186,14 @@ export function capQuad(
 }
 
 /**
- * A closed block along a path, between two signed lateral offsets: front face
- * at `front`, back face at `back`, top and end caps. `sign` is the side of the
- * track the block stands on, so the front face looks at the track.
+ * A block along a path, between two signed lateral offsets: front face at
+ * `front`, back face at `back`, end caps and, unless `top` is false, a top.
+ * `sign` is the side of the track the block stands on, so the front face looks
+ * at the track.
+ *
+ * Colliders are built without a top, like the barrier ribbons proven in game: a
+ * horizontal face at body height gives the car a second, upward contact that
+ * lets it slide through the wall.
  */
 export function solidWall(
   mesh: Mesh,
@@ -198,12 +203,13 @@ export function solidWall(
   low: number,
   high: number,
   sign: number,
+  top = true,
 ) {
   for (let i = 1; i < path.length; i++) {
     const a = path[i - 1],
       b = path[i];
     wallQuad(mesh, a, b, front(a), front(b), low, high, sign);
-    topQuad(mesh, a, b, [front(a), back(a)], [front(b), back(b)], high);
+    if (top) topQuad(mesh, a, b, [front(a), back(a)], [front(b), back(b)], high);
     wallQuad(mesh, a, b, back(a), back(b), low, high, -sign);
   }
   const first = path[0],
@@ -370,7 +376,7 @@ export function buildBarriers(project: Project, samples: readonly Sample[]): Mes
         const wall = decor('concrete_decor', 'concrete');
         solidWall(wall, path, lateral, back, COLLIDER_BOTTOM, size.collider, sign);
         const block = collider('concrete');
-        solidWall(block, path, lateral, behind, COLLIDER_BOTTOM, size.collider, sign);
+        solidWall(block, path, lateral, behind, COLLIDER_BOTTOM, size.collider, sign, false);
         meshes.push(block, wall);
         break;
       }
