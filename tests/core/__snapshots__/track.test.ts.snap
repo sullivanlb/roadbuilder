@@ -1,0 +1,43 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`centerline > keeps the club template stable 1`] = `
+{
+  "samples": 596,
+  "stats": {
+    "climb": 12,
+    "elevation": 12,
+    "grade": 5.289843783589109,
+    "length": 1818.9750400090454,
+    "max": 12,
+    "min": 0,
+  },
+}
+`;
+
+exports[`centerline > keeps the kart template stable 1`] = `
+{
+  "samples": 291,
+  "stats": {
+    "climb": 0,
+    "elevation": 0,
+    "grade": 0,
+    "length": 888.6758240206188,
+    "max": 0,
+    "min": 0,
+  },
+}
+`;
+
+exports[`centerline > keeps the mountain template stable 1`] = `
+{
+  "samples": 688,
+  "stats": {
+    "climb": 145,
+    "elevation": 145,
+    "grade": 19.40817143746518,
+    "length": 2086.75935722466,
+    "max": 145,
+    "min": 0,
+  },
+}
+`;

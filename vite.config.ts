@@ -5,6 +5,8 @@ export default defineConfig({
   plugins: [vue()],
   base: './',
   server: { port: 5173, strictPort: true },
+  // Three.js (~550 kB) is split into the lazily loaded 3D preview chunk.
+  build: { chunkSizeWarningLimit: 600 },
   define: {
     // vue-i18n feature flags: full install, no deprecated options API, no devtools in production.
     __VUE_I18N_FULL_INSTALL__: true,

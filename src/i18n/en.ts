@@ -52,6 +52,9 @@ export const enMessages: Record<MessageKey, string> = {
   'canvas.start': 'START',
   'canvas.finish': 'FINISH',
 
+  'preview.unavailable':
+    'The 3D preview needs WebGL, which this device does not provide. The 2D plan remains usable.',
+
   'telemetry.length': 'TOTAL LENGTH',
   'telemetry.climb': 'ELEVATION GAIN',
   'telemetry.grade': 'MAX GRADE',
@@ -208,11 +211,9 @@ export const enMessages: Record<MessageKey, string> = {
   'toast.barrierSamePoint': 'Pick an end point different from the start point.',
   'toast.barriersLimit': 'Maximum {max} barrier spans.',
   'toast.barrierAdded': 'Barrier added. Escape to finish drawing.',
-  'toast.pointTooClose': 'Place this point at least 2 meters from the others.',
+  'toast.pointTooClose': 'Place this point at least {min} meters from the others.',
   'toast.pointsLimit': 'Maximum {max} points per track.',
   'toast.projectDownloaded': 'Project downloaded. Keep this file to resume your work.',
-  'toast.importTooLarge': 'This file exceeds 1 MB. Pick a Roadbuilder JSON project.',
-  'toast.importInvalidJson': 'The file is not valid JSON. Your current project is preserved.',
   'toast.projectOpened': '“{name}” is open.',
   'toast.newProject': 'New track. Ctrl+Z brings the previous one back.',
   'toast.archiveDownloaded': 'Archive downloaded. The installation guide is inside the ZIP.',
@@ -221,30 +222,21 @@ export const enMessages: Record<MessageKey, string> = {
   'toast.storageUnreadable':
     'The local save could not be read back. The demo circuit is open; your project file can still be imported.',
   'project.defaultName': 'My track',
+  'template.club': 'Hills Circuit',
+  'template.kart': 'Pines Karting',
+  'template.mountain': 'Light Pass',
+  'template.blank': 'My new track',
 
-  'projectError.projectFormat': 'This file is not a Roadbuilder version 1 project.',
-  'projectError.nameLength': 'The name must be between {min} and {max} characters.',
-  'projectError.authorLength': 'Invalid author ({max} characters maximum).',
-  'projectError.trackOptions': 'Invalid track options.',
-  'projectError.pointsLimit': 'Maximum {max} points.',
-  'projectError.invalidPoint': 'Invalid point.',
-  'projectError.valueRange': '{field}: expected value between {min} and {max}.',
-  'projectError.barriersLimit': 'Maximum {max} barrier spans.',
-  'projectError.barriersMinPoints': 'Barriers need at least two track points.',
-  'projectError.invalidBarrier': 'Invalid barrier.',
-  'projectError.barrierType': 'Unknown barrier type.',
-  'projectError.barrierSide': 'Invalid barrier side.',
-  'projectError.barrierStartIndex': 'Barrier start: point index out of the track.',
-  'projectError.barrierEndIndex': 'Barrier end: point index out of the track.',
-  'projectError.barrierSpan': 'A barrier must cover at least two points.',
+  'projectError.fileTooLarge': 'This file exceeds {size} MB. Pick a Roadbuilder project.',
+  'projectError.invalidJson': 'The file is not valid JSON. Your current project is preserved.',
+  'projectError.notAProject': 'This file is not a Roadbuilder version 2 project.',
+  'projectError.pointsLimit': 'The project exceeds {max} points.',
+  'projectError.barriersLimit': 'The project exceeds {max} barrier spans.',
+  'projectError.duplicateId': 'The project contains two items with the same identifier.',
+  'projectError.barrierEndpoint': 'A barrier rests on a point that does not exist.',
+  'projectError.barrierSpan': 'A barrier must join two different points.',
   'projectError.barrierDirection': 'On an open road, a barrier must follow the track direction.',
-  'projectError.field.x': 'Position X',
-  'projectError.field.y': 'Altitude',
-  'projectError.field.z': 'Position Z',
-  'projectError.field.width': 'Width',
-  'projectError.field.shoulder': 'Shoulder',
-  'projectError.field.terrainMargin': 'Terrain margin',
-  'projectError.field.barrierOffset': 'Barrier offset',
+  'projectError.invalidValue': 'Invalid value in the project: {path}.',
 
   'trackIssue.pointsMinimumClosed': 'Add at least {min} points to close the circuit.',
   'trackIssue.pointsMinimumOpen': 'Add at least {min} points to create a road.',
@@ -256,7 +248,7 @@ export const enMessages: Record<MessageKey, string> = {
   'trackIssue.trackCrossing':
     'The track crosses itself: move the points involved. Bridges are not supported.',
 
-  'exportError.foldedEdge':
+  'exportError.foldedSurface':
     'A road or pit edge folds inside a corner. Spread the points, reduce the width or move the start of the track to a straight.',
 
   'documents.objHeader': '# Roadbuilder — meters, Y up, forward -Z',
@@ -276,6 +268,6 @@ export const enMessages: Record<MessageKey, string> = {
   'documents.installationNoBarrierLimits':
     'No barriers, bridges or scenery; the terrain relief is interpolated automatically.\n',
   'documents.installationTail':
-    'Not all road/shoulder edge overlaps are detected.\nFor a competition track, review and complete the model in a 3D tool.\n\nThe project.roadbuilder.json file lets you resume the work in the editor.\n',
+    'Not all road/shoulder edge overlaps are detected.\nFor a competition track, review and complete the model in a 3D tool.\n\nThe {projectFile} file lets you resume the work in the editor.\n',
   'documents.installationWarnings': 'WARNINGS',
 };

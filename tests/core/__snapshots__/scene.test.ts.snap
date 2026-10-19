@@ -1,0 +1,111 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`scene > builds the club template 1`] = `
+[
+  {
+    "indices": 3570,
+    "name": "1ROAD_main_0",
+    "vertices": 2380,
+  },
+  {
+    "indices": 7140,
+    "name": "1GRASS_verge_0",
+    "vertices": 4760,
+  },
+  {
+    "indices": 3612,
+    "name": "1KERB_red_0",
+    "vertices": 2408,
+  },
+  {
+    "indices": 3528,
+    "name": "1KERB_white_0",
+    "vertices": 2352,
+  },
+  {
+    "indices": 7146,
+    "name": "road_markings_0",
+    "vertices": 4764,
+  },
+  {
+    "indices": 6,
+    "name": "1PIT_spawn_0",
+    "vertices": 4,
+  },
+  {
+    "indices": 45960,
+    "name": "1GRASS_terrain_0",
+    "vertices": 8489,
+  },
+]
+`;
+
+exports[`scene > builds the kart template 1`] = `
+[
+  {
+    "indices": 1740,
+    "name": "1ROAD_main_0",
+    "vertices": 1160,
+  },
+  {
+    "indices": 3480,
+    "name": "1GRASS_verge_0",
+    "vertices": 2320,
+  },
+  {
+    "indices": 1704,
+    "name": "1KERB_red_0",
+    "vertices": 1136,
+  },
+  {
+    "indices": 1776,
+    "name": "1KERB_white_0",
+    "vertices": 1184,
+  },
+  {
+    "indices": 3486,
+    "name": "road_markings_0",
+    "vertices": 2324,
+  },
+  {
+    "indices": 6,
+    "name": "1PIT_spawn_0",
+    "vertices": 4,
+  },
+  {
+    "indices": 20235,
+    "name": "1GRASS_terrain_0",
+    "vertices": 3790,
+  },
+]
+`;
+
+exports[`scene > builds the mountain template 1`] = `
+[
+  {
+    "indices": 4122,
+    "name": "1ROAD_main_0",
+    "vertices": 2748,
+  },
+  {
+    "indices": 8244,
+    "name": "1GRASS_verge_0",
+    "vertices": 5496,
+  },
+  {
+    "indices": 8256,
+    "name": "road_markings_0",
+    "vertices": 5504,
+  },
+  {
+    "indices": 6,
+    "name": "1PIT_spawn_0",
+    "vertices": 4,
+  },
+  {
+    "indices": 49107,
+    "name": "1GRASS_terrain_0",
+    "vertices": 9125,
+  },
+]
+`;

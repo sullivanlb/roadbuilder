@@ -6,27 +6,37 @@ import tseslint from 'typescript-eslint';
 /** Files linted with full type information. */
 const typedFiles = ['src/**/*.ts', 'src/**/*.vue', 'tests/**/*.ts', 'vite.config.ts'];
 
-/** Architecture guards: each layer may only import from lower layers. */
+/** Architecture guards: each layer may only import from the layers below it. */
 const layerGuards = [
   {
-    files: ['src/domain/**/*.ts'],
-    forbidden: ['components', 'composables', 'export', 'rendering', 'i18n'],
-    message: 'The domain is the pure core: it must not import from upper layers.',
+    files: ['src/core/**/*.ts'],
+    forbidden: ['app', 'components', 'editor', 'export', 'i18n', 'platform', 'rendering', 'stores'],
+    packages: ['vue', 'pinia', '@vueuse/*', 'three', 'three/*'],
+    message: 'The core is the pure domain: no framework and no upper layer.',
   },
   {
     files: ['src/export/**/*.ts'],
-    forbidden: ['components', 'composables', 'rendering'],
-    message: 'The export layer may only depend on the domain and shared libraries.',
+    forbidden: ['app', 'components', 'editor', 'i18n', 'platform', 'rendering', 'stores'],
+    packages: ['vue', 'pinia', '@vueuse/*'],
+    message: 'The export layer only depends on the core; texts are passed in.',
   },
   {
     files: ['src/rendering/**/*.ts'],
-    forbidden: ['components', 'composables', 'export'],
-    message: 'The rendering layer may only depend on the domain and shared libraries.',
+    forbidden: ['app', 'components', 'editor', 'export', 'i18n', 'platform', 'stores'],
+    packages: ['vue', 'pinia'],
+    message: 'Rendering draws what it is given: it only depends on the core.',
   },
   {
-    files: ['src/composables/**/*.ts'],
-    forbidden: ['components'],
-    message: 'Composables must not import UI components.',
+    files: ['src/platform/**/*.ts'],
+    forbidden: ['app', 'components', 'core', 'editor', 'export', 'i18n', 'rendering', 'stores'],
+    packages: [],
+    message: 'The platform port knows nothing of the editor.',
+  },
+  {
+    files: ['src/stores/**/*.ts', 'src/editor/**/*.ts', 'src/i18n/**/*.ts'],
+    forbidden: ['app', 'components'],
+    packages: [],
+    message: 'State and behaviour must not depend on UI components.',
   },
 ];
 
@@ -80,12 +90,17 @@ export default [
     },
   },
 
-  ...layerGuards.map(({ files, forbidden, message }) => ({
+  ...layerGuards.map(({ files, forbidden, packages, message }) => ({
     files,
     rules: {
       'no-restricted-imports': [
         'error',
-        { patterns: forbidden.map((layer) => ({ group: [`**/${layer}/**`], message })) },
+        {
+          patterns: [
+            ...forbidden.map((layer) => ({ group: [`**/${layer}/**`], message })),
+            ...(packages.length ? [{ group: packages, message }] : []),
+          ],
+        },
       ],
     },
   })),

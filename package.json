@@ -12,7 +12,7 @@
     "preview": "vite preview --host 127.0.0.1",
     "typecheck": "vue-tsc --noEmit && vue-tsc --noEmit -p tsconfig.node.json",
     "test": "vitest run",
-    "test:ui": "vitest run tests/editor.test.ts",
+    "test:ui": "vitest run tests/app.test.ts",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
     "format": "prettier --write .",

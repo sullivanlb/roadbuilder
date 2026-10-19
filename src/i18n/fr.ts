@@ -57,6 +57,9 @@ export const frMessages = {
   'canvas.start': 'DÉPART',
   'canvas.finish': 'ARRIVÉE',
 
+  'preview.unavailable':
+    'L’aperçu 3D nécessite WebGL, indisponible sur cet appareil. Le plan 2D reste utilisable.',
+
   'telemetry.length': 'LONGUEUR TOTALE',
   'telemetry.climb': 'DÉNIVELÉ POSITIF',
   'telemetry.grade': 'PENTE MAX.',
@@ -222,12 +225,9 @@ export const frMessages = {
   'toast.barrierSamePoint': 'Choisissez un point d’arrivée différent du point de départ.',
   'toast.barriersLimit': 'Maximum {max} tronçons de barrière.',
   'toast.barrierAdded': 'Barrière ajoutée. Échap pour terminer le tracé.',
-  'toast.pointTooClose': 'Placez ce point à au moins 2 mètres des autres.',
+  'toast.pointTooClose': 'Placez ce point à au moins {min} mètres des autres.',
   'toast.pointsLimit': 'Maximum {max} points par tracé.',
   'toast.projectDownloaded': 'Projet téléchargé. Gardez ce fichier pour reprendre votre travail.',
-  'toast.importTooLarge': 'Ce fichier dépasse 1 Mo. Choisissez un projet Roadbuilder JSON.',
-  'toast.importInvalidJson':
-    'Le fichier n’est pas un JSON valide. Votre projet actuel est conservé.',
   'toast.projectOpened': '« {name} » est ouvert.',
   'toast.newProject': 'Nouveau tracé. Ctrl+Z permet de retrouver le précédent.',
   'toast.archiveDownloaded': 'Archive téléchargée. Le guide d’installation est dans le ZIP.',
@@ -236,31 +236,23 @@ export const frMessages = {
   'toast.storageUnreadable':
     'La sauvegarde locale n’a pas pu être relue. Le circuit de démonstration est ouvert ; votre fichier projet reste importable.',
   'project.defaultName': 'Mon tracé',
+  'template.club': 'Circuit des Collines',
+  'template.kart': 'Karting des Pins',
+  'template.mountain': 'Col de la Lumière',
+  'template.blank': 'Mon nouveau tracé',
 
-  'projectError.projectFormat': 'Ce fichier n’est pas un projet Roadbuilder version 1.',
-  'projectError.nameLength': 'Le nom doit contenir de {min} à {max} caractères.',
-  'projectError.authorLength': 'Auteur invalide ({max} caractères maximum).',
-  'projectError.trackOptions': 'Options du tracé invalides.',
-  'projectError.pointsLimit': 'Maximum {max} points.',
-  'projectError.invalidPoint': 'Point invalide.',
-  'projectError.valueRange': '{field} : valeur attendue entre {min} et {max}.',
-  'projectError.barriersLimit': 'Maximum {max} tronçons de barrière.',
-  'projectError.barriersMinPoints': 'Les barrières nécessitent au moins deux points de tracé.',
-  'projectError.invalidBarrier': 'Barrière invalide.',
-  'projectError.barrierType': 'Type de barrière inconnu.',
-  'projectError.barrierSide': 'Côté de barrière invalide.',
-  'projectError.barrierStartIndex': 'Début de barrière : indice de point hors du tracé.',
-  'projectError.barrierEndIndex': 'Fin de barrière : indice de point hors du tracé.',
-  'projectError.barrierSpan': 'Une barrière doit couvrir au moins deux points.',
+  'projectError.fileTooLarge': 'Ce fichier dépasse {size} Mo. Choisissez un projet Roadbuilder.',
+  'projectError.invalidJson':
+    'Le fichier n’est pas un JSON valide. Votre projet actuel est conservé.',
+  'projectError.notAProject': 'Ce fichier n’est pas un projet Roadbuilder version 2.',
+  'projectError.pointsLimit': 'Le projet dépasse {max} points.',
+  'projectError.barriersLimit': 'Le projet dépasse {max} tronçons de barrière.',
+  'projectError.duplicateId': 'Le projet contient deux éléments avec le même identifiant.',
+  'projectError.barrierEndpoint': 'Une barrière s’appuie sur un point qui n’existe pas.',
+  'projectError.barrierSpan': 'Une barrière doit relier deux points différents.',
   'projectError.barrierDirection':
     'Sur une route ouverte, une barrière doit suivre le sens du tracé.',
-  'projectError.field.x': 'Position X',
-  'projectError.field.y': 'Altitude',
-  'projectError.field.z': 'Position Z',
-  'projectError.field.width': 'Largeur',
-  'projectError.field.shoulder': 'Accotement',
-  'projectError.field.terrainMargin': 'Marge du terrain',
-  'projectError.field.barrierOffset': 'Décalage de barrière',
+  'projectError.invalidValue': 'Valeur invalide dans le projet : {path}.',
 
   'trackIssue.pointsMinimumClosed': 'Ajoutez au moins {min} points pour fermer le circuit.',
   'trackIssue.pointsMinimumOpen': 'Ajoutez au moins {min} points pour créer une route.',
@@ -273,7 +265,7 @@ export const frMessages = {
   'trackIssue.trackCrossing':
     'Le tracé se croise : déplacez les points concernés. Les ponts ne sont pas pris en charge.',
 
-  'exportError.foldedEdge':
+  'exportError.foldedSurface':
     'Un bord de route ou de stand se replie dans un virage. Écartez les points, réduisez la largeur ou déplacez le début du tracé vers une ligne droite.',
 
   'documents.objHeader': '# Roadbuilder — mètres, Y vertical, avant -Z',
@@ -294,7 +286,7 @@ export const frMessages = {
   'documents.installationNoBarrierLimits':
     'Pas de barrières, de ponts ou de décor ; le relief du terrain est interpolé automatiquement.\n',
   'documents.installationTail':
-    'Les chevauchements de bords de route/accotements ne sont pas tous détectés.\nPour un circuit destiné à la compétition, vérifiez et complétez le modèle dans un outil 3D.\n\nLe fichier projet.roadbuilder.json permet de reprendre le travail dans l’éditeur.\n',
+    'Les chevauchements de bords de route/accotements ne sont pas tous détectés.\nPour un circuit destiné à la compétition, vérifiez et complétez le modèle dans un outil 3D.\n\nLe fichier {projectFile} permet de reprendre le travail dans l’éditeur.\n',
   'documents.installationWarnings': 'AVERTISSEMENTS',
 } as const;
 

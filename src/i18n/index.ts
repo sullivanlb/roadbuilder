@@ -1,6 +1,8 @@
 import { createI18n } from 'vue-i18n';
-import type { ExportError, ProjectErrorDetail, TrackIssue } from '../domain/diagnostics';
-import type { DocumentTexts } from './documents';
+import type { ProjectErrorDetail } from '../core/project/errors';
+import type { TrackIssue } from '../core/track/issues';
+import type { DocumentTexts } from '../export/documents';
+import type { ExportError } from '../export/errors';
 import { enMessages } from './en';
 import { frMessages } from './fr';
 import type { MessageKey, MessageParams } from './fr';
@@ -85,42 +87,26 @@ export function formatNumber(value: number, digits = 0): string {
 export function formatProjectError(detail: ProjectErrorDetail, target?: Locale): string {
   const tr = translator(target);
   switch (detail.code) {
-    case 'project-format':
-      return tr('projectError.projectFormat');
-    case 'name-length':
-      return tr('projectError.nameLength', { min: detail.min, max: detail.max });
-    case 'author-length':
-      return tr('projectError.authorLength', { max: detail.max });
-    case 'track-options':
-      return tr('projectError.trackOptions');
+    case 'file-too-large':
+      return tr('projectError.fileTooLarge', { size: detail.maxBytes / (1024 * 1024) });
+    case 'invalid-json':
+      return tr('projectError.invalidJson');
+    case 'not-a-project':
+      return tr('projectError.notAProject');
     case 'points-limit':
       return tr('projectError.pointsLimit', { max: detail.max });
-    case 'invalid-point':
-      return tr('projectError.invalidPoint');
-    case 'value-range':
-      return tr('projectError.valueRange', {
-        field: tr(`projectError.field.${detail.field}`),
-        min: detail.min,
-        max: detail.max,
-      });
     case 'barriers-limit':
       return tr('projectError.barriersLimit', { max: detail.max });
-    case 'barriers-min-points':
-      return tr('projectError.barriersMinPoints');
-    case 'invalid-barrier':
-      return tr('projectError.invalidBarrier');
-    case 'barrier-type':
-      return tr('projectError.barrierType');
-    case 'barrier-side':
-      return tr('projectError.barrierSide');
-    case 'barrier-index':
-      return tr(
-        detail.end === 'from' ? 'projectError.barrierStartIndex' : 'projectError.barrierEndIndex',
-      );
+    case 'duplicate-id':
+      return tr('projectError.duplicateId');
+    case 'barrier-endpoint':
+      return tr('projectError.barrierEndpoint');
     case 'barrier-span':
       return tr('projectError.barrierSpan');
     case 'barrier-direction':
       return tr('projectError.barrierDirection');
+    case 'invalid-value':
+      return tr('projectError.invalidValue', { path: detail.path });
   }
 }
 
@@ -145,11 +131,12 @@ export function formatTrackIssue(issue: TrackIssue, target?: Locale): string {
   }
 }
 
-/** Turns a failed export into the text appended to the « export failed » toast. */
+/** Turns a failed export into the text appended to the « export failed » notification. */
 export function formatExportError(error: ExportError, target?: Locale): string {
-  return error.detail.code === 'invalid-track'
-    ? (error.issues?.errors ?? []).map((issue) => formatTrackIssue(issue, target)).join('\n')
-    : translator(target)('exportError.foldedEdge');
+  const detail = error.detail;
+  return detail.code === 'invalid-track'
+    ? detail.issues.errors.map((issue) => formatTrackIssue(issue, target)).join('\n')
+    : translator(target)('exportError.foldedSurface');
 }
 
 /** Localised texts embedded in the exported archives. */
@@ -163,7 +150,7 @@ export function documentTexts(target: Locale): DocumentTexts {
       }),
     objReadme: (barrierCount) =>
       tr('documents.objReadme') + (barrierCount ? tr('documents.objReadmeBarriers') : ''),
-    installation: ({ name, slug, terrainMargin, barrierCount, warnings }) =>
+    installation: ({ name, slug, projectFile, terrainMargin, barrierCount, warnings }) =>
       tr('documents.installationHead', { name, slug }) +
       (barrierCount
         ? tr('documents.installationBarriers', { count: barrierCount }, barrierCount) + '\n'
@@ -172,7 +159,7 @@ export function documentTexts(target: Locale): DocumentTexts {
       (barrierCount
         ? tr('documents.installationBarrierLimits')
         : tr('documents.installationNoBarrierLimits')) +
-      tr('documents.installationTail') +
+      tr('documents.installationTail', { projectFile }) +
       (warnings.length
         ? '\n' +
           tr('documents.installationWarnings') +

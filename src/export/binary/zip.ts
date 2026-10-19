@@ -1,9 +1,11 @@
-import type { ExportFiles } from '../../domain/types';
 import { crc32 } from './crc32';
 import { BinaryWriter, utf8 } from './writer';
 
+/** Archive content: path → text or bytes. */
+export type ArchiveFiles = Record<string, string | Uint8Array>;
+
 /** Packs files into a stored (uncompressed) ZIP archive. */
-export function zipFiles(files: ExportFiles) {
+export function zipFiles(files: ArchiveFiles) {
   const writer = new BinaryWriter(),
     records = [];
   for (const [path, content] of Object.entries(files)) {

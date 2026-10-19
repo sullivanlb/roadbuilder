@@ -1,8 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import { ExportError } from '../src/domain/diagnostics';
-import { createProject } from '../src/domain/project/factory';
-import { buildExport } from '../src/export/trackExport';
-import type { ExportFiles } from '../src/domain/types';
+import { buildArchive } from '../src/export/archive';
+import type { ArchiveFiles } from '../src/export/binary/zip';
+import { ExportError } from '../src/export/errors';
 import {
   documentTexts,
   formatExportError,
@@ -14,17 +13,23 @@ import {
 import { enMessages } from '../src/i18n/en';
 import { frMessages } from '../src/i18n/fr';
 import type { MessageKey } from '../src/i18n/fr';
+import { template } from './helpers';
+
+const tooClose = new ExportError({
+  code: 'invalid-track',
+  issues: { errors: [{ code: 'points-too-close', min: 2 }], warnings: [], tightTurns: [] },
+});
 
 describe('French catalogue', () => {
   it('formats project import failures with their parameters', () => {
-    expect(formatProjectError({ code: 'value-range', field: 'x', min: -10000, max: 10000 })).toBe(
-      'Position X : valeur attendue entre -10000 et 10000.',
+    expect(formatProjectError({ code: 'invalid-value', path: 'road.width' })).toBe(
+      'Valeur invalide dans le projet : road.width.',
     );
-    expect(formatProjectError({ code: 'barrier-index', end: 'to' })).toBe(
-      'Fin de barrière : indice de point hors du tracé.',
+    expect(formatProjectError({ code: 'file-too-large', maxBytes: 1024 * 1024 })).toBe(
+      'Ce fichier dépasse 1 Mo. Choisissez un projet Roadbuilder.',
     );
-    expect(formatProjectError({ code: 'name-length', min: 1, max: 80 })).toBe(
-      'Le nom doit contenir de 1 à 80 caractères.',
+    expect(formatProjectError({ code: 'points-limit', max: 160 })).toBe(
+      'Le projet dépasse 160 points.',
     );
   });
 
@@ -42,14 +47,10 @@ describe('French catalogue', () => {
   });
 
   it('lists the issues of a rejected export', () => {
-    const invalid = new ExportError(
-      { code: 'invalid-track' },
-      { errors: [{ code: 'points-too-close', min: 2 }], warnings: [], tightTurns: [] },
-    );
-    expect(formatExportError(invalid)).toBe(
+    expect(formatExportError(tooClose)).toBe(
       'Deux points consécutifs sont trop proches (minimum 2 m).',
     );
-    expect(formatExportError(new ExportError({ code: 'folded-edge' }))).toContain(
+    expect(formatExportError(new ExportError({ code: 'folded-surface' }))).toContain(
       'se replie dans un virage',
     );
   });
@@ -63,27 +64,23 @@ describe('French catalogue', () => {
 const placeholders = (text: string) =>
   [...text.matchAll(/\{(\w+)\}/g)].map((match) => match[1]).sort();
 
-const jsonFile = (files: ExportFiles, suffix: string) =>
+const jsonFile = (files: ArchiveFiles, suffix: string) =>
   JSON.parse(files[Object.keys(files).find((key) => key.endsWith(suffix))!] as string) as {
     description: string;
   };
 
 describe('English catalogue', () => {
   it('formats the imported project and export failures', () => {
-    expect(
-      formatProjectError({ code: 'value-range', field: 'x', min: -10000, max: 10000 }, 'en'),
-    ).toBe('Position X: expected value between -10000 and 10000.');
-    expect(formatProjectError({ code: 'barrier-index', end: 'to' }, 'en')).toBe(
-      'Barrier end: point index out of the track.',
+    expect(formatProjectError({ code: 'invalid-value', path: 'points.3.y' }, 'en')).toBe(
+      'Invalid value in the project: points.3.y.',
     );
-    const invalid = new ExportError(
-      { code: 'invalid-track' },
-      { errors: [{ code: 'points-too-close', min: 2 }], warnings: [], tightTurns: [] },
+    expect(formatProjectError({ code: 'barrier-direction' }, 'en')).toBe(
+      'On an open road, a barrier must follow the track direction.',
     );
-    expect(formatExportError(invalid, 'en')).toBe(
+    expect(formatExportError(tooClose, 'en')).toBe(
       'Two consecutive points are too close (minimum 2 m).',
     );
-    expect(formatExportError(new ExportError({ code: 'folded-edge' }), 'en')).toContain(
+    expect(formatExportError(new ExportError({ code: 'folded-surface' }), 'en')).toContain(
       'folds inside a corner',
     );
   });
@@ -135,6 +132,7 @@ describe('English catalogue', () => {
       documents.installation({
         name: 'Circuit test',
         slug: 'circuit_test',
+        projectFile: 'circuit_test.roadbuilder.json',
         terrainMargin: 300,
         barrierCount: 2,
         warnings: [],
@@ -144,6 +142,7 @@ describe('English catalogue', () => {
       documents.installation({
         name: 'Circuit test',
         slug: 'circuit_test',
+        projectFile: 'circuit_test.roadbuilder.json',
         terrainMargin: 300,
         barrierCount: 2,
         warnings: [{ code: 'steep-grade', grade: 18.2 }],
@@ -151,11 +150,12 @@ describe('English catalogue', () => {
     ).toContain('WARNINGS\nMaximum grade of 18 %');
   });
 
-  it('localises the archives while the default stays French', () => {
-    const project = createProject('club');
-    const english = buildExport(project, 'ac', 'en');
-    const french = buildExport(project, 'ac');
+  it('localises the archives', () => {
+    const project = template('club');
+    const english = buildArchive(project, 'assetto', documentTexts('en'));
+    const french = buildArchive(project, 'assetto', documentTexts('fr'));
     expect(english.files['INSTALLATION.txt']).toContain('EXPERIMENTAL KN5 EXPORT');
+    expect(english.files['INSTALLATION.txt']).toContain('The rb_test_club.roadbuilder.json file');
     expect(french.files['INSTALLATION.txt']).toContain('EXPORT KN5 EXPÉRIMENTAL');
     expect(jsonFile(english.files, 'ui/ui_track.json').description).toContain(
       'Made with Roadbuilder',
@@ -163,10 +163,10 @@ describe('English catalogue', () => {
     expect(jsonFile(french.files, 'ui/ui_track.json').description).toContain(
       'Créé avec Roadbuilder',
     );
-    const englishObj = buildExport(project, 'obj', 'en');
-    expect(englishObj.files['LIRE-MOI.txt']).toContain('Import track.obj into Blender');
+    const englishObj = buildArchive(project, 'obj', documentTexts('en'));
+    expect(englishObj.files['README.txt']).toContain('Import track.obj into Blender');
     expect(englishObj.files['track.obj']).toContain('# Roadbuilder — meters');
-    expect(buildExport(project, 'obj', 'fr').files['track.obj']).toContain(
+    expect(buildArchive(project, 'obj', documentTexts('fr')).files['track.obj']).toContain(
       '# Roadbuilder — mètres',
     );
   });
