@@ -123,7 +123,7 @@ describe('barriers', () => {
     const project = allBarrierTypes(template('club'));
     const samples = sampleTrack(project);
     const scene = buildScene(project, samples);
-    for (const name of ['1WALL_wall_3_0', '1WALL_pitwall_0']) {
+    for (const name of ['1WALL_wall_3_0', '1WALL_divider_0']) {
       const mesh = scene.meshes.find((candidate) => candidate.name === name)!;
       const distances = [];
       for (let i = 0; i < vertexCount(mesh); i++) {
@@ -134,11 +134,24 @@ describe('barriers', () => {
     }
   });
 
+  it('name every physical mesh after one surface key only', () => {
+    // Assetto Corsa may find the surface key anywhere in the name, ignoring case:
+    // « 1WALL_pitwall » would read as pit floor and let cars through.
+    const keys = ['ROAD', 'GRASS', 'KERB', 'PIT', 'WALL'];
+    const scene = buildScene(allBarrierTypes(template('club')));
+    for (const mesh of scene.meshes) {
+      const prefix = /^\d+([A-Z]+)/.exec(mesh.name);
+      if (!prefix) continue;
+      const found = keys.filter((key) => mesh.name.toUpperCase().includes(key));
+      expect(found, mesh.name).toEqual([prefix[1]]);
+    }
+  });
+
   it('build colliders from vertical faces only, like the ribbons proven in game', () => {
     const scene = buildScene(allBarrierTypes(template('club')));
     const colliders = scene.meshes.filter((mesh) => mesh.name.startsWith('1WALL'));
     expect(colliders.map((mesh) => mesh.name)).toEqual(
-      expect.arrayContaining(['1WALL_pitwall_0', '1WALL_wall_3_0']),
+      expect.arrayContaining(['1WALL_divider_0', '1WALL_wall_3_0']),
     );
     for (const mesh of colliders)
       for (let i = 1; i < mesh.normals.length; i += 3)

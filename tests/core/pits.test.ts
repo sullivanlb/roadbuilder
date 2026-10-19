@@ -146,11 +146,11 @@ describe('pit lane geometry', () => {
     const scene = buildScene(project, samples);
     const names = scene.meshes.map((mesh) => mesh.name);
     expect(names).toEqual(
-      expect.arrayContaining(['1PIT_lane_0', '1WALL_pitwall_0', 'pitwall_decor_0']),
+      expect.arrayContaining(['1PIT_lane_0', '1WALL_divider_0', 'divider_decor_0']),
     );
     expect(names.some((name) => name.startsWith('1PIT_spawn'))).toBe(false);
-    expect(scene.meshes.find((mesh) => mesh.name === '1WALL_pitwall_0')!.visible).toBe(false);
-    expect(scene.meshes.find((mesh) => mesh.name === 'pitwall_decor_0')!.visible).toBe(true);
+    expect(scene.meshes.find((mesh) => mesh.name === '1WALL_divider_0')!.visible).toBe(false);
+    expect(scene.meshes.find((mesh) => mesh.name === 'divider_decor_0')!.visible).toBe(true);
     const markers = scene.markers.map((marker) => marker.name);
     for (let i = 0; i < 10; i++)
       expect(markers).toEqual(expect.arrayContaining([`AC_PIT_${i}`, `AC_START_${i}`]));

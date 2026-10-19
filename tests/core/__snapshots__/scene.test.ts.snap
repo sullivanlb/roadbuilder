@@ -34,12 +34,12 @@ exports[`scene > builds the club template 1`] = `
   },
   {
     "indices": 1008,
-    "name": "1WALL_pitwall_0",
+    "name": "1WALL_divider_0",
     "vertices": 672,
   },
   {
     "indices": 1506,
-    "name": "pitwall_decor_0",
+    "name": "divider_decor_0",
     "vertices": 1004,
   },
   {
