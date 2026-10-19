@@ -21,7 +21,7 @@ Conservez cette même adresse pour retrouver la sauvegarde automatique. `localho
 | ------------------- | ---------------------------------------------------------------- |
 | `npm run dev`       | Serveur de développement avec rechargement automatique           |
 | `npm run typecheck` | Typage strict de l’application, de la configuration et des tests |
-| `npm test`          | Tests de géométrie, exports, historique, stockage et interface   |
+| `npm test`          | Tests du domaine, des exports, des stores et de l’interface      |
 | `npm run test:ui`   | Tests de l’interface Vue avec DOM et canvas simulés              |
 | `npm run build`     | Vérification des types et compilation dans `dist/`               |
 | `npm run preview`   | Aperçu local de la compilation, à l’adresse affichée par Vite    |
@@ -30,26 +30,34 @@ Pour distribuer l’application, servez le contenu de **`dist/`** sur un héberg
 
 ### Organisation du code
 
-- `src/components/` : composants Vue rangés par zone — `layout/` (barre d’actions), `sidebar/` (réglages, barrières, relief), `workspace/` (canvas, statistiques, profil d’altitude), `dialogs/` (nouveau, export, aide) et `ui/` (champs et icônes partagés).
-- `src/composables/` : état partagé de l’éditeur, historique des actions, sauvegarde et interactions avec le canvas. L’état est créé par instance d’application et partagé par injection.
-- `src/domain/` : types des projets, validation, géométrie, maillages, terrain, scènes, historique et accès au stockage. Ces modules ne dépendent pas de Vue.
-- `src/export/` : encodeurs binaires PNG/ZIP, KN5, OBJ et structure des archives Assetto Corsa.
-- `src/i18n/` : moteur **vue-i18n** avec une façade typée — catalogues français et anglais (messages typés, diagnostics, documents exportés), formats de nombres et sélecteur de langue.
-- `src/rendering/` : moteur canvas 2D/3D, avec nettoyage des observateurs et animations au démontage.
-- `src/styles/` : styles de l’interface existante.
-- `tests/` : tests Vitest ; `fixtures/legacy-baseline.json` contient les mesures et empreintes SHA-256 capturées avant migration pour les trois modèles et leurs deux exports.
+Le vocabulaire du domaine est défini dans [`CONTEXT.md`](CONTEXT.md) et les décisions d’architecture dans [`docs/adr/`](docs/adr/). Chaque couche n’importe que les couches inférieures ; ESLint le vérifie.
 
-Les composants utilisent la Composition API. Les données géométriques volumineuses restent hors de la réactivité profonde. Les mutations du projet passent par le composable pour regrouper chaque geste ou saisie dans l’historique. Les écouteurs globaux, temporisations et URL de téléchargement sont libérés au démontage.
+- `src/core/` : le domaine, sans framework. `project/` contient le format v2 (schéma zod, règles et bornes, modèles, opérations d’édition immer), `track/` l’axe du tracé, les tronçons et les diagnostics, `scene/` la construction de la scène (chaussée, terrain, barrières, repères).
+- `src/export/` : archives Assetto Corsa (KN5, fichiers ini, carte) et OBJ, encodeurs binaires PNG/ZIP. Les textes des documents exportés sont fournis par l’appelant.
+- `src/rendering/` : dessin du plan 2D et du profil (Canvas 2D), aperçu 3D (Three.js, chargé à la demande), palette de couleurs.
+- `src/platform/` : accès au stockage et aux fichiers derrière une interface ; implémentation web aujourd’hui, Tauri ensuite.
+- `src/stores/` : état Pinia — projet et historique, éditeur (sélection, outil, barrière en cours), vue, fichiers et sauvegarde automatique, export, interface.
+- `src/editor/` : outils du plan (un module par outil), interactions au pointeur et raccourcis clavier.
+- `src/components/` : composants Vue avec styles scoped — `layout/`, `sidebar/`, `workspace/`, `dialogs/` et `ui/` (primitives partagées).
+- `src/i18n/` : vue-i18n avec catalogues français et anglais typés.
+- `src/styles/` : jetons de design et styles de base uniquement.
+- `tests/` : Vitest — `core/` et `export/` sans DOM, `stores.test.ts` pour la logique de l’éditeur, `app.test.ts` pour l’interface (DOM et canvas simulés).
+
+Le projet est une valeur immuable : chaque modification produit un nouveau projet, l’historique conserve les versions précédentes et les calculs dérivés (échantillons, diagnostics, scène) se refont uniquement quand le projet change.
+
+### Format de projet
+
+Les fichiers `.roadbuilder.json` sont au **format version 2** : les points de contrôle et les barrières ont des identifiants stables, et une barrière relie deux points par leurs identifiants. Les fichiers de la version 1 ne sont plus acceptés.
 
 ### Backend
 
-**Aucun backend pour le moment.** Si des comptes, une bibliothèque partagée ou des traitements distants deviennent nécessaires, le backend sera développé avec **Symfony**. Il n’y a pas de dépendance PHP, de base de données ni d’API factice dans cette version.
+**Aucun backend pour le moment.** Si des comptes, une bibliothèque partagée ou des traitements distants deviennent nécessaires, le backend sera développé avec **Symfony**. Une application de bureau **Tauri** est prévue : l’accès aux fichiers passe déjà par `src/platform/`.
 
 ### Vérifications avant livraison
 
-Les tests vérifient les projets anciens et invalides, le maillage et ses indices, les exports identiques octet par octet à l’ancienne version, les gestes et raccourcis, l’historique, la restauration, la récupération des sauvegardes corrompues, les téléchargements, ainsi que les barrières : validation, colliders orientés vers la piste, bridage dans les virages, traçage, sélection, entretien et exports. Les deux catalogues de langue sont compilés et comparés clé par clé (placeholders et formes plurielles comprises). Les tests d’interface utilisent un DOM et un canvas simulés : ils ne remplacent pas une vérification visuelle dans un navigateur.
+La CI (GitHub Actions) vérifie le formatage, le lint, les types, les tests et la compilation à chaque push. Les tests couvrent le format de projet et ses références, les opérations d’édition, la géométrie et les diagnostics, la scène (valeurs finies, indices valides, colliders orientés vers la piste, bridage dans les virages), la structure des archives, l’historique, la sauvegarde automatique et sa récupération, ainsi que les parcours de l’interface. Les tailles de maillage et les statistiques des modèles sont figées dans des snapshots : après une modification volontaire de la géométrie, mettez-les à jour avec `npx vitest -u` et vérifiez l’export **dans Assetto Corsa**.
 
-Pour la vérification manuelle : ouvrir les trois modèles et une page blanche, déplacer/ajouter/supprimer des points, régler largeur et relief, naviguer en 2D/3D, tester zoom et raccourcis, tracer des barrières des quatre types, enregistrer/recharger/importer un projet, puis télécharger les ZIP Assetto Corsa et OBJ. Comparer également le rendu aux dimensions bureau et mobile. La validation dans Assetto Corsa reste manuelle.
+Pour la vérification manuelle : ouvrir les trois modèles et une page blanche, déplacer/ajouter/supprimer des points, régler largeur et relief, naviguer en 2D/3D, tester zoom et raccourcis, tracer des barrières des quatre types, enregistrer/recharger/importer un projet, puis télécharger les ZIP Assetto Corsa et OBJ. Comparer également le rendu aux dimensions bureau et mobile.
 
 ## Fonctionnalités disponibles
 
@@ -63,7 +71,7 @@ Pour la vérification manuelle : ouvrir les trois modèles et une page blanche, 
 - Sauvegarde locale automatique et import/export de projets `.roadbuilder.json`.
 - Export ZIP Assetto Corsa avec modèle KN5, textures, surfaces, départ et stand.
 - Export OBJ avec matériaux et textures pour poursuivre la modélisation dans un outil 3D.
-- Interface bilingue **français / anglais** : le sélecteur **FR / EN** de la barre d’actions traduit l’interface et les documents exportés (`INSTALLATION.txt`, `LIRE-MOI.txt`, description `ui_track.json`). Le choix est mémorisé dans le navigateur.
+- Interface bilingue **français / anglais** : le sélecteur **FR / EN** de la barre d’actions traduit l’interface et les documents exportés (`INSTALLATION.txt`, `README.txt`, description `ui_track.json`). Le choix est mémorisé dans le navigateur.
 
 ## Créer et conserver un tracé
 
@@ -92,7 +100,7 @@ Le terrain suit les altitudes du tracé et se raccorde aux accotements. Son mail
 
 Le contour en pointillés du plan 2D montre la limite extérieure. L’aperçu 3D affiche le terrain réel. Les exports **Assetto Corsa et OBJ** incluent cette même géométrie ; dans le jeu, elle utilise la surface physique **GRASS**. Au-delà du contour extérieur, il n’y a plus de sol : augmentez la marge pour disposer de plus d’espace.
 
-Les anciens projets restent compatibles et reçoivent automatiquement la marge par défaut. Pour ajouter le terrain à un circuit déjà installé, ouvrez son projet, exportez un nouveau ZIP et remplacez son dossier dans le jeu après avoir sauvegardé l’ancienne version.
+Pour ajouter le terrain à un circuit déjà installé, ouvrez son projet, exportez un nouveau ZIP et remplacez son dossier dans le jeu après avoir sauvegardé l’ancienne version.
 
 ### Barrières et collisions
 
@@ -100,7 +108,7 @@ Les tronçons se posent avec l’outil **B** ou le bouton **Tracer sur le plan**
 
 Les quatre types ont des hauteurs réalistes : glissière 0,78 m, pneus 0,85 m, TecPro 0,85 m, mur en béton 1,1 m. Comme les circuits officiels, chaque tronçon produit un **collider invisible** nommé `1WALL_*` que le jeu utilise pour la collision, plus un décor visible (rail, pneus, blocs rouges et blancs ou mur). Les colliders restent à l’extérieur de la chaussée, y compris dans les virages très serrés.
 
-L’inversion du sens du tracé retourne les tronçons, la suppression d’un point déplace ou supprime les tronçons concernés, et le passage en route ouverte scinde les tronçons qui bouclaient. Les projets sans barrière gardent des exports strictement identiques à la version précédente.
+L’inversion du sens du tracé retourne les tronçons, la suppression d’un point déplace ou supprime les tronçons concernés, et le passage en route ouverte scinde les tronçons qui bouclaient.
 
 | Action                                    | Raccourci                           |
 | ----------------------------------------- | ----------------------------------- |
