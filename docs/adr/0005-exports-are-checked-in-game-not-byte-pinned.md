@@ -1,0 +1,3 @@
+# Exports are checked by importing them in game, not pinned byte for byte
+
+The tests used to compare every export against SHA-256 hashes captured from the original HTML tool, which made any change to the generated geometry look like a regression. An export is correct when Assetto Corsa loads and drives it. The tests now check structural invariants (finite values, upward-facing roadway, valid indices, KN5 header, archive layout, markers) and keep regenerable snapshots of mesh sizes and track statistics, which are updated deliberately with `vitest -u` when the geometry changes on purpose. Any change to the generated scene must be verified in game before release.
