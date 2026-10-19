@@ -30,7 +30,7 @@ Pour distribuer l’application, servez le contenu de **`dist/`** sur un héberg
 
 ### Organisation du code
 
-Le vocabulaire du domaine est défini dans [`CONTEXT.md`](CONTEXT.md) et les décisions d’architecture dans [`docs/adr/`](docs/adr/). Chaque couche n’importe que les couches inférieures ; ESLint le vérifie.
+Le vocabulaire du domaine est défini dans [`CONTEXT.md`](CONTEXT.md), les décisions d’architecture dans [`docs/adr/`](docs/adr/) et ce qu’Assetto Corsa attend d’un export — appris en jeu ou documenté — dans [`docs/assetto-corsa.md`](docs/assetto-corsa.md). Complétez ce dernier après chaque test en jeu. Chaque couche n’importe que les couches inférieures ; ESLint le vérifie.
 
 - `src/core/` : le domaine, sans framework. `project/` contient le format v2 (schéma zod, règles et bornes, modèles, opérations d’édition immer), `track/` l’axe du tracé, les tronçons et les diagnostics, `scene/` la construction de la scène (chaussée, terrain, barrières, repères).
 - `src/export/` : archives Assetto Corsa (KN5, fichiers ini, carte) et OBJ, encodeurs binaires PNG/ZIP. Les textes des documents exportés sont fournis par l’appelant.

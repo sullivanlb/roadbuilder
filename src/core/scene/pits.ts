@@ -48,7 +48,7 @@ export function buildPitWall(project: Project, samples: readonly Sample[]): Mesh
     sign,
   );
   // The name must not contain another surface key (ROAD, GRASS, KERB, PIT):
-  // Assetto Corsa may read « 1WALL_pitwall » as pit lane floor, with no collision.
+  // « 1WALL_pitwall » was read as pit lane floor, with no collision (docs/assetto-corsa.md).
   const collider = createMesh('1WALL_divider', 'concrete', 'barrier', false);
   solidWall(
     collider,
