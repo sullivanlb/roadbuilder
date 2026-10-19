@@ -32,7 +32,7 @@ const layerGuards = [
 
 export default [
   {
-    ignores: ['dist/**', 'node_modules/**', '.husky/**', 'Roadbuilder.html', 'package-lock.json'],
+    ignores: ['dist/**', 'node_modules/**', '.husky/**', 'package-lock.json'],
   },
 
   js.configs.recommended,

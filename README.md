@@ -11,17 +11,9 @@ npm ci
 npm run dev
 ```
 
-Ouvrez **http://127.0.0.1:5173/**. Sous Windows, **Demarrer.bat** installe les dépendances si nécessaire, lance Vite et ouvre le navigateur. Gardez sa fenêtre ouverte pendant l’utilisation. La première installation nécessite Internet ; les dépendances et ressources de l’application sont ensuite locales.
+Ouvrez **http://127.0.0.1:5173/**. La première installation nécessite Internet ; les dépendances et ressources de l’application sont ensuite locales.
 
 Conservez cette même adresse pour retrouver la sauvegarde automatique. `localhost`, `127.0.0.1`, un autre port et un hébergement distant ont des stockages distincts. Le serveur de développement utilise un port fixe et signale s’il est déjà occupé.
-
-## Reprendre un ancien projet HTML
-
-Le format **`.roadbuilder.json` version 1** reste compatible, y compris les fichiers sans marge de terrain, qui reçoivent la valeur de 150 m.
-
-Le navigateur ne transfère pas automatiquement la sauvegarde de l’ancien `file://` vers la nouvelle adresse. **Roadbuilder.html** est désormais une petite page de récupération, conservée au même emplacement : ouvrez-la dans le navigateur utilisé auparavant, téléchargez l’ancienne sauvegarde et importez-la avec **Ouvrir** dans l’application Vue. Cette page ne modifie ni ne supprime le stockage existant. Si vous disposez déjà d’un fichier projet, importez-le directement.
-
-La page de récupération n’est pas incluse dans la compilation de production.
 
 ## Développement et distribution
 
