@@ -109,6 +109,22 @@ export function removePoint(draft: ProjectDraft, id: Id) {
   dropPitsUnlessCircuit(draft);
 }
 
+/** Removes several control points, one after the other (see removePoint). */
+export function removePoints(draft: ProjectDraft, ids: readonly Id[]) {
+  for (const id of ids) removePoint(draft, id);
+}
+
+/** Raises or lowers several control points by `dy`, each within the altitude rule. */
+export function shiftAltitude(draft: ProjectDraft, ids: readonly Id[], dy: number) {
+  for (const point of draft.points)
+    if (ids.includes(point.id)) point.y = within(RULES.altitude, point.y + dy);
+}
+
+/** Puts several control points at the same altitude. */
+export function setAltitude(draft: ProjectDraft, ids: readonly Id[], y: number) {
+  for (const point of draft.points) if (ids.includes(point.id)) point.y = within(RULES.altitude, y);
+}
+
 /**
  * Drives the track the other way. A circuit keeps its first control point so the
  * start stays in place. Barriers and width zones keep covering the same ground:

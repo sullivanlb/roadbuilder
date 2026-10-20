@@ -549,6 +549,47 @@ describe('editor interface', () => {
     expect($('tool-width').getAttribute('aria-pressed')).toBe('true');
   });
 
+  it('selects points in a rectangle, moves them together and edits them as a group', async () => {
+    await mountApp();
+    const { project, editor } = stores();
+    const [a, b] = project.project.points.slice(1, 3).map((point) => screen(point));
+    const box = {
+      left: Math.min(a.x, b.x) - 6,
+      top: Math.min(a.y, b.y) - 6,
+      right: Math.max(a.x, b.x) + 6,
+      bottom: Math.max(a.y, b.y) + 6,
+    };
+    pointer('pointerdown', { x: box.left, y: box.top });
+    pointer('pointermove', { x: box.right, y: box.bottom });
+    await settle();
+    expect(editor.marquee).not.toBeNull();
+    pointer('pointerup', { x: box.right, y: box.bottom });
+    await settle();
+    const ids = editor.selectedPointIds;
+    expect(ids).toEqual(
+      expect.arrayContaining(project.project.points.slice(1, 3).map((p) => p.id)),
+    );
+    expect($('points-editor')).not.toBeNull();
+
+    // Dragging one of them moves the group, in one undo step.
+    const before = project.project.points.filter((point) => ids.includes(point.id));
+    pointer('pointerdown', a);
+    pointer('pointermove', { x: a.x + 30, y: a.y });
+    pointer('pointerup', { x: a.x + 30, y: a.y });
+    await settle();
+    const after = project.project.points.filter((point) => ids.includes(point.id));
+    const shifts = after.map((point, i) => point.x - before[i].x);
+    expect(shifts.every((shift) => Math.abs(shift - shifts[0]) < 1e-9 && shift > 0)).toBe(true);
+    await click('undo');
+    expect(project.project.points.filter((point) => ids.includes(point.id))).toEqual(before);
+
+    await click('points-up');
+    expect(project.project.points.find((point) => point.id === ids[0])!.y).toBe(before[0].y + 1);
+    await click('points-delete');
+    expect(project.project.points.some((point) => ids.includes(point.id))).toBe(false);
+    expect($('point-empty')).not.toBeNull();
+  });
+
   it('picks a stretch in the band, lays a zone on it and stretches the zone by its end', async () => {
     await mountApp();
     await click('layer-road');

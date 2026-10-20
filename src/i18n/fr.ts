@@ -57,7 +57,8 @@ export const frMessages = {
   'canvas.hintWidthDraft': 'Cliquez la fin de la portion · Échap annule',
   'canvas.hintSelectLayer':
     'Cliquez un élément de la couche pour le régler · Molette pour zoomer · Espace + glisser pour naviguer',
-  'canvas.hintSelect': 'Glissez un point · Molette pour zoomer · Espace + glisser pour naviguer',
+  'canvas.hintSelect':
+    'Glissez un point · Maj + clic ou glisser dans le vide pour en prendre plusieurs · Espace + glisser pour naviguer',
   'canvas.start': 'DÉPART',
   'canvas.finish': 'ARRIVÉE',
 
@@ -93,6 +94,13 @@ export const frMessages = {
   'range.planned': 'Cette couche est prévue : la plage servira à peindre ou à sculpter.',
   'range.note':
     'La même plage sert dans chaque couche : changez de couche pour y poser autre chose.',
+  'points.title': '{count} points',
+  'points.average': 'Altitude moyenne : {altitude} m',
+  'points.altitude': 'Altitude de tous les points',
+  'points.flatten': 'Aplanir',
+  'points.delete': 'Supprimer les {count} points',
+  'points.hint':
+    'Maj + clic ajoute ou retire un point. Glissez dans le vide pour en prendre plusieurs, ou choisissez une plage dans la bande.',
   'layers.aria': 'Couches',
   'layers.title': 'Couches',
   'layers.track': 'Tracé',

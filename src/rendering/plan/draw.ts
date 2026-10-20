@@ -28,7 +28,9 @@ export interface PlanScene {
   hiddenLayers: readonly LayerId[];
   pitLaneSelected: boolean;
   tightTurns: readonly TightTurn[];
-  selectedPointId: Id | null;
+  selectedPointIds: readonly Id[];
+  /** Rectangle being dragged to select points, in screen pixels. */
+  marquee: { x0: number; y0: number; x1: number; y1: number } | null;
   hoveredPointId: Id | null;
   selectedBarrierId: Id | null;
   /** First click of the barrier being laid, as a track distance. */
@@ -454,7 +456,7 @@ function drawPoints(ctx: Context, view: PlanProjection, scene: PlanScene) {
   }
   scene.project.points.forEach((point, i) => {
     const p = view.toScreen(point),
-      selected = point.id === scene.selectedPointId,
+      selected = scene.selectedPointIds.includes(point.id),
       invalid = affected.has(point.id);
     if (selected) {
       ctx.fillStyle = COLORS.point.halo;
@@ -559,4 +561,14 @@ export function drawPlan(ctx: Context, view: PlanProjection, scene: PlanScene, d
   }
   drawPoints(ctx, view, scene);
   if (scene.samples.length > 1) drawCursor(ctx, view, scene);
+  const box = scene.marquee;
+  if (box) {
+    const x = Math.min(box.x0, box.x1),
+      y = Math.min(box.y0, box.y1);
+    ctx.fillStyle = COLORS.band.range;
+    ctx.fillRect(x, y, Math.abs(box.x1 - box.x0), Math.abs(box.y1 - box.y0));
+    ctx.strokeStyle = COLORS.accent;
+    ctx.lineWidth = 1;
+    ctx.strokeRect(x + 0.5, y + 0.5, Math.abs(box.x1 - box.x0), Math.abs(box.y1 - box.y0));
+  }
 }

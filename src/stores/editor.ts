@@ -11,6 +11,9 @@ import {
   pointRejection,
   removeBarrier,
   removePoint,
+  removePoints,
+  setAltitude,
+  shiftAltitude,
   removeWidthZone,
   setPitLane,
   updateBarrier,
@@ -78,6 +81,9 @@ export const useEditorStore = defineStore('editor', () => {
       return current?.kind === kind ? (current as Extract<Selection, { kind: K }>) : null;
     });
   const selectedPoints = selected('points');
+  const selectedPointIds = computed(() => selectedPoints.value?.ids ?? []);
+  /** Rectangle being dragged on the plan to select points, in screen pixels. */
+  const marquee = ref<{ x0: number; y0: number; x1: number; y1: number } | null>(null);
   /** The selected control point, when the selection holds points. */
   const selectedPointId = computed(() => selectedPoints.value?.ids[0] ?? null);
   const selectedBarrierId = computed(() => selected('barrier').value?.id ?? null);
@@ -300,6 +306,13 @@ export const useEditorStore = defineStore('editor', () => {
     if (points.length) selectPoint(points[Math.max(0, Math.min(points.length - 1, index))].id);
   }
 
+  /** Adds a control point to the selection, or takes it out. */
+  function togglePoint(id: Id) {
+    const ids = selectedPointIds.value;
+    const next = ids.includes(id) ? ids.filter((other) => other !== id) : [...ids, id];
+    select(next.length ? { kind: 'points', ids: next } : null);
+  }
+
   const selectBarrier = (id: Id | null) => select(id ? { kind: 'barrier', id } : null);
   const selectWidthZone = (id: Id | null) => select(id ? { kind: 'widthZone', id } : null);
 
@@ -315,7 +328,15 @@ export const useEditorStore = defineStore('editor', () => {
     selection.value = { kind: 'points', ids: [id] };
   }
 
+  /** Deletes the selected control points; after a single one, its neighbour is selected. */
   function deleteSelectedPoint() {
+    const ids = selectedPointIds.value;
+    if (ids.length > 1) {
+      store.edit((draft) => removePoints(draft, ids));
+      selection.value = null;
+      if (!store.project.points.length) setTool('add');
+      return;
+    }
     const id = selectedPointId.value;
     if (id === null || !selectedPoint.value) return;
     const index = selectedIndex.value;
@@ -324,6 +345,21 @@ export const useEditorStore = defineStore('editor', () => {
     const next = points[Math.min(index, points.length - 1)];
     selection.value = next ? { kind: 'points', ids: [next.id] } : null;
     if (!points.length) setTool('add');
+  }
+
+  /** Raises or lowers every selected control point. */
+  function shiftSelectedAltitude(dy: number) {
+    const ids = selectedPointIds.value;
+    if (ids.length) store.edit((draft) => shiftAltitude(draft, ids, dy));
+  }
+
+  /** Puts the selected control points at their average altitude, to the half metre. */
+  function flattenSelected() {
+    const ids = selectedPointIds.value;
+    const points = store.project.points.filter((point) => ids.includes(point.id));
+    if (!points.length) return;
+    const average = points.reduce((sum, point) => sum + point.y, 0) / points.length;
+    store.edit((draft) => setAltitude(draft, ids, Math.round(average * 2) / 2));
   }
 
   function beginBarrier(spot: RoadSpot) {
@@ -427,6 +463,8 @@ export const useEditorStore = defineStore('editor', () => {
     view,
     selection,
     selectedPoints,
+    selectedPointIds,
+    marquee,
     selectedPointId,
     selectedBarrierId,
     barrierType,
@@ -455,6 +493,9 @@ export const useEditorStore = defineStore('editor', () => {
     barriersOnRange,
     pitLaneOnRange,
     selectPoint,
+    togglePoint,
+    shiftSelectedAltitude,
+    flattenSelected,
     selectPointAt,
     selectBarrier,
     selectWidthZone,

@@ -51,7 +51,8 @@ export const enMessages: Record<MessageKey, string> = {
   'canvas.hintWidthDraft': 'Click where the zone ends · Escape cancels',
   'canvas.hintSelectLayer':
     'Click an item of the layer to adjust it · Scroll to zoom · Space + drag to pan',
-  'canvas.hintSelect': 'Drag a point · Scroll to zoom · Space + drag to pan',
+  'canvas.hintSelect':
+    'Drag a point · Shift + click or drag over empty space to take several · Space + drag to pan',
   'canvas.start': 'START',
   'canvas.finish': 'FINISH',
 
@@ -86,6 +87,13 @@ export const enMessages: Record<MessageKey, string> = {
   'range.cancel': 'Clear the stretch',
   'range.planned': 'This layer is planned: the stretch will be used to paint or sculpt.',
   'range.note': 'The same stretch works on every layer: switch layers to lay something else on it.',
+  'points.title': '{count} points',
+  'points.average': 'Average elevation: {altitude} m',
+  'points.altitude': 'Elevation of every point',
+  'points.flatten': 'Level',
+  'points.delete': 'Delete the {count} points',
+  'points.hint':
+    'Shift + click adds or removes a point. Drag over empty space to take several, or pick a stretch in the band.',
   'layers.aria': 'Layers',
   'layers.title': 'Layers',
   'layers.track': 'Track',

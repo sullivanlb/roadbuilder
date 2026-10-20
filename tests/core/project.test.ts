@@ -6,10 +6,13 @@ import {
   insertPoint,
   pointRejection,
   removePoint,
+  removePoints,
   rename,
   reverseTrack,
+  setAltitude,
   setClosed,
   setRoad,
+  shiftAltitude,
   updateBarrier,
   updatePoint,
 } from '../../src/core/project/edits';
@@ -205,6 +208,20 @@ describe('editing operations', () => {
     expect(fromLast.barriers.map(({ from, to }) => [from.point, to.point])).toEqual([
       ids(circuit).slice(0, 2),
     ]);
+  });
+
+  it('removes, raises and levels several points at once', () => {
+    const project = template('club');
+    const [a, b, c] = project.points;
+    const removed = produce(project, (draft) => removePoints(draft, [a.id, c.id]));
+    expect(ids(removed)).not.toContain(a.id);
+    expect(ids(removed)).not.toContain(c.id);
+    expect(removed.points).toHaveLength(project.points.length - 2);
+    const raised = produce(project, (draft) => shiftAltitude(draft, [a.id, b.id], 2));
+    expect(raised.points.slice(0, 3).map((point) => point.y)).toEqual([a.y + 2, b.y + 2, c.y]);
+    const level = produce(project, (draft) => setAltitude(draft, [a.id, b.id], 5000));
+    expect(level.points[0].y).toBe(RULES.altitude.max);
+    expect(level.points[1].y).toBe(RULES.altitude.max);
   });
 
   it('refuses a barrier too short or over the limit', () => {

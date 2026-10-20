@@ -4,6 +4,7 @@ import { useEditorStore } from '../../stores/editor';
 import BarrierSection from '../sidebar/BarrierSection.vue';
 import PitSection from '../sidebar/PitSection.vue';
 import PointSection from '../sidebar/PointSection.vue';
+import PointsSection from '../sidebar/PointsSection.vue';
 import RoadSection from '../sidebar/RoadSection.vue';
 import StartSection from '../sidebar/StartSection.vue';
 import TerrainSection from '../sidebar/TerrainSection.vue';
@@ -21,7 +22,8 @@ const editor = useEditorStore();
     <RangeInspector v-if="editor.range" />
     <template v-if="editor.layer === 'track'">
       <TrackSection />
-      <PointSection />
+      <PointsSection v-if="editor.selectedPointIds.length > 1" />
+      <PointSection v-else />
     </template>
     <template v-else-if="editor.layer === 'road'">
       <RoadSection />
