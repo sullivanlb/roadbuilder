@@ -13,7 +13,6 @@ import RangeField from '../ui/RangeField.vue';
 import SidebarSection from '../ui/SidebarSection.vue';
 import TrackPositionField from './TrackPositionField.vue';
 
-defineProps<{ index: number }>();
 const store = useProjectStore();
 const editor = useEditorStore();
 
@@ -30,7 +29,7 @@ const preview = (patch: Partial<PitLane>) =>
 </script>
 
 <template>
-  <SidebarSection :index="index" :title="t('pits.title')">
+  <SidebarSection :title="t('pits.title')">
     <template v-if="lane" #badge>
       <span id="pit-cars">{{ store.project.cars }} {{ t('pits.carsUnit').toUpperCase() }}</span>
     </template>

@@ -204,8 +204,10 @@ afterEach(() => {
 describe('editor interface', () => {
   it('shows the project, draws it and groups slider moves in the history', async () => {
     await mountApp();
-    expect($('point-count').textContent).toBe('09 POINTS');
+    expect($('layer-track').textContent).toContain('9');
     expect(drawCalls).toBeGreaterThan(0);
+    await click('layer-terrain');
+    expect($('layer-terrain').getAttribute('aria-pressed')).toBe('true');
     await type('terrain-margin', '200', false);
     await type('terrain-margin', '300');
     expect($('terrain-margin-value').textContent).toBe('300 m');
@@ -214,6 +216,9 @@ describe('editor interface', () => {
     expect($('terrain-margin-value').textContent).toBe('150 m');
     await click('redo');
     expect($('terrain-margin-value').textContent).toBe('300 m');
+    // Back on the track layer, its selection is where it was left.
+    press('1');
+    await settle();
     await type('point-altitude', '42');
     expect((await saved()).points[0].y).toBe(42);
     await type('point-altitude', '');
@@ -379,9 +384,11 @@ describe('editor interface', () => {
       expect(at.y).toBeLessThan(SIZE.height);
     }
 
-    strokes = [];
+    await click('layer-road');
     await type('track-width', '4');
-    await settle();
+    await click('layer-track');
+    strokes = [];
+    await settle(40);
     expect(strokes).not.toContain('#ec8b7f');
     expect($('point-issues')).toBeNull();
     expect($('locate-tight-turn')).toBeNull();
@@ -391,6 +398,8 @@ describe('editor interface', () => {
 
   it('lays a barrier with two clicks on the road, then selects it on the plan', async () => {
     await mountApp();
+    await click('layer-edges');
+    expect($('tool-width')).toBeNull();
     await click('tool-barrier');
     expect($('barrier-status').textContent).toContain('début de la barrière');
     strokes = [];
@@ -446,6 +455,7 @@ describe('editor interface', () => {
 
   it('draws a pit lane with the P tool and sets its number of cars', async () => {
     await mountApp();
+    await click('layer-pits');
     await click('pit-delete');
     expect($('pits-empty')).not.toBeNull();
     press('p');
@@ -462,13 +472,17 @@ describe('editor interface', () => {
     const { pitLane, cars } = await saved();
     expect(pitLane).toMatchObject({ side: 'right', width: 7 });
     expect(cars).toBe(6);
+    await click('layer-track');
     await click('mode-open');
+    await click('layer-pits');
     expect($('pits-road')).not.toBeNull();
     expect((await saved()).pitLane).toBeNull();
   });
 
   it('lays a width zone with the L tool, then adjusts and deletes it', async () => {
     await mountApp();
+    press('2');
+    await settle();
     expect($('width-status').textContent).toContain('largeur de base');
     press('l');
     await settle();
@@ -503,12 +517,37 @@ describe('editor interface', () => {
     expect($('width-status').textContent).toContain('début de la portion');
   });
 
+  it('offers one layer at a time, with its tools, its planned tools and its settings', async () => {
+    await mountApp();
+    expect($('layer-track').getAttribute('aria-pressed')).toBe('true');
+    expect($('tool-add')).not.toBeNull();
+    expect($('point-badge')).not.toBeNull();
+    await click('soon-arc');
+    expect($('toast').textContent).toContain('rayon réglable');
+    press('3');
+    await settle();
+    expect($('tool-add')).toBeNull();
+    expect($('tool-barrier')).not.toBeNull();
+    expect($('barrier-empty')).not.toBeNull();
+    expect($('point-badge')).toBeNull();
+    await click('layer-eye-edges');
+    expect(stores().editor.hiddenLayers).toEqual(['edges']);
+    expect($('layer-eye-edges').getAttribute('aria-pressed')).toBe('false');
+    await click('layer-decor');
+    expect($('inspector-planned')).not.toBeNull();
+    // A tool key of another layer moves to that layer.
+    press('l');
+    await settle();
+    expect($('layer-road').getAttribute('aria-pressed')).toBe('true');
+    expect($('tool-width').getAttribute('aria-pressed')).toBe('true');
+  });
+
   it('switches the whole interface to English and remembers it', async () => {
     await mountApp();
     expect($('locale-fr').getAttribute('aria-pressed')).toBe('true');
     await click('locale-en');
     expect($('new-project').textContent).toContain('New');
-    expect($('scene-label').textContent).toBe('TOP-DOWN VIEW');
+    expect($('layer-track').textContent).toContain('Track');
     expect($('validation-status').textContent).toContain('Geometry ready');
     expect(document.documentElement.lang).toBe('en');
     expect(localStorage.getItem('roadbuilder.locale')).toBe('en');

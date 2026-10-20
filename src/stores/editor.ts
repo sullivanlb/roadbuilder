@@ -94,24 +94,41 @@ export const useEditorStore = defineStore('editor', () => {
     ),
   );
 
+  /** What is left of a selection in the current project. */
+  function stillThere(current: Selection): Selection {
+    const project = store.project;
+    switch (current?.kind) {
+      case 'points': {
+        const ids = current.ids.filter((id) => store.pointIndex.has(id));
+        return ids.length === current.ids.length
+          ? current
+          : ids.length
+            ? { kind: 'points', ids }
+            : null;
+      }
+      case 'barrier':
+        return project.barriers.some((b) => b.id === current.id) ? current : null;
+      case 'widthZone':
+        return project.widthZones.some((z) => z.id === current.id) ? current : null;
+      case 'pitLane':
+        return project.pitLane ? current : null;
+      case undefined:
+        return null;
+    }
+  }
+
   // Undo, redo or an opened file can remove what was selected or being laid.
   watch(
     () => store.project,
     (project) => {
-      const current = selection.value;
-      if (current?.kind === 'points') {
-        const ids = current.ids.filter((id) => store.pointIndex.has(id));
-        if (ids.length !== current.ids.length)
-          selection.value = ids.length ? { kind: 'points', ids } : null;
-      }
-      const gone =
-        (current?.kind === 'barrier' && !project.barriers.some((b) => b.id === current.id)) ||
-        (current?.kind === 'widthZone' && !project.widthZones.some((z) => z.id === current.id)) ||
-        (current?.kind === 'pitLane' && !project.pitLane);
-      if (gone) selection.value = null;
+      const left = stillThere(selection.value);
+      if (left !== selection.value) selection.value = left;
       if (!isCircuit(project)) pitDraft.value = null;
     },
   );
+
+  /** Each layer keeps its selection while another one is edited. */
+  const remembered = new Map<LayerId, Selection>();
 
   function clearDrafts() {
     barrierDraft.value = null;
@@ -122,12 +139,13 @@ export const useEditorStore = defineStore('editor', () => {
     widthTarget.value = null;
   }
 
-  /** Works on another layer: its tools and its elements only, nothing selected yet. */
+  /** Works on another layer: its tools, its elements, and what was selected in it before. */
   function setLayer(next: LayerId) {
     if (layer.value === next) return;
     store.commit();
+    remembered.set(layer.value, selection.value);
     layer.value = next;
-    selection.value = null;
+    selection.value = stillThere(remembered.get(next) ?? null);
     clearDrafts();
     if (layerOfTool(tool.value) !== null) tool.value = 'select';
   }
@@ -166,6 +184,7 @@ export const useEditorStore = defineStore('editor', () => {
   /** Starts a new document: on the track layer, first point selected, the right tool for an empty track. */
   function reset() {
     layer.value = 'track';
+    remembered.clear();
     clearDrafts();
     setTool(store.project.points.length ? 'select' : 'add');
     selection.value = firstPoint();

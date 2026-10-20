@@ -5,6 +5,7 @@ import { useFilesStore } from '../../stores/files';
 import { useUiStore } from '../../stores/ui';
 import AppButton from '../ui/AppButton.vue';
 import AppIcon from '../ui/AppIcon.vue';
+import ProjectName from './ProjectName.vue';
 
 const files = useFilesStore();
 const exporter = useExportStore();
@@ -25,6 +26,7 @@ const ui = useUiStore();
       >
       <span class="version">0.1</span>
     </a>
+    <ProjectName />
     <nav class="actions" :aria-label="t('topbar.projectAria')">
       <AppButton id="new-project" class="collapsible" @click="ui.openDialog('new')">
         <AppIcon name="plus" /><span>{{ t('topbar.new') }}</span>
@@ -46,6 +48,14 @@ const ui = useUiStore();
         }}<span class="wide-only"> {{ t('topbar.exportTrack') }}</span>
       </AppButton>
       <span class="divider"></span>
+      <AppButton
+        id="open-help"
+        :aria-label="t('sidebar.help')"
+        :title="t('sidebar.help')"
+        @click="ui.openDialog('help')"
+      >
+        <AppIcon name="help" />
+      </AppButton>
       <div class="locale-switch" role="group" :aria-label="t('topbar.language')">
         <button
           v-for="code in LOCALES"

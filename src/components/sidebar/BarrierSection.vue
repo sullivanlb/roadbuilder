@@ -16,7 +16,6 @@ import SidebarSection from '../ui/SidebarSection.vue';
 import TrackPositionField from './TrackPositionField.vue';
 import { usePlaceLabel } from './usePlaceLabel';
 
-defineProps<{ index: number }>();
 const store = useProjectStore();
 const editor = useEditorStore();
 
@@ -72,7 +71,7 @@ function preview(patch: Parameters<typeof updateBarrier>[2]) {
 </script>
 
 <template>
-  <SidebarSection :index="index" :title="t('barriers.title')">
+  <SidebarSection :title="t('barriers.title')">
     <template v-if="barriers.length" #badge>
       <span id="barrier-count">{{
         t('barriers.count', { count: String(barriers.length).padStart(2, '0') }, barriers.length)

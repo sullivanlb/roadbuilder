@@ -10,7 +10,7 @@ import AppIcon from '../ui/AppIcon.vue';
 import SegmentedControl from '../ui/SegmentedControl.vue';
 import ElevationProfile from './ElevationProfile.vue';
 import PlanCanvas from './PlanCanvas.vue';
-import ToolPalette from './ToolPalette.vue';
+import LayerTools from './LayerTools.vue';
 import TrackTelemetry from './TrackTelemetry.vue';
 import ZoomControls from './ZoomControls.vue';
 
@@ -41,31 +41,16 @@ const statusDetails = computed(() =>
 
 <template>
   <section class="workspace" :aria-label="t('editor.aria')">
-    <div class="heading">
-      <div>
-        <span class="eyebrow">{{ t('editor.eyebrow') }}</span>
-        <h1>{{ t('editor.title') }}<span>.</span></h1>
-      </div>
+    <div class="stage">
+      <PlanCanvas v-show="editor.view === '2d'" />
+      <PreviewCanvas v-if="editor.view === '3d'" />
+      <LayerTools />
       <SegmentedControl
         v-model="view"
         class="views"
         :options="views"
         :label="t('editor.viewAria')"
       />
-    </div>
-    <div class="stage">
-      <PlanCanvas v-show="editor.view === '2d'" />
-      <PreviewCanvas v-if="editor.view === '3d'" />
-      <ToolPalette />
-      <div class="badge">
-        <span class="live"></span
-        ><span id="scene-label">{{
-          editor.view === '2d' ? t('editor.scene2d') : t('editor.scene3d')
-        }}</span
-        ><span id="point-count" class="count">{{
-          t('editor.pointCount', { count: String(store.project.points.length).padStart(2, '0') })
-        }}</span>
-      </div>
       <div v-if="!store.project.points.length" id="empty-canvas" class="empty">
         <AppIcon name="route" />
         <h2>{{ t('editor.emptyTitle') }}</h2>
@@ -106,31 +91,10 @@ const statusDetails = computed(() =>
   min-width: 0;
   overflow: hidden;
 }
-.heading {
-  height: 95px;
-  flex-shrink: 0;
-  padding: 22px 28px 19px;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-}
-.eyebrow {
-  font-size: 8px;
-  letter-spacing: 1.7px;
-  font-weight: 650;
-  color: var(--muted);
-}
-h1 {
-  font-size: 23px;
-  font-weight: 500;
-  margin-top: 6px;
-  letter-spacing: -0.7px;
-}
-h1 > span {
-  color: var(--accent);
-}
 .views {
+  position: absolute;
+  top: 12px;
+  right: 12px;
   border: 1px solid var(--line);
   background: var(--panel);
 }
@@ -138,31 +102,12 @@ h1 > span {
   position: relative;
   flex: 1;
   min-height: 280px;
-  margin: 0 24px;
+  margin: 12px 12px 0;
   background: #1b2924;
   border: 1px solid #364139;
   border-radius: 9px;
   overflow: hidden;
 }
-.badge {
-  position: absolute;
-  right: 18px;
-  top: 28px;
-  font-size: 8px;
-  letter-spacing: 1.4px;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  color: #a2b49c;
-  pointer-events: none;
-}
-.count {
-  padding-left: 10px;
-  border-left: 1px solid #476044;
-  color: #799176;
-  font-family: monospace;
-}
-.live,
 .dot {
   width: 5px;
   height: 5px;
@@ -170,10 +115,6 @@ h1 > span {
   border-radius: 50%;
   display: inline-block;
   flex-shrink: 0;
-}
-.live {
-  width: 4px;
-  height: 4px;
 }
 .empty {
   pointer-events: none;
@@ -225,53 +166,17 @@ h1 > span {
   margin: 0 9px;
   color: #546a69;
 }
-@media (min-width: 1500px) {
-  .stage {
-    margin: 0 32px;
-  }
-  .heading {
-    padding-left: 36px;
-    padding-right: 36px;
-  }
-}
 @media (max-width: 1200px) {
-  .count,
   .about {
     display: none;
   }
-  h1 {
-    font-size: 21px;
-  }
 }
 @media (max-width: 950px) {
-  .heading {
-    padding: 18px;
-    height: 90px;
-  }
-  h1 {
-    font-size: 17px;
-  }
-  .eyebrow {
-    font-size: 7px;
-  }
   .views {
     --icon-size: 0;
   }
-  .stage {
-    margin: 0 16px;
-  }
-  .badge {
-    display: none;
-  }
 }
 @media (max-width: 650px) {
-  .heading {
-    height: 83px;
-    padding: 16px;
-  }
-  .stage {
-    margin: 0 12px;
-  }
   .footer {
     padding: 12px 18px;
     font-size: 8px;

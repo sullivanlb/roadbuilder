@@ -6,12 +6,11 @@ import { useProjectStore } from '../../stores/project';
 import RangeField from '../ui/RangeField.vue';
 import SidebarSection from '../ui/SidebarSection.vue';
 
-defineProps<{ index: number }>();
 const store = useProjectStore();
 </script>
 
 <template>
-  <SidebarSection :index="index" :title="t('sidebar.terrain')">
+  <SidebarSection :title="t('sidebar.terrain')">
     <RangeField
       id="terrain-margin"
       :label="t('sidebar.terrainMargin')"

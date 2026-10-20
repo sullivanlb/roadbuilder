@@ -8,7 +8,6 @@ import RangeField from '../ui/RangeField.vue';
 import SidebarSection from '../ui/SidebarSection.vue';
 import ToggleField from '../ui/ToggleField.vue';
 
-defineProps<{ index: number }>();
 const store = useProjectStore();
 const road = computed(() => store.project.road);
 const kerbs = computed({
@@ -20,7 +19,7 @@ const preview = (patch: Parameters<typeof setRoad>[1]) =>
 </script>
 
 <template>
-  <SidebarSection :index="index" :title="t('sidebar.road')">
+  <SidebarSection :title="t('sidebar.road')">
     <RangeField
       id="track-width"
       :label="t('sidebar.width')"

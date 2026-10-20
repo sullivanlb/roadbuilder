@@ -2,12 +2,15 @@
 import AppIcon from './AppIcon.vue';
 import type { IconName } from './icons';
 
-/** Square icon button of the canvas toolbars; `active` marks the current tool. */
-defineProps<{ icon: IconName; label: string; active?: boolean }>();
+/**
+ * Square icon button of the canvas toolbars; `active` marks the current tool,
+ * `soon` a tool planned but not built yet.
+ */
+defineProps<{ icon: IconName; label: string; active?: boolean; soon?: boolean }>();
 </script>
 
 <template>
-  <button type="button" class="tool" :class="{ active }" :aria-label="label" :title="label">
+  <button type="button" class="tool" :class="{ active, soon }" :aria-label="label" :title="label">
     <AppIcon :name="icon" />
   </button>
 </template>
@@ -28,6 +31,11 @@ defineProps<{ icon: IconName; label: string; active?: boolean }>();
 }
 .tool:hover {
   background: var(--hover);
+}
+.soon {
+  color: var(--faint);
+  outline: 1px dashed var(--line-strong);
+  outline-offset: -3px;
 }
 .active {
   color: var(--accent-text);

@@ -192,7 +192,7 @@ describe('editor', () => {
     expect(pick('terrain')).toBeNull();
   });
 
-  it('moves to the layer of a tool or a selection, and starts each layer with nothing selected', () => {
+  it('moves to the layer of a tool or a selection, and keeps each layer’s selection', () => {
     const { project, editor } = stores();
     project.replace(template('club'));
     editor.reset();
@@ -208,6 +208,8 @@ describe('editor', () => {
     editor.setLayer('road');
     expect(editor.tool).toBe('select');
     expect(editor.selection).toBeNull();
+    editor.setLayer('track');
+    expect(editor.selectedPointId).toBe(project.project.points[2].id);
     editor.toggleLayer('edges');
     expect(editor.hiddenLayers).toEqual(['edges']);
     editor.toggleLayer('edges');

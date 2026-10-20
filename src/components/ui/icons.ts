@@ -21,6 +21,17 @@ export const ICONS = {
   flag: 'M5 22V3m0 1c5-4 9 4 15 0v10c-6 4-10-4-15 0',
   pits: 'M3 4v16M8 4v16M8 8h13M8 14h13M12 8v6M17 8v6',
   width: 'M7 3v18M17 3v18M10 12H3m4-3-3 3 3 3m7-3h7m-4-3 3 3-3 3',
+  eye: 'M2 12s4-7 10-7 10 7 10 7-4 7-10 7S2 12 2 12zM9 12a3 3 0 1 0 6 0a3 3 0 1 0-6 0',
+  straight: 'M4 20 20 4M3 21h3v-3M18 6V3h3',
+  arc: 'M4 20a16 16 0 0 1 16-16',
+  freehand: 'M3 17c3-6 5 4 8-2s5-8 10-4',
+  banking: 'M3 18h18L3 9zM15 13v5',
+  surface: 'M4 4h16v16H4zM4 12h16M12 4v16',
+  runoff: 'M3 20c4-8 14-8 18 0M8 17v.5M12 15v.5M16 17v.5',
+  sectors: 'M5 3v18M5 4h11l-3 3.5 3 3.5H5',
+  sculpt: 'm2 20 6-9 4 5 3-4 7 8z',
+  trees: 'm12 3 6 8h-4l4 6H6l4-6H6zM12 17v4',
+  grandstands: 'M3 20h18M5 20v-4h14v4M7 16v-4h10v4M9 12V8h6v4',
 } as const;
 
 export type IconName = keyof typeof ICONS;

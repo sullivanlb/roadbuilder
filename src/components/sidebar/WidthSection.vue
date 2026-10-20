@@ -13,7 +13,6 @@ import SidebarSection from '../ui/SidebarSection.vue';
 import TrackPositionField from './TrackPositionField.vue';
 import { usePlaceLabel } from './usePlaceLabel';
 
-defineProps<{ index: number }>();
 const store = useProjectStore();
 const editor = useEditorStore();
 
@@ -41,7 +40,7 @@ const preview = (patch: Parameters<typeof updateWidthZone>[2]) => {
 </script>
 
 <template>
-  <SidebarSection :index="index" :title="t('widths.title')">
+  <SidebarSection :title="t('widths.title')">
     <template v-if="zones.length" #badge>
       <span id="width-count">{{
         t('widths.count', { count: String(zones.length).padStart(2, '0') }, zones.length)
