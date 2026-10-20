@@ -7,6 +7,7 @@ import { useProjectStore } from '../../stores/project';
 import AppIcon from '../ui/AppIcon.vue';
 import SegmentedControl from '../ui/SegmentedControl.vue';
 import PlanCanvas from './PlanCanvas.vue';
+import PlanNavigator from './PlanNavigator.vue';
 import TrackBand from './TrackBand.vue';
 import LayerTools from './LayerTools.vue';
 import ZoomControls from './ZoomControls.vue';
@@ -33,6 +34,7 @@ const views = computed(() => [
       <PlanCanvas v-show="editor.view === '2d'" />
       <PreviewCanvas v-if="editor.view === '3d'" />
       <LayerTools />
+      <PlanNavigator v-if="editor.view === '2d' && store.samples.length > 1" />
       <SegmentedControl
         v-model="view"
         class="views"

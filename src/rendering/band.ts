@@ -2,6 +2,7 @@ import type { BarrierType, Project } from '../core/project/schema';
 import { startLine } from '../core/scene/road';
 import { controlPointSample, trackLength, trackStats } from '../core/track/centerline';
 import type { Sample } from '../core/track/centerline';
+import type { Corner } from '../core/track/corners';
 import { pitLaneLayout } from '../core/track/pitLane';
 import { positionRange } from '../core/track/ranges';
 import type { TrackRange } from '../core/track/ranges';
@@ -16,7 +17,7 @@ import { BARRIER_STYLE, COLORS } from './theme';
  */
 
 /** Margins of the band, in pixels: row labels on the left, distances at the bottom. */
-export const BAND = { left: 84, right: 12, top: 6, bottom: 18, rowGap: 4, edge: 5 } as const;
+export const BAND = { left: 84, right: 12, top: 18, bottom: 18, rowGap: 4, edge: 5 } as const;
 
 export interface BandSize {
   width: number;
@@ -59,6 +60,7 @@ export interface BandLabels {
   start: string;
   empty: string;
   distance: (metres: number) => string;
+  corner: (corner: Corner) => string;
 }
 
 const ROWS: Record<LayerId, [BandRowId, number][]> = {
@@ -206,6 +208,22 @@ export function bandHit(
   return { row, s, block: null, edge: null };
 }
 
+/** The corner named in the strip along the top of the band under the pointer, if any. */
+export function bandCornerAt(
+  size: BandSize,
+  view: BandView,
+  total: number,
+  corners: readonly Corner[],
+  x: number,
+  y: number,
+): Corner | null {
+  if (y >= BAND.top) return null;
+  const s = bandS(size, view, x);
+  return (
+    corners.find((corner) => rangeSpans(corner, total).some(([a, b]) => s >= a && s <= b)) ?? null
+  );
+}
+
 /** The control point closest to track distance `s`. */
 export function nearestPoint(samples: readonly Sample[], pointCount: number, s: number): number {
   let best = 0,
@@ -230,6 +248,7 @@ export interface BandScene {
   rows: readonly BandRow[];
   blocks: readonly BandBlock[];
   labels: BandLabels;
+  corners: readonly Corner[];
   /** The selected block, if the selection is laid along the track. */
   selectedBlockId: string | null;
   selectedPointIds: readonly string[];
@@ -254,8 +273,9 @@ export function drawBand(ctx: Context, size: BandSize, dpr: number, scene: BandS
   for (const row of scene.rows) {
     ctx.fillStyle = COLORS.band.row;
     ctx.fillRect(BAND.left, row.y, w, row.height);
-    drawRow(ctx, size, scene, row);
   }
+  drawCorners(ctx, size, scene, total);
+  for (const row of scene.rows) drawRow(ctx, size, scene, row);
   for (const block of scene.blocks) {
     const row = scene.rows.find((candidate) => candidate.id === block.row);
     if (row) drawBlock(ctx, size, scene, row, block, total);
@@ -385,6 +405,22 @@ function drawBlock(
       ctx.fillText(block.label, x0 + 6, row.y + row.height / 2);
     }
   }
+}
+
+/** Corners shaded across the rows and named along the top, to find one's way. */
+function drawCorners(ctx: Context, size: BandSize, scene: BandScene, total: number) {
+  ctx.font = '10px "Segoe UI", sans-serif';
+  ctx.textBaseline = 'middle';
+  for (const corner of scene.corners)
+    for (const [a, b] of rangeSpans(corner, total)) {
+      const x0 = bandX(size, scene.view, a),
+        x1 = bandX(size, scene.view, b);
+      ctx.fillStyle = COLORS.band.corner;
+      ctx.fillRect(x0, 0, x1 - x0, size.height - BAND.bottom);
+      const label = scene.labels.corner(corner);
+      ctx.fillStyle = COLORS.band.label;
+      if (x1 - x0 > ctx.measureText(label).width + 6) ctx.fillText(label, x0 + 3, BAND.top / 2);
+    }
 }
 
 /** Distances along the bottom, at a step that suits the zoom. */

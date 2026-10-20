@@ -101,6 +101,13 @@ export const frMessages = {
   'points.delete': 'Supprimer les {count} points',
   'points.hint':
     'Maj + clic ajoute ou retire un point. Glissez dans le vide pour en prendre plusieurs, ou choisissez une plage dans la bande.',
+  'corner.short': 'V{number}',
+  'corner.left': 'Virage {number} · gauche · {angle}°',
+  'corner.right': 'Virage {number} · droite · {angle}°',
+  'navigator.map': 'Vue d’ensemble : cliquez pour centrer le plan',
+  'navigator.goto': 'Aller à…',
+  'navigator.corners': 'Virages',
+  'navigator.issues': 'À corriger',
   'layers.aria': 'Couches',
   'layers.title': 'Couches',
   'layers.track': 'Tracé',

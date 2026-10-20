@@ -2,9 +2,11 @@ import { produce } from 'immer';
 import { describe, expect, it } from 'vitest';
 import { addBarrier } from '../src/core/project/edits';
 import { sampleTrack, trackLength } from '../src/core/track/centerline';
+import { trackCorners } from '../src/core/track/corners';
 import {
   BAND,
   bandBlocks,
+  bandCornerAt,
   bandHit,
   bandRows,
   bandS,
@@ -33,6 +35,7 @@ const labels: BandLabels = {
   start: 'Ligne de départ',
   empty: 'Rien',
   distance: (metres) => `${metres} m`,
+  corner: (corner) => `T${corner.number}`,
 };
 
 describe('track band', () => {
@@ -85,6 +88,17 @@ describe('track band', () => {
     // The right-hand row holds nothing there.
     expect(hit(middle, rows[1].y + 2).block).toBeNull();
     expect(nearestPoint(samples, project.points.length, block.range.start + 1)).toBe(1);
+  });
+
+  it('names the corner under the strip along the top', () => {
+    const project = template('club');
+    const samples = sampleTrack(project);
+    const corners = trackCorners(project, samples);
+    const total = trackLength(samples);
+    const view = { start: 0, end: total };
+    const x = bandX(size, view, corners[1].start + corners[1].length / 2);
+    expect(bandCornerAt(size, view, total, corners, x, 4)).toBe(corners[1]);
+    expect(bandCornerAt(size, view, total, corners, x, BAND.top + 10)).toBeNull();
   });
 
   it('shows the pit lane and the start line on the pits layer', () => {

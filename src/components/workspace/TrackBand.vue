@@ -12,7 +12,14 @@ import { trackLength } from '../../core/track/centerline';
 import { positionAt } from '../../core/track/positions';
 import type { TrackRange } from '../../core/track/ranges';
 import { formatNumber, formatTrackIssue, t } from '../../i18n';
-import { bandBlocks, bandHit, bandRows, drawBand, nearestPoint } from '../../rendering/band';
+import {
+  bandBlocks,
+  bandCornerAt,
+  bandHit,
+  bandRows,
+  drawBand,
+  nearestPoint,
+} from '../../rendering/band';
 import type { BandBlock, BandLabels, BandView } from '../../rendering/band';
 import { useEditorStore } from '../../stores/editor';
 import { useProjectStore } from '../../stores/project';
@@ -52,6 +59,7 @@ const labels = computed<BandLabels>(() => ({
   lane: t('band.laneBlock'),
   start: t('band.startBlock'),
   empty: t('band.empty'),
+  corner: (corner) => t('corner.short', { number: corner.number }),
   distance: (metres) =>
     metres >= 1000 ? `${formatNumber(metres / 1000, metres % 1000 ? 1 : 0)} km` : `${metres} m`,
 }));
@@ -90,6 +98,7 @@ function draw() {
     rows: rows.value,
     blocks: blocks.value,
     labels: labels.value,
+    corners: store.corners,
     selectedBlockId: selectedBlockId.value,
     selectedPointIds: editor.selectedPoints?.ids ?? [],
     range: editor.range,
@@ -148,6 +157,16 @@ function onPointerDown(event: PointerEvent) {
   if (event.button !== 0 || store.samples.length < 2) return;
   canvas.value!.setPointerCapture(event.pointerId);
   const { x, hit } = pointer(event);
+  const rect = canvas.value!.getBoundingClientRect();
+  const corner = bandCornerAt(
+    size.value,
+    view.value,
+    total.value,
+    store.corners,
+    x,
+    event.clientY - rect.top,
+  );
+  if (corner) return viewport.focusRange(corner);
   const block = hit.block;
   if (block) {
     if (block.kind === 'widthZone') editor.selectWidthZone(block.id);

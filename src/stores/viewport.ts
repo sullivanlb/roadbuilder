@@ -6,6 +6,8 @@ import type { PlanPoint } from '../core/math';
 import type { IssueLocation } from '../core/track/issues';
 import { issueLayer } from '../editor/layers';
 import { terrainBounds } from '../core/track/layout';
+import { rangeSamples } from '../core/track/ranges';
+import type { TrackRange } from '../core/track/ranges';
 import { frameCamera, PlanProjection, zoomCamera } from '../rendering/plan/projection';
 import type { PlanCamera, ScreenPoint, ViewportSize } from '../rendering/plan/projection';
 import { useEditorStore } from './editor';
@@ -55,6 +57,16 @@ export const useViewportStore = defineStore('viewport', () => {
       bounds(points, Math.max(20, store.project.road.width * 2)),
       size.value,
     );
+  }
+
+  /** Frames a stretch of track, e.g. a corner. */
+  function focusRange(range: TrackRange) {
+    focus(rangeSamples(store.samples, range));
+  }
+
+  /** Centres the plan on a place, keeping the zoom. */
+  function centerOn(at: PlanPoint) {
+    camera.value = { ...camera.value, x: at.x, z: at.z };
   }
 
   function zoom(factor: number, at?: ScreenPoint) {
@@ -109,6 +121,8 @@ export const useViewportStore = defineStore('viewport', () => {
     fit,
     focus,
     focusIssue,
+    focusRange,
+    centerOn,
     bandView,
     setBandView,
     zoom,

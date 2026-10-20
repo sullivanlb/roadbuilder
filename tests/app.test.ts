@@ -590,6 +590,32 @@ describe('editor interface', () => {
     expect($('point-empty')).not.toBeNull();
   });
 
+  it('jumps to a corner from the go-to menu or the band, and recentres from the mini map', async () => {
+    await mountApp();
+    const { project, viewport } = stores();
+    const corner = project.corners[2];
+    const select = $<HTMLSelectElement>('goto');
+    expect(select.querySelectorAll('optgroup option').length).toBeGreaterThanOrEqual(
+      project.corners.length,
+    );
+    const fitted = viewport.projection.camera.scale;
+    select.value = 'corner:2';
+    select.dispatchEvent(new Event('change'));
+    await settle();
+    expect(viewport.projection.camera.scale).toBeGreaterThan(fitted);
+    const apex = sampleAt(project.samples, corner.apex)!;
+    const onScreen = screen(apex);
+    expect(onScreen.x).toBeGreaterThan(0);
+    expect(onScreen.x).toBeLessThan(SIZE.width);
+    expect(select.value).toBe('');
+
+    $('mini-map').dispatchEvent(
+      new MouseEvent('click', { clientX: 84, clientY: 56, bubbles: true }),
+    );
+    await settle();
+    expect(viewport.projection.camera.x).not.toBe(apex.x);
+  });
+
   it('picks a stretch in the band, lays a zone on it and stretches the zone by its end', async () => {
     await mountApp();
     await click('layer-road');

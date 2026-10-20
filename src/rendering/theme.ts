@@ -37,6 +37,7 @@ export const COLORS = {
     base: '#5f7377',
     tick: '#5f7377',
     blockText: '#1b2714',
+    corner: '#a0bc6c14',
   },
   pits: { lane: '#596264', wall: '#ddd9c9', box: '#d3f47d99', grid: '#e4e9d6aa' },
   profile: { grid: '#39504355', line: '#bddb86', fillTop: '#a7cb5e40', fillBottom: '#a7cb5e03' },

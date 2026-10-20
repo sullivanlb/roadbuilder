@@ -6,6 +6,7 @@ import { computed, shallowRef } from 'vue';
 import { createProject } from '../core/project/factory';
 import type { Project } from '../core/project/schema';
 import { sampleTrack, trackStats } from '../core/track/centerline';
+import { trackCorners } from '../core/track/corners';
 import { trackIssues } from '../core/track/issues';
 import { t } from '../i18n';
 
@@ -25,6 +26,7 @@ export const useProjectStore = defineStore('project', () => {
   const samples = computed(() => sampleTrack(project.value));
   const stats = computed(() => trackStats(samples.value));
   const issues = computed(() => trackIssues(project.value, samples.value));
+  const corners = computed(() => trackCorners(project.value, samples.value));
   /** Position of each control point in the track, by ID. */
   const pointIndex = computed(
     () => new Map(project.value.points.map((point, index) => [point.id, index])),
@@ -79,6 +81,7 @@ export const useProjectStore = defineStore('project', () => {
     samples,
     stats,
     issues,
+    corners,
     pointIndex,
     canUndo: history.canUndo,
     canRedo: history.canRedo,

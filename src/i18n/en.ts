@@ -94,6 +94,13 @@ export const enMessages: Record<MessageKey, string> = {
   'points.delete': 'Delete the {count} points',
   'points.hint':
     'Shift + click adds or removes a point. Drag over empty space to take several, or pick a stretch in the band.',
+  'corner.short': 'T{number}',
+  'corner.left': 'Turn {number} · left · {angle}°',
+  'corner.right': 'Turn {number} · right · {angle}°',
+  'navigator.map': 'Overview: click to centre the plan',
+  'navigator.goto': 'Go to…',
+  'navigator.corners': 'Turns',
+  'navigator.issues': 'To fix',
   'layers.aria': 'Layers',
   'layers.title': 'Layers',
   'layers.track': 'Track',
