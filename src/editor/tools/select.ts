@@ -1,11 +1,14 @@
 import { updatePoint } from '../../core/project/edits';
-import { findBarrier, findPoint, findRoad } from '../../rendering/plan/hitTest';
+import { findBarrier, findPoint, findRoad, findWidthZone } from '../../rendering/plan/hitTest';
 import type { Tool } from './tool';
 
 /** Grid used while Shift is held during a drag, in metres. */
 const SNAP = 5;
 
-/** Selects and drags control points, selects barriers, inserts a point with a double click. */
+/**
+ * Selects and drags control points, selects barriers and width zones, inserts a
+ * point with a double click.
+ */
 export const selectTool: Tool = {
   cursor: ({ editor }) => (editor.hoveredPointId ? 'grab' : 'default'),
   hint: () => 'canvas.hintSelect',
@@ -35,7 +38,9 @@ export const selectTool: Tool = {
     }
     const barrier = findBarrier(view, project.project, project.samples, at);
     editor.selectBarrier(barrier);
-    if (!barrier) editor.selectPoint(null);
+    if (barrier) return;
+    editor.selectPoint(null);
+    editor.selectWidthZone(findWidthZone(view, project.project, project.samples, at));
   },
   hover({ project, editor, viewport }, { at }) {
     editor.hoveredPointId = findPoint(viewport.projection, project.project, at);

@@ -8,6 +8,7 @@ import { sampleTrack, trackStats } from './centerline';
 import type { Sample } from './centerline';
 import { LAYOUT } from './layout';
 import { pitBoxCapacity, pitLaneLayout } from './pitLane';
+import { overlapStart, widthZoneRanges } from './width';
 
 /** Thresholds of the track checks. */
 export const CHECKS = {
@@ -15,7 +16,7 @@ export const CHECKS = {
   minLength: 80,
   /** Grade, in percent, above which a warning is raised. */
   steepGrade: 18,
-  /** A bend is too tight when its radius falls below this fraction of the road width. */
+  /** A bend is too tight when its radius falls below this fraction of the local roadway width. */
   tightRadius: 0.65,
 } as const;
 
@@ -31,7 +32,8 @@ export type TrackIssue =
   | { code: 'tight-turn'; from: number; to: number }
   | { code: 'track-crossing' }
   | { code: 'pit-lane-too-short'; cars: number; capacity: number }
-  | { code: 'pit-lane-too-tight'; from: number; to: number };
+  | { code: 'pit-lane-too-tight'; from: number; to: number }
+  | { code: 'width-zones-overlap' };
 
 /** The worst bend of one segment that is too tight for the road width. */
 export interface TightTurn {
@@ -92,7 +94,7 @@ export function trackIssues(
     const a = samples[i - 2],
       b = samples[i + 2];
     const radius = (b.s - a.s) / (Math.hypot(a.nx - b.nx, a.nz - b.nz) || 0.00001);
-    if (!(radius < project.road.width * CHECKS.tightRadius)) continue;
+    if (!(radius < 2 * samples[i].half * CHECKS.tightRadius)) continue;
     const segment = samples[i].segment;
     const previous = tightBySegment.get(segment);
     if (previous && previous.radius <= radius) continue;
@@ -118,7 +120,35 @@ export function trackIssues(
     errors.push(location.issue);
     if (location.sampleIndex >= 0) locations.push(location);
   }
+  const overlap = widthZonesOverlap(project, samples);
+  if (overlap) {
+    warnings.push(overlap.issue);
+    locations.push(overlap);
+  }
   return { errors, warnings, tightTurns, locations };
+}
+
+/**
+ * Width zones are laid without overlapping, but moving their positions can make
+ * them overlap; the later zone then wins. Located where the first overlap starts.
+ */
+function widthZonesOverlap(project: Project, samples: readonly Sample[]): IssueLocation | null {
+  const ranges = widthZoneRanges(project, samples);
+  const total = samples.at(-1)?.s ?? 0;
+  for (let i = 0; i < ranges.length; i++)
+    for (let j = i + 1; j < ranges.length; j++) {
+      const s = overlapStart(ranges[i], ranges[j], total);
+      if (s === null) continue;
+      return {
+        issue: { code: 'width-zones-overlap' },
+        sampleIndex: Math.max(
+          0,
+          samples.findIndex((sample) => sample.s >= s),
+        ),
+        pointIds: [],
+      };
+    }
+  return null;
 }
 
 /** The pit lane must hold every car and must not fold on the inside of a bend. */

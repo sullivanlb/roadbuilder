@@ -36,6 +36,7 @@ export function useShortcuts() {
     { key: 'a', run: tool('add') },
     { key: 'b', run: tool('barrier') },
     { key: 'p', run: tool('pits') },
+    { key: 'l', run: tool('width') },
     { key: 'h', run: tool('pan') },
     { key: 'f', run: viewport.fit },
     { key: 'delete', run: editor.deleteSelectedPoint },
@@ -45,6 +46,7 @@ export function useShortcuts() {
       run: () => {
         if (editor.barrierDraft) editor.cancelBarrier();
         else if (editor.pitDraft) editor.cancelPitLane();
+        else if (editor.widthDraft !== null) editor.cancelWidthZone();
         else editor.setTool('select');
       },
     },

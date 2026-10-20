@@ -35,6 +35,16 @@ const barrier = z.object({
 /** A place on the track: a control point plus a distance along the track after it (docs/adr/0006). */
 const trackPosition = z.object({ point: id, distance: ranged(RULES.positionDistance) });
 
+/** A stretch where the roadway takes another width than the base one, both edges alike. */
+const widthZone = z.object({
+  id,
+  /** Where the zone starts, in track direction. */
+  from: trackPosition,
+  /** Where the zone ends, in track direction. */
+  to: trackPosition,
+  width: ranged(RULES.width),
+});
+
 const pitLane = z.object({
   side: z.enum(SIDES),
   entry: trackPosition,
@@ -57,6 +67,7 @@ const projectShape = z.object({
   terrain: z.object({ margin: ranged(RULES.terrainMargin) }),
   points: z.array(controlPoint).max(RULES.points.max),
   barriers: z.array(barrier).max(RULES.barriers.max),
+  widthZones: z.array(widthZone).max(RULES.widthZones.max).default([]),
   /** Absent until set: the start line then sits a little after the first control point. */
   startLine: trackPosition.optional(),
   pitLane: pitLane.nullable().default(null),
@@ -71,7 +82,7 @@ function checkReferences(project: ProjectShape, ctx: z.RefinementCtx<ProjectShap
     ctx.addIssue({ code: 'custom', path, params: { reason } });
   const order = new Map(project.points.map((point, index) => [point.id, index]));
   const ids = new Set<string>();
-  for (const item of [...project.points, ...project.barriers]) {
+  for (const item of [...project.points, ...project.barriers, ...project.widthZones]) {
     if (ids.has(item.id)) return fail('duplicate-id', []);
     ids.add(item.id);
   }
@@ -89,6 +100,10 @@ function checkReferences(project: ProjectShape, ctx: z.RefinementCtx<ProjectShap
     ['startLine', project.startLine],
     ['pitLane', project.pitLane?.entry],
     ['pitLane', project.pitLane?.exit],
+    ...project.widthZones.flatMap((zone) => [
+      ['widthZones', zone.from] as const,
+      ['widthZones', zone.to] as const,
+    ]),
   ] as const;
   for (const [field, position] of positions)
     if (position && !order.has(position.point)) return fail('position-point', [field]);
@@ -104,6 +119,7 @@ export type ControlPoint = Project['points'][number];
 export type Barrier = Project['barriers'][number];
 export type BarrierType = Barrier['type'];
 export type Side = Barrier['side'];
+export type WidthZone = Project['widthZones'][number];
 export type RoadSettings = Project['road'];
 export type TrackPosition = NonNullable<Project['startLine']>;
 export type PitLane = NonNullable<Project['pitLane']>;
@@ -122,6 +138,7 @@ function toDetail(error: z.ZodError): ProjectErrorDetail {
   if (issue.code === 'too_big' && issue.path.length === 1) {
     if (head === 'points') return { code: 'points-limit', max: RULES.points.max };
     if (head === 'barriers') return { code: 'barriers-limit', max: RULES.barriers.max };
+    if (head === 'widthZones') return { code: 'width-zones-limit', max: RULES.widthZones.max };
   }
   return { code: 'invalid-value', path: issue.path.join('.') };
 }

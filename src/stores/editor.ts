@@ -4,14 +4,17 @@ import type { Id } from '../core/ids';
 import type { Vec3 } from '../core/math';
 import {
   addBarrier,
+  addWidthZone,
   barrierRejection,
   insertPoint,
   opposite,
   pointRejection,
   removeBarrier,
   removePoint,
+  removeWidthZone,
   setPitLane,
   updateBarrier,
+  widthZoneRejection,
 } from '../core/project/edits';
 import { RULES } from '../core/project/rules';
 import { isCircuit } from '../core/project/schema';
@@ -19,11 +22,12 @@ import type { BarrierType, Side } from '../core/project/schema';
 import { trackLength } from '../core/track/centerline';
 import { LAYOUT } from '../core/track/layout';
 import { positionAt } from '../core/track/positions';
+import { rangeBetween } from '../core/track/width';
 import { t } from '../i18n';
 import { useProjectStore } from './project';
 import { useUiStore } from './ui';
 
-export type ToolId = 'select' | 'add' | 'barrier' | 'pits' | 'pan';
+export type ToolId = 'select' | 'add' | 'barrier' | 'pits' | 'width' | 'pan';
 export type ViewMode = '2d' | '3d';
 
 /** A barrier being laid: its first click is done, the second is awaited. */
@@ -60,6 +64,10 @@ export const useEditorStore = defineStore('editor', () => {
   /** Entry of the pit lane being laid; the exit click is awaited. */
   const pitDraft = ref<RoadSpot | null>(null);
   const pitTarget = ref<RoadSpot | null>(null);
+  const selectedWidthZoneId = ref<Id | null>(null);
+  /** Track distance of the first click of the width zone being laid; the second is awaited. */
+  const widthDraft = ref<number | null>(null);
+  const widthTarget = ref<number | null>(null);
 
   const selectedIndex = computed(() =>
     selectedPointId.value === null ? -1 : (store.pointIndex.get(selectedPointId.value) ?? -1),
@@ -67,6 +75,9 @@ export const useEditorStore = defineStore('editor', () => {
   const selectedPoint = computed(() => store.project.points[selectedIndex.value]);
   const selectedBarrier = computed(() =>
     store.project.barriers.find((barrier) => barrier.id === selectedBarrierId.value),
+  );
+  const selectedWidthZone = computed(() =>
+    store.project.widthZones.find((zone) => zone.id === selectedWidthZoneId.value),
   );
   /** Located issues around the selected control point. */
   const selectedIssues = computed(() =>
@@ -86,6 +97,8 @@ export const useEditorStore = defineStore('editor', () => {
       if (!project.barriers.some((barrier) => barrier.id === selectedBarrierId.value))
         selectedBarrierId.value = null;
       if (barrierDraft.value && !exists(barrierDraft.value.from)) barrierDraft.value = null;
+      if (!project.widthZones.some((zone) => zone.id === selectedWidthZoneId.value))
+        selectedWidthZoneId.value = null;
       if (!isCircuit(project)) pitDraft.value = null;
     },
   );
@@ -101,6 +114,10 @@ export const useEditorStore = defineStore('editor', () => {
       pitDraft.value = null;
       pitTarget.value = null;
     }
+    if (next !== 'width') {
+      widthDraft.value = null;
+      widthTarget.value = null;
+    }
   }
 
   function setView(next: ViewMode) {
@@ -112,8 +129,10 @@ export const useEditorStore = defineStore('editor', () => {
   function reset() {
     selectedPointId.value = store.project.points[0]?.id ?? null;
     selectedBarrierId.value = null;
+    selectedWidthZoneId.value = null;
     barrierDraft.value = null;
     pitDraft.value = null;
+    widthDraft.value = null;
     setTool(store.project.points.length ? 'select' : 'add');
   }
 
@@ -131,6 +150,11 @@ export const useEditorStore = defineStore('editor', () => {
   function selectBarrier(id: Id | null) {
     store.commit();
     selectedBarrierId.value = id;
+  }
+
+  function selectWidthZone(id: Id | null) {
+    store.commit();
+    selectedWidthZoneId.value = id;
   }
 
   /** Adds a control point after `index` (by default after the selection) and selects it. */
@@ -205,6 +229,47 @@ export const useEditorStore = defineStore('editor', () => {
     ui.notify(t('toast.pitLaneAdded'));
   }
 
+  /** First click of a width zone: one end. */
+  function beginWidthZone(s: number) {
+    widthDraft.value = s;
+  }
+
+  function cancelWidthZone() {
+    widthDraft.value = null;
+  }
+
+  /** Second click: the other end. The zone covers the stretch between the two clicks. */
+  function completeWidthZone(s: number) {
+    const first = widthDraft.value;
+    if (first === null) return;
+    const range = rangeBetween(store.project, store.samples, first, s);
+    const rejection = widthZoneRejection(store.project, store.samples, range);
+    if (rejection === 'width-zones-limit')
+      return ui.notify(t('toast.widthZonesLimit', { max: RULES.widthZones.max }), true);
+    if (rejection === 'too-short')
+      return ui.notify(t('toast.widthZoneTooShort', { min: RULES.widthZoneLength }), true);
+    if (rejection === 'overlap') return ui.notify(t('toast.widthZoneOverlap'), true);
+    selectedWidthZoneId.value = store.edit((project) =>
+      addWidthZone(project, {
+        from: positionAt(store.project, store.samples, range.start),
+        to: positionAt(store.project, store.samples, range.start + range.length),
+      }),
+    );
+    widthDraft.value = null;
+    widthTarget.value = null;
+    ui.notify(t('toast.widthZoneAdded'));
+  }
+
+  function deleteSelectedWidthZone() {
+    const zone = selectedWidthZone.value;
+    if (!zone) return;
+    const zones = store.project.widthZones;
+    const index = zones.indexOf(zone);
+    store.edit((draft) => removeWidthZone(draft, zone.id));
+    selectedWidthZoneId.value =
+      store.project.widthZones[Math.min(index, zones.length - 2)]?.id ?? null;
+  }
+
   /** Chooses the type of the next barrier, and of the selected one if any. */
   function setBarrierType(type: BarrierType) {
     barrierType.value = type;
@@ -240,9 +305,13 @@ export const useEditorStore = defineStore('editor', () => {
     roadTarget,
     pitDraft,
     pitTarget,
+    selectedWidthZoneId,
+    widthDraft,
+    widthTarget,
     selectedIndex,
     selectedPoint,
     selectedBarrier,
+    selectedWidthZone,
     selectedIssues,
     setTool,
     setView,
@@ -250,6 +319,7 @@ export const useEditorStore = defineStore('editor', () => {
     selectPoint,
     selectPointAt,
     selectBarrier,
+    selectWidthZone,
     addPoint,
     deleteSelectedPoint,
     beginBarrier,
@@ -258,6 +328,10 @@ export const useEditorStore = defineStore('editor', () => {
     beginPitLane,
     cancelPitLane,
     completePitLane,
+    beginWidthZone,
+    cancelWidthZone,
+    completeWidthZone,
+    deleteSelectedWidthZone,
     setBarrierType,
     swapSelectedBarrierSide,
     deleteSelectedBarrier,

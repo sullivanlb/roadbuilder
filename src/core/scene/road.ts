@@ -3,7 +3,7 @@ import { isCircuit } from '../project/schema';
 import type { Project, Side } from '../project/schema';
 import { sampleAt, trackLength } from '../track/centerline';
 import type { Sample } from '../track/centerline';
-import { clampToBend, kerbWidth, LAYOUT } from '../track/layout';
+import { clampToBend, kerbWidth, LAYOUT, roadEdge } from '../track/layout';
 import { pitLaneLayout, sideEdge } from '../track/pitLane';
 import type { PitLaneLayout } from '../track/pitLane';
 import { positionDistance, startLinePosition, wrapDistance } from '../track/positions';
@@ -67,9 +67,8 @@ export function buildRoad(project: Project, samples: readonly Sample[]): RoadMes
     markings: createMesh('road_markings', 'paint', 'surface'),
     pit: createMesh(lane ? '1PIT_lane' : '1PIT_spawn', 'pit', 'surface'),
   };
-  const road = project.road;
-  const half = road.width / 2,
-    edge = half + kerbWidth(road);
+  const road = project.road,
+    kerb = kerbWidth(road);
   // Shoulders start beyond the kerb, or beyond the pit lane where it runs. On the
   // inside of a bend they narrow before the centre of curvature, so they never
   // fold over themselves on tight karting corners.
@@ -87,58 +86,69 @@ export function buildRoad(project: Project, samples: readonly Sample[]): RoadMes
     );
   };
   const line = LAYOUT.edgeLine;
+  // Lateral spans measured from each roadway edge, symmetric on both sides; the
+  // roadway may change width between a and b inside a width zone.
+  const both = (a: Sample, b: Sample, from: number, to: number) =>
+    [
+      [
+        [-a.half - to, -a.half - from],
+        [-b.half - to, -b.half - from],
+      ],
+      [
+        [a.half + from, a.half + to],
+        [b.half + from, b.half + to],
+      ],
+    ] as [number, number][][];
   for (let i = 0; i < samples.length - 1; i++) {
     const a = samples[i],
       b = samples[i + 1];
     if (distance(a, b) < 0.0001) continue;
-    strip(meshes.road, a, b, [-half, half]);
+    strip(meshes.road, a, b, [-a.half, a.half], [-b.half, b.half]);
     shoulder(a, b, 'left');
     shoulder(a, b, 'right');
-    strip(meshes.markings, a, b, [-half + line.outer, -half + line.inner], undefined, 0.012);
-    strip(meshes.markings, a, b, [half - line.inner, half - line.outer], undefined, 0.012);
+    for (const [atA, atB] of both(a, b, -line.inner, -line.outer))
+      strip(meshes.markings, a, b, atA, atB, 0.012);
     if (road.kerbs) {
       // Kerb colours alternate every 5 m.
       const mesh = Math.floor(a.s / 5) % 2 ? meshes.kerbRed : meshes.kerbWhite;
-      strip(mesh, a, b, [-edge, -half], undefined, 0.025);
-      strip(mesh, a, b, [half, edge], undefined, 0.025);
+      for (const [atA, atB] of both(a, b, 0, kerb)) strip(mesh, a, b, atA, atB, 0.025);
     }
-    if (lane) pitLaneStrip(meshes.pit, lane, edge, a, b);
+    if (lane) pitLaneStrip(meshes.pit, lane, a, b);
   }
   if (!lane) {
     const spawn = startPosition(project, samples),
       length = trackLength(samples);
-    strip(
-      meshes.pit,
-      at(samples, Math.max(0, spawn.s - LAYOUT.spawnPad.length / 2)),
-      at(samples, Math.min(length, spawn.s + LAYOUT.spawnPad.length / 2)),
-      [-edge - LAYOUT.spawnPad.depth, -edge],
-      undefined,
-      0.04,
-    );
+    const a = at(samples, Math.max(0, spawn.s - LAYOUT.spawnPad.length / 2)),
+      b = at(samples, Math.min(length, spawn.s + LAYOUT.spawnPad.length / 2));
+    const pad = (p: Sample): [number, number] => {
+      const edge = roadEdge(road, p);
+      return [-edge - LAYOUT.spawnPad.depth, -edge];
+    };
+    strip(meshes.pit, a, b, pad(a), pad(b), 0.04);
   }
-  const start = startLine(project, samples);
-  strip(meshes.markings, start, at(samples, start.s + 0.6), [-half, half], undefined, 0.018);
-  if (!project.road.closed) {
-    const finish = trackLength(samples) - LAYOUT.finishBeforeEnd;
-    strip(
-      meshes.markings,
-      at(samples, finish),
-      at(samples, finish + 0.6),
-      [-half, half],
-      undefined,
-      0.018,
-    );
-  }
+  const crossLine = (from: Sample) => {
+    const to = at(samples, from.s + 0.6);
+    strip(meshes.markings, from, to, [-from.half, from.half], [-to.half, to.half], 0.018);
+  };
+  crossLine(startLine(project, samples));
+  if (!project.road.closed) crossLine(at(samples, trackLength(samples) - LAYOUT.finishBeforeEnd));
   return meshes;
 }
 
 /** The pit lane surface between two samples, from the kerb edge out to the lane's outer edge. */
-function pitLaneStrip(mesh: Mesh, lane: PitLaneLayout, edge: number, a: Sample, b: Sample) {
+function pitLaneStrip(mesh: Mesh, lane: PitLaneLayout, a: Sample, b: Sample) {
   const pa = lane.profile(a.s),
     pb = lane.profile(b.s);
   // Both ends must be in the lane, and in the same pass (not across the end of the lane).
   if (!pa || !pb || lane.along(b.s)! < lane.along(a.s)!) return;
-  strip(mesh, a, b, across(lane.sign, edge, pa.outer), across(lane.sign, edge, pb.outer), 0.02);
+  strip(
+    mesh,
+    a,
+    b,
+    across(lane.sign, pa.edge, pa.outer),
+    across(lane.sign, pb.edge, pb.outer),
+    0.02,
+  );
 }
 
 /** The start line, as placed in the project. */

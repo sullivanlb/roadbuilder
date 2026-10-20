@@ -4,6 +4,8 @@ import type { Vec3 } from '../../core/math';
 import type { Project, Side } from '../../core/project/schema';
 import { barrierPath } from '../../core/scene/barriers';
 import type { Sample } from '../../core/track/centerline';
+import { widestHalf } from '../../core/track/layout';
+import { rangeContains, widthZoneRanges } from '../../core/track/width';
 import type { PlanProjection, ScreenPoint } from './projection';
 
 /** Pick distances, in pixels. */
@@ -55,7 +57,7 @@ export function findRoad(
   at: ScreenPoint,
 ): RoadHit | null {
   let best: RoadHit | null = null,
-    threshold = Math.max(PICK.road, project.road.width * view.camera.scale);
+    threshold = Math.max(PICK.road, 2 * widestHalf(project.road, samples) * view.camera.scale);
   for (let i = 1; i < samples.length; i++) {
     const p = samples[i - 1],
       q = samples[i];
@@ -105,6 +107,22 @@ export function findRoadPosition(
   const road = findRoad(view, project, samples, at);
   if (!road) return null;
   return { s: road.s, side: sideOf(view, road, at) };
+}
+
+/** The width zone under the cursor, the later one where zones overlap, or null. */
+export function findWidthZone(
+  view: PlanProjection,
+  project: Project,
+  samples: readonly Sample[],
+  at: ScreenPoint,
+): Id | null {
+  const road = findRoad(view, project, samples, at);
+  if (!road) return null;
+  const total = samples.at(-1)!.s;
+  const ranges = widthZoneRanges(project, samples).filter((range) =>
+    rangeContains(range, total, road.s),
+  );
+  return ranges.at(-1)?.zone.id ?? null;
 }
 
 /** The barrier under the cursor, or null. */

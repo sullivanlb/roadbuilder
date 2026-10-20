@@ -2,6 +2,7 @@ import { clamp, distance } from '../math';
 import type { Vec3 } from '../math';
 import { isCircuit } from '../project/schema';
 import type { Project } from '../project/schema';
+import { halfWidthAt, widthZoneRanges } from './width';
 
 /** A point of the centerline with its local frame, laid out at regular spacing. */
 export interface Sample extends Vec3 {
@@ -18,9 +19,12 @@ export interface Sample extends Vec3 {
   grade: number;
   /** Signed curvature in 1/m: positive when the track bends to the right. */
   curvature: number;
+  /** Half the roadway width here, kerbs excluded: the base width, or that of a width zone. */
+  half: number;
 }
 
-export type Track = Pick<Project, 'road' | 'points'>;
+/** What the centerline is laid out from; without width zones the roadway keeps its base width. */
+export type Track = Pick<Project, 'road' | 'points'> & Partial<Pick<Project, 'widthZones'>>;
 
 // Centripetal Catmull–Rom: stable bends even with unevenly spaced control points.
 function interpolate(p0: Vec3, p1: Vec3, p2: Vec3, p3: Vec3, t: number): Vec3 {
@@ -43,14 +47,21 @@ function interpolate(p0: Vec3, p1: Vec3, p2: Vec3, p3: Vec3, t: number): Vec3 {
   return p;
 }
 
-const frameless = { s: 0, nx: 0, nz: 1, grade: 0, curvature: 0 };
+const frameless = { s: 0, nx: 0, nz: 1, grade: 0, curvature: 0, half: 0 };
 
 /** Lays out the centerline as samples roughly `spacing` metres apart. */
 export function sampleTrack(track: Track, spacing = 3): Sample[] {
   const points = track.points,
     n = points.length;
   const position = (p: Vec3): Vec3 => ({ x: p.x, y: p.y, z: p.z });
-  if (n < 2) return points.map((p) => ({ ...position(p), segment: 0, t: 0, ...frameless }));
+  if (n < 2)
+    return points.map((p) => ({
+      ...position(p),
+      segment: 0,
+      t: 0,
+      ...frameless,
+      half: track.road.width / 2,
+    }));
   const circuit = isCircuit(track);
   // A road is extended past its ends in a straight line so its first and last bends stay natural.
   const get = (i: number): Vec3 => {
@@ -104,6 +115,9 @@ export function sampleTrack(track: Track, spacing = 3): Sample[] {
       bz = after.z - p.z;
     p.curvature = (2 * (ax * bz - az * bx)) / (Math.hypot(ax, az) * Math.hypot(bx, bz) * l || 1);
   });
+  // Width zones are track positions: they can only be placed once distances are known.
+  const ranges = widthZoneRanges(track, samples);
+  for (const p of samples) p.half = halfWidthAt(track.road.width / 2, ranges, length, p.s);
   return samples;
 }
 
@@ -125,7 +139,8 @@ export function sampleAt(samples: readonly Sample[], s: number): Sample | null {
     b = samples[hi],
     t = (s - a.s) / (b.s - a.s || 1);
   const p = { ...a };
-  for (const k of ['x', 'y', 'z', 'nx', 'nz', 'grade'] as const) p[k] = a[k] + (b[k] - a[k]) * t;
+  for (const k of ['x', 'y', 'z', 'nx', 'nz', 'grade', 'half'] as const)
+    p[k] = a[k] + (b[k] - a[k]) * t;
   const normalLength = Math.hypot(p.nx, p.nz) || 1;
   p.nx /= normalLength;
   p.nz /= normalLength;

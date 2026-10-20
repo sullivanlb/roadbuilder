@@ -30,6 +30,7 @@ export const frMessages = {
   'editor.addTitle': 'Ajouter des points (A)',
   'editor.barrierTitle': 'Tracer une barrière (B)',
   'editor.pitsTitle': 'Tracer la voie des stands (P)',
+  'editor.widthTitle': 'Tracer une portion de largeur (L)',
   'editor.panTitle': 'Déplacer la vue (H)',
   'editor.undoTitle': 'Annuler (Ctrl+Z)',
   'editor.redoTitle': 'Rétablir (Ctrl+Maj+Z)',
@@ -57,6 +58,8 @@ export const frMessages = {
   'canvas.hintPits':
     'Cliquez l’entrée de la voie des stands, sur la rive voulue · Échap quitte l’outil',
   'canvas.hintPitsDraft': 'Cliquez la sortie de la voie des stands · Échap annule',
+  'canvas.hintWidth': 'Cliquez le début de la portion sur la piste · Échap quitte l’outil',
+  'canvas.hintWidthDraft': 'Cliquez la fin de la portion · Échap annule',
   'canvas.hintSelect': 'Glissez un point · Molette pour zoomer · Espace + glisser pour naviguer',
   'canvas.start': 'DÉPART',
   'canvas.finish': 'ARRIVÉE',
@@ -93,7 +96,7 @@ export const frMessages = {
   'sidebar.reverse': 'Inverser le sens',
   'sidebar.startLine': 'Ligne de départ',
   'sidebar.road': 'La chaussée',
-  'sidebar.width': 'Largeur de la route',
+  'sidebar.width': 'Largeur de base',
   'sidebar.shoulder': 'Accotements',
   'sidebar.kerbs': 'Vibreurs rouge et blanc',
   'sidebar.kerbsNote': 'Le long des deux bords',
@@ -143,6 +146,21 @@ export const frMessages = {
   'barriers.empty':
     'Aucune barrière pour l’instant. Le tracé se sécurise en deux clics : départ puis arrivée.',
 
+  'widths.title': 'Les largeurs',
+  'widths.count': '{count} PORTION | {count} PORTIONS',
+  'widths.draw': 'Tracer une portion',
+  'widths.empty':
+    'La route garde partout sa largeur de base. Tracez une portion pour élargir une ligne droite ou resserrer un passage.',
+  'widths.statusTool': 'Cliquez le début de la portion sur la piste. Échap annule.',
+  'widths.statusDraft': 'Cliquez la fin de la portion sur la piste.',
+  'widths.statusChoose':
+    'Cliquez une portion sur le plan ou dans la liste pour la régler. La largeur change progressivement sur 20 m à chaque bout.',
+  'widths.row': '{index} · {width} m · {from} → {to}',
+  'widths.place': '{point} + {distance} m',
+  'widths.width': 'Largeur de la portion',
+  'widths.from': 'Début',
+  'widths.to': 'Fin',
+  'widths.delete': 'Supprimer',
   'pits.title': 'Les stands',
   'pits.roadOnly':
     'Les stands sont réservés aux circuits fermés : une route ouverte accueille une seule voiture.',
@@ -232,6 +250,7 @@ export const frMessages = {
   'help.shortcutBarrier': 'Tracer une barrière',
   'help.shortcutPan': 'Déplacer la vue',
   'help.shortcutPits': 'Tracer les stands',
+  'help.shortcutWidth': 'Tracer une portion de largeur',
   'help.shortcutFit': 'Tout cadrer',
   'help.shortcutUndo': 'Annuler',
   'help.shortcutRedo': 'Rétablir',
@@ -251,6 +270,10 @@ export const frMessages = {
   'toast.pitLaneAdded':
     'Voie des stands ajoutée. Réglez le nombre de voitures dans « Les stands ».',
   'toast.pitLaneSamePlace': 'Choisissez une sortie éloignée de l’entrée.',
+  'toast.widthZoneAdded': 'Portion ajoutée. Réglez sa largeur dans « Les largeurs ».',
+  'toast.widthZoneTooShort': 'Une portion doit mesurer au moins {min} m.',
+  'toast.widthZoneOverlap': 'Cette portion en chevauche une autre : modifiez plutôt celle-ci.',
+  'toast.widthZonesLimit': 'Maximum {max} portions de largeur.',
   'toast.pointTooClose': 'Placez ce point à au moins {min} mètres des autres.',
   'toast.pointsLimit': 'Maximum {max} points par tracé.',
   'toast.projectDownloaded': 'Projet téléchargé. Gardez ce fichier pour reprendre votre travail.',
@@ -273,6 +296,7 @@ export const frMessages = {
   'projectError.notAProject': 'Ce fichier n’est pas un projet Roadbuilder version 2.',
   'projectError.pointsLimit': 'Le projet dépasse {max} points.',
   'projectError.barriersLimit': 'Le projet dépasse {max} tronçons de barrière.',
+  'projectError.widthZonesLimit': 'Le projet dépasse {max} portions de largeur.',
   'projectError.duplicateId': 'Le projet contient deux éléments avec le même identifiant.',
   'projectError.barrierEndpoint': 'Une barrière s’appuie sur un point qui n’existe pas.',
   'projectError.barrierSpan': 'Une barrière doit relier deux points différents.',
@@ -298,6 +322,8 @@ export const frMessages = {
     'La voie des stands n’accueille que {capacity} voitures sur {cars} : allongez-la ou réduisez le nombre de voitures.',
   'trackIssue.pitLaneTooTight':
     'La voie des stands est trop serrée entre les points {from} et {to} : placez-la à l’extérieur du virage ou réduisez sa largeur.',
+  'trackIssue.widthZonesOverlap':
+    'Deux portions de largeur se chevauchent : la dernière de la liste l’emporte. Déplacez le début ou la fin de l’une d’elles.',
   'exportError.foldedSurface':
     'Un bord de route ou de stand se replie dans un virage. Écartez les points, réduisez la largeur ou déplacez le début du tracé vers une ligne droite.',
 

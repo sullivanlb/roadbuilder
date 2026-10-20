@@ -60,6 +60,14 @@ export const lightingIni = () => ini({ LIGHTING: { SUN_PITCH_ANGLE: 45, SUN_HEAD
 
 export const grooveIni = () => ini({ GROOVE: { VIRTUAL_LAPS: 1, MAX_LAPS: 30, STARTING_LAPS: 0 } });
 
+/** The roadway width, as a range where width zones make it vary. */
+function widthLabel(samples: readonly Sample[]): string {
+  const widths = samples.map((sample) => Math.round(sample.half * 20) / 10);
+  const min = Math.min(...widths),
+    max = Math.max(...widths);
+  return min === max ? `${min} m` : `${min}–${max} m`;
+}
+
 /** ui_track.json, read by the game and Content Manager to present the track. */
 export function uiTrackJson(
   project: Project,
@@ -76,7 +84,7 @@ export function uiTrackJson(
       country: '',
       city: '',
       length: `${Math.round(stats.length)} m`,
-      width: `${project.road.width} m`,
+      width: widthLabel(samples),
       pitboxes: String(project.cars),
       run: circuit ? (isClockwise(samples) ? 'clockwise' : 'counter-clockwise') : 'point-to-point',
       author: project.author || 'Roadbuilder',

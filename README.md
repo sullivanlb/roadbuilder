@@ -58,13 +58,14 @@ Les fichiers `.roadbuilder.json` sont au **format version 2** : les points de co
 
 La CI (GitHub Actions) vérifie le formatage, le lint, les types, les tests et la compilation à chaque push. Les tests couvrent le format de projet et ses références, les opérations d’édition, la géométrie et les diagnostics, la scène (valeurs finies, indices valides, colliders orientés vers la piste, bridage dans les virages), la structure des archives, l’historique, la sauvegarde automatique et sa récupération, ainsi que les parcours de l’interface. Les tailles de maillage et les statistiques des modèles sont figées dans des snapshots : après une modification volontaire de la géométrie, mettez-les à jour avec `npx vitest -u` et vérifiez l’export **dans Assetto Corsa**.
 
-Pour la vérification manuelle : ouvrir les trois modèles et une page blanche, déplacer/ajouter/supprimer des points, régler largeur et relief, naviguer en 2D/3D, tester zoom et raccourcis, tracer des barrières des quatre types, enregistrer/recharger/importer un projet, puis télécharger les ZIP Assetto Corsa et OBJ. Comparer également le rendu aux dimensions bureau et mobile.
+Pour la vérification manuelle : ouvrir les trois modèles et une page blanche, déplacer/ajouter/supprimer des points, régler largeur et relief, tracer une portion plus large et une plus étroite, naviguer en 2D/3D, tester zoom et raccourcis, tracer des barrières des quatre types, enregistrer/recharger/importer un projet, puis télécharger les ZIP Assetto Corsa et OBJ. Comparer également le rendu aux dimensions bureau et mobile.
 
 ## Fonctionnalités disponibles
 
 - Circuits fermés et routes ouvertes, avec modèles club, karting, montagne et page blanche.
 - Dessin en 2D : ajout, déplacement et suppression de points, zoom et navigation.
-- Réglage de la largeur, des accotements, des vibreurs et de l’altitude par point.
+- Réglage de la largeur de base, des accotements, des vibreurs et de l’altitude par point.
+- Largeur variable : portions plus larges ou plus étroites, tracées en deux clics n’importe où sur la piste.
 - Barrières avec collision : glissières, pneus, blocs TecPro et murs en béton, tracés en deux clics le long de la piste.
 - Terrain complet en herbe, raccordé au relief, à l’intérieur et autour du tracé, avec une marge réglable de 50 à 500 m et des collisions dans Assetto Corsa.
 - Aperçu 3D orientable et profil d’altitude.
@@ -111,6 +112,14 @@ Le nombre de voitures fixe les emplacements de stand, répartis tous les 10 m le
 
 Les barrières posées du même côté que la voie sont repoussées derrière elle.
 
+### Largeur variable
+
+La largeur réglée dans **La chaussée** est la **largeur de base**. Pour élargir une ligne droite ou resserrer un passage, utilisez l’outil **L** ou le bouton **Tracer une portion** de la section **Les largeurs** : un premier clic marque le début de la portion, un second sa fin. Sur un circuit, les deux clics retiennent le plus court des deux trajets entre eux. La portion démarre 4 m plus large que la base ; réglez ensuite sa largeur (4 à 24 m), son début et sa fin (un point plus une distance en mètres).
+
+La largeur change progressivement sur 20 m à chaque bout, sans marche. Les deux bords s’écartent de la même façon : l’axe reste au milieu de la chaussée. Vibreurs, accotements, voie des stands, barrières, grille et chronométrage suivent la largeur locale. Le contrôle des virages serrés compare chaque virage à la largeur locale : resserrer une épingle peut donc débloquer l’export.
+
+Une nouvelle portion ne peut pas en chevaucher une autre (maximum **40 portions**). Si un réglage les fait se chevaucher, la dernière de la liste l’emporte et un avertissement le signale. Un clic sur la chaussée avec l’outil de sélection sélectionne la portion qui s’y trouve. L’inversion du sens du tracé garde chaque portion à sa place, et le passage en route ouverte scinde une portion qui traverse le départ.
+
 ### Barrières et collisions
 
 Les tronçons se posent avec l’outil **B** ou le bouton **Tracer sur le plan** : un premier clic fixe le point de départ sur la rive cliquée, un second le point d’arrivée. L’aperçu suit la piste entre les deux points. Échap annule le tracé en cours ; les tronçons se règlent ensuite dans **Les barrières** (écartement de 0 à 10 m au-delà du vibreur, changement de côté, suppression). Maximum **120 tronçons**.
@@ -124,6 +133,7 @@ L’inversion du sens du tracé retourne les tronçons, la suppression d’un po
 | Sélection / ajout / déplacement de la vue | V / A / H                           |
 | Tracer une barrière                       | B                                   |
 | Tracer la voie des stands                 | P                                   |
+| Tracer une portion de largeur             | L                                   |
 | Navigation temporaire                     | Espace + glisser, ou bouton central |
 | Cadrer le tracé                           | F                                   |
 | Grille de 5 m pendant un déplacement      | Maj                                 |
@@ -152,15 +162,15 @@ Prochaines priorités : **trajectoires IA → dévers**.
 - [x] **Terrain complet** : sol continu à l’intérieur et autour du tracé, marge réglable, adaptation au relief, aperçu 2D/3D et export avec collisions.
 - [x] **Barrières et murs** : glissières, pneus, TecPro et murs en béton tracés en deux clics, avec colliders invisibles dans Assetto Corsa.
 - [x] **Vrais stands** : voie des stands avec entrée, sortie et muret, plusieurs emplacements et une grille de départ (à valider en jeu).
-- [ ] **Trajectoires IA** : permettre aux adversaires de parcourir le circuit et de rejoindre les stands.
-- [ ] **Largeur variable** : régler la largeur par portion pour élargir une ligne droite ou resserrer un passage.
+- [x] **Largeur variable** : régler la largeur par portion pour élargir une ligne droite ou resserrer un passage (à valider en jeu).
 - [ ] **Dévers et virages relevés** : incliner la chaussée dans les courbes.
 - [ ] **Outils de dessin précis** : ajouter des lignes droites, arcs de cercle et virages à rayon réglable.
-- [ ] **Départ et chronométrage personnalisables** : déplacer les lignes de départ et d’arrivée ainsi que les secteurs.
 - [ ] **Décors à placer** : ajouter arbres, bâtiments, tribunes, panneaux et éclairages.
 - [ ] **Revêtements personnalisés** : choisir asphalte, terre, gravier, marquages et vibreurs par portion.
 - [ ] **Sculpture du terrain** : créer collines, talus, fossés et dégagements.
 - [ ] **Image de fond** : importer un plan ou une vue aérienne et dessiner dessus à l’échelle.
+- [ ] **Départ et chronométrage personnalisables** : déplacer les lignes de départ et d’arrivée ainsi que les secteurs.
+- [ ] **Trajectoires IA** : permettre aux adversaires de parcourir le circuit et de rejoindre les stands.
 - [ ] **Import GPX** : utiliser une trace GPS comme base pour reproduire une route.
 - [ ] **Caméra embarquée** : parcourir virtuellement le tracé avant de l’exporter.
 - [ ] **Bibliothèque de projets** : gérer plusieurs circuits avec miniatures et versions.
@@ -171,7 +181,7 @@ Prochaines priorités : **trajectoires IA → dévers**.
 
 L’import dans Assetto Corsa a été confirmé par l’utilisateur pour la version précédente. L’ajout du terrain a été testé sur la géométrie et les exports, mais reste à vérifier en jeu. L’export reste expérimental et vise les essais libres en solo ; cela ne valide pas tous les tracés ni toutes les configurations du jeu.
 
-- Voie des stands et grille de départ encore à vérifier en jeu.
+- Voie des stands, grille de départ et portions de largeur encore à vérifier en jeu.
 - Pas de trajectoires IA ni de courses avec des adversaires.
 - Chronométrage à vérifier, particulièrement sur les routes ouvertes, prévues pour le roulage libre.
 - Le terrain reste limité au rectangle visible dans l’éditeur ; posez des barrières aux endroits risqués, sinon une chute reste possible au-delà.

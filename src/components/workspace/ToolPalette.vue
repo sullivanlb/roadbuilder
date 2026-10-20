@@ -14,6 +14,7 @@ const tools = computed<{ id: ToolId; icon: IconName; label: string }[]>(() => [
   { id: 'add', icon: 'plus', label: t('editor.addTitle') },
   { id: 'barrier', icon: 'wall', label: t('editor.barrierTitle') },
   { id: 'pits', icon: 'pits', label: t('editor.pitsTitle') },
+  { id: 'width', icon: 'width', label: t('editor.widthTitle') },
   { id: 'pan', icon: 'move', label: t('editor.panTitle') },
 ]);
 </script>

@@ -58,8 +58,15 @@ _Avoid_: anchor, marker, chainage
 ### Road surfaces
 
 **Roadway** (chaussée):
-The paved driving surface, of uniform width.
+The paved driving surface. Its width is the base width, except inside width zones.
 _Avoid_: asphalt, road surface
+
+**Base width** (largeur de base):
+The roadway width wherever no width zone applies.
+
+**Width zone** (portion de largeur):
+A stretch of track between two track positions where the roadway takes another width, on both edges alike. The width eases in and out over a fixed length at each end; where zones overlap, the later one wins.
+_Avoid_: section, segment, width span
 
 **Kerb** (vibreur):
 The striped strip running along each edge of the roadway.

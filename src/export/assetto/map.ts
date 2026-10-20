@@ -1,6 +1,7 @@
 import { bounds } from '../../core/math';
 import type { Project } from '../../core/project/schema';
 import { barrierPath } from '../../core/scene/barriers';
+import { widestHalf } from '../../core/track/layout';
 import { pitLaneLayout } from '../../core/track/pitLane';
 import type { Sample } from '../../core/track/centerline';
 import { encodePng } from '../binary/png';
@@ -11,7 +12,7 @@ export function makeMap(project: Project, samples: readonly Sample[], preview = 
     height = 512,
     pixels = new Uint8Array(width * height * 4);
   if (preview) for (let i = 0; i < pixels.length; i += 4) pixels.set([26, 40, 35, 255], i);
-  const bb = bounds(samples, project.road.width + 15);
+  const bb = bounds(samples, 2 * widestHalf(project.road, samples) + 15);
   const scale = Math.min(
     (width - 60) / Math.max(1, bb.maxX - bb.minX),
     (height - 60) / Math.max(1, bb.maxZ - bb.minZ),
@@ -42,7 +43,7 @@ export function makeMap(project: Project, samples: readonly Sample[], preview = 
       dot(
         (a.x + (b.x - a.x) * t + xOffset) * scale,
         (a.z + (b.z - a.z) * t + zOffset) * scale,
-        Math.max(2, (project.road.width * scale) / 2),
+        Math.max(2, (a.half + (b.half - a.half) * t) * scale),
         preview ? [210, 233, 142, 255] : [255, 255, 255, 255],
       );
     }

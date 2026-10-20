@@ -12,6 +12,8 @@ import type { Sample } from '../../core/track/centerline';
 import type { TightTurn } from '../../core/track/issues';
 import { kerbWidth, LAYOUT, roadEdge, terrainBounds } from '../../core/track/layout';
 import { pitLaneLayout } from '../../core/track/pitLane';
+import { rangeBetween, widthZoneRanges } from '../../core/track/width';
+import type { TrackRange } from '../../core/track/width';
 import { BARRIER_STYLE, COLORS } from '../theme';
 import type { PlanProjection } from './projection';
 
@@ -31,6 +33,11 @@ export interface PlanScene {
   pitDraft: { entry: number; side: Side } | null;
   /** Where the next pit lane click would land. */
   pitTarget: { s: number; side: Side } | null;
+  selectedWidthZoneId: Id | null;
+  /** First click of the width zone being laid, as a track distance. */
+  widthDraft: number | null;
+  /** Where the next width zone click would land. */
+  widthTarget: number | null;
   labels: { start: string; finish: string };
 }
 
@@ -93,6 +100,56 @@ function drawBackground(ctx: Context, view: PlanProjection) {
     }
 }
 
+/**
+ * Strokes the centerline with a width in pixels that follows the roadway width,
+ * one path per run of samples where that width does not change. Dashes carry on
+ * from one run to the next.
+ */
+function strokeAlong(
+  ctx: Context,
+  view: PlanProjection,
+  samples: readonly Sample[],
+  color: string,
+  width: (half: number) => number,
+  dash: number[] = [],
+) {
+  ctx.strokeStyle = color;
+  ctx.setLineDash(dash);
+  let run = NaN;
+  const flush = () => {
+    if (Number.isNaN(run)) return;
+    ctx.lineWidth = width(run);
+    ctx.stroke();
+  };
+  for (let i = 1; i < samples.length; i++) {
+    const a = samples[i - 1],
+      b = samples[i];
+    const half = (a.half + b.half) / 2;
+    if (half !== run) {
+      flush();
+      run = half;
+      ctx.beginPath();
+      if (dash.length) ctx.lineDashOffset = a.s * view.camera.scale;
+      const p = view.toScreen(a);
+      ctx.moveTo(p.x, p.y);
+    }
+    const q = view.toScreen(b);
+    ctx.lineTo(q.x, q.y);
+  }
+  flush();
+  ctx.setLineDash([]);
+  ctx.lineDashOffset = 0;
+}
+
+/** Samples along a stretch of track, about every 2 m. */
+function alongRange(samples: readonly Sample[], range: TrackRange): Sample[] {
+  const total = trackLength(samples),
+    steps = Math.max(1, Math.ceil(range.length / 2));
+  return Array.from({ length: steps + 1 }, (_, i) =>
+    sampleAt(samples, (range.start + (range.length * i) / steps) % total)!,
+  );
+}
+
 /** Terrain outline, then the road drawn as stacked strokes from the widest to the narrowest. */
 function drawTrack(ctx: Context, view: PlanProjection, scene: PlanScene) {
   const { project, samples } = scene,
@@ -109,25 +166,22 @@ function drawTrack(ctx: Context, view: PlanProjection, scene: PlanScene) {
   dashed(ctx, [6, 5], () => ctx.strokeRect(corner.x, corner.y, width, height));
 
   const kerbs = 2 * kerbWidth(road);
-  trace(ctx, view, samples);
   ctx.lineJoin = 'round';
   ctx.lineCap = 'round';
-  const stroke = (color: string, lineWidth: number) => {
-    ctx.strokeStyle = color;
-    ctx.lineWidth = lineWidth;
-    ctx.stroke();
-  };
-  stroke(COLORS.road.shadow, (road.width + road.shoulder * 2 + 5) * scale + 4);
-  stroke(COLORS.road.shoulder, (road.width + road.shoulder * 2 + kerbs) * scale);
+  const stroke = (color: string, width: (half: number) => number, dash?: number[]) =>
+    strokeAlong(ctx, view, samples, color, width, dash);
+  stroke(COLORS.road.shadow, (half) => (2 * half + road.shoulder * 2 + 5) * scale + 4);
+  stroke(COLORS.road.shoulder, (half) => (2 * half + road.shoulder * 2 + kerbs) * scale);
   if (road.kerbs) {
-    stroke(COLORS.road.kerbWhite, (road.width + kerbs) * scale);
-    dashed(ctx, [5 * scale, 5 * scale], () =>
-      stroke(COLORS.road.kerbRed, (road.width + kerbs) * scale),
-    );
+    stroke(COLORS.road.kerbWhite, (half) => (2 * half + kerbs) * scale);
+    stroke(COLORS.road.kerbRed, (half) => (2 * half + kerbs) * scale, [5 * scale, 5 * scale]);
   }
-  stroke(COLORS.road.edge, Math.max(road.width * scale, 2));
-  stroke(COLORS.road.asphalt, Math.max((road.width - 0.6) * scale, 1.5));
-  dashed(ctx, [3, 7], () => stroke(COLORS.road.centerLine, 0.75));
+  stroke(COLORS.road.edge, (half) => Math.max(2 * half * scale, 2));
+  stroke(COLORS.road.asphalt, (half) => Math.max((2 * half - 0.6) * scale, 1.5));
+  trace(ctx, view, samples);
+  ctx.strokeStyle = COLORS.road.centerLine;
+  ctx.lineWidth = 0.75;
+  dashed(ctx, [3, 7], () => ctx.stroke());
 
   // Direction arrows, evenly spread along the track.
   const length = trackLength(samples);
@@ -152,7 +206,7 @@ function drawTrack(ctx: Context, view: PlanProjection, scene: PlanScene) {
 function drawStart(ctx: Context, view: PlanProjection, scene: PlanScene) {
   const start = startLine(scene.project, scene.samples);
   const p = view.toScreen(start),
-    half = (scene.project.road.width * view.camera.scale) / 2;
+    half = start.half * view.camera.scale;
   ctx.save();
   ctx.translate(p.x, p.y);
   ctx.rotate(Math.atan2(-start.nx, start.nz));
@@ -177,7 +231,7 @@ function drawStart(ctx: Context, view: PlanProjection, scene: PlanScene) {
 function drawPits(ctx: Context, view: PlanProjection, scene: PlanScene) {
   const { project, samples } = scene;
   const lane = pitLaneLayout(project, samples);
-  const edge = roadEdge(project.road);
+  const edge = (sample: Sample) => roadEdge(project.road, sample);
   const beside = (sample: Sample, lateral: number) =>
     view.toScreen({ x: sample.x + sample.nx * lateral, z: sample.z + sample.nz * lateral });
   if (lane) {
@@ -191,10 +245,10 @@ function drawPits(ctx: Context, view: PlanProjection, scene: PlanScene) {
         pb = lane.profile(b.s);
       if (!pa || !pb || lane.along(b.s)! < lane.along(a.s)!) continue;
       const corners = [
-        beside(a, lane.sign * edge),
+        beside(a, lane.sign * pa.edge),
         beside(a, lane.sign * pa.outer),
         beside(b, lane.sign * pb.outer),
-        beside(b, lane.sign * edge),
+        beside(b, lane.sign * pb.edge),
       ];
       ctx.beginPath();
       corners.forEach((p, k) => (k ? ctx.lineTo(p.x, p.y) : ctx.moveTo(p.x, p.y)));
@@ -209,7 +263,7 @@ function drawPits(ctx: Context, view: PlanProjection, scene: PlanScene) {
     for (const sample of samples) {
       const along = lane.along(sample.s);
       const inWall = along !== null && along >= lane.taper && along <= lane.length - lane.taper;
-      const p = beside(sample, lane.sign * (edge + LAYOUT.pitLane.wallGap / 2));
+      const p = beside(sample, lane.sign * (edge(sample) + LAYOUT.pitLane.wallGap / 2));
       if (inWall && drawing) ctx.lineTo(p.x, p.y);
       else if (inWall) ctx.moveTo(p.x, p.y);
       drawing = inWall;
@@ -233,10 +287,11 @@ function drawPits(ctx: Context, view: PlanProjection, scene: PlanScene) {
     const total = trackLength(samples);
     const span = (((target.s - draft.entry) % total) + total) % total;
     const sign = draft.side === 'right' ? 1 : -1;
-    const lateral = sign * (edge + LAYOUT.pitLane.wallGap + DEFAULTS.pitLaneWidth / 2);
+    const lateral = LAYOUT.pitLane.wallGap + DEFAULTS.pitLaneWidth / 2;
     ctx.beginPath();
     for (let d = 0; d <= span; d += 3) {
-      const p = beside(sampleAt(samples, (draft.entry + d) % total)!, lateral);
+      const sample = sampleAt(samples, (draft.entry + d) % total)!;
+      const p = beside(sample, sign * (edge(sample) + lateral));
       if (d === 0) ctx.moveTo(p.x, p.y);
       else ctx.lineTo(p.x, p.y);
     }
@@ -244,6 +299,47 @@ function drawPits(ctx: Context, view: PlanProjection, scene: PlanScene) {
     ctx.lineWidth = 3;
     dashed(ctx, [6, 5], () => ctx.stroke());
   }
+}
+
+/**
+ * The roadway edges of every width zone, the selected one highlighted, and the
+ * zone being laid as dashed edges.
+ */
+function drawWidthZones(ctx: Context, view: PlanProjection, scene: PlanScene) {
+  const { project, samples } = scene;
+  const edges = (range: TrackRange) => {
+    const path = alongRange(samples, range);
+    ctx.beginPath();
+    for (const side of [-1, 1])
+      path.forEach((sample, i) => {
+        const p = view.toScreen({
+          x: sample.x + sample.nx * side * sample.half,
+          z: sample.z + sample.nz * side * sample.half,
+        });
+        if (i === 0) ctx.moveTo(p.x, p.y);
+        else ctx.lineTo(p.x, p.y);
+      });
+  };
+  ctx.save();
+  ctx.lineCap = 'round';
+  for (const range of widthZoneRanges(project, samples)) {
+    edges(range);
+    if (range.zone.id === scene.selectedWidthZoneId) {
+      ctx.strokeStyle = COLORS.selection;
+      ctx.lineWidth = 6;
+      ctx.stroke();
+    }
+    ctx.strokeStyle = COLORS.widthZone;
+    ctx.lineWidth = 1.5;
+    ctx.stroke();
+  }
+  if (scene.widthDraft !== null && scene.widthTarget !== null) {
+    edges(rangeBetween(project, samples, scene.widthDraft, scene.widthTarget));
+    ctx.strokeStyle = COLORS.accent;
+    ctx.lineWidth = 2.5;
+    dashed(ctx, [6, 5], () => ctx.stroke());
+  }
+  ctx.restore();
 }
 
 /** Highlights the bends that are too tight, with a marker where each is tightest. */
@@ -384,6 +480,7 @@ export function drawPlan(ctx: Context, view: PlanProjection, scene: PlanScene, d
   if (scene.samples.length > 1) {
     drawTrack(ctx, view, scene);
     drawPits(ctx, view, scene);
+    drawWidthZones(ctx, view, scene);
     drawStart(ctx, view, scene);
     drawTightTurns(ctx, view, scene);
     drawBarriers(ctx, view, scene);

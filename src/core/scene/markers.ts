@@ -28,10 +28,11 @@ const placeAt = (project: Project, samples: readonly Sample[], s: number) =>
 export function gridPlaces(project: Project, samples: readonly Sample[]): Place[] {
   if (!isCircuit(project) || samples.length < 2) return [];
   const line = startLine(project, samples);
-  return Array.from({ length: project.cars }, (_, i) => ({
-    sample: placeAt(project, samples, line.s - LAYOUT.grid.front - i * LAYOUT.grid.spacing),
-    lateral: ((i % 2 ? -1 : 1) * project.road.width) / 4,
-  }));
+  return Array.from({ length: project.cars }, (_, i) => {
+    const sample = placeAt(project, samples, line.s - LAYOUT.grid.front - i * LAYOUT.grid.spacing);
+    // Halfway between the centerline and the roadway edge.
+    return { sample, lateral: ((i % 2 ? -1 : 1) * sample.half) / 2 };
+  });
 }
 
 /** One pit box per car along the parallel part of the pit lane, in the middle of the lane. */
@@ -53,8 +54,7 @@ export function pitBoxPlaces(project: Project, samples: readonly Sample[]): Plac
  * boxes and three timing gates along the track.
  */
 export function buildMarkers(project: Project, samples: readonly Sample[]): Marker[] {
-  const half = project.road.width / 2,
-    length = trackLength(samples),
+  const length = trackLength(samples),
     circuit = isCircuit(project);
   const markers: Marker[] = [];
   const at = (s: number) => placeAt(project, samples, s);
@@ -88,11 +88,11 @@ export function buildMarkers(project: Project, samples: readonly Sample[]): Mark
   const boxes = pitBoxPlaces(project, samples);
   if (boxes.length)
     boxes.forEach((place, i) => marker(`AC_PIT_${i}`, place.sample, place.lateral, 0.3));
-  else marker('AC_PIT_0', spawn, -(roadEdge(project.road) + LAYOUT.spawnPad.depth / 2), 0.3);
+  else marker('AC_PIT_0', spawn, -(roadEdge(project.road, spawn) + LAYOUT.spawnPad.depth / 2), 0.3);
 
   const gate = (index: number, p: Sample) => {
-    marker(`AC_TIME_${index}_L`, p, -half - 1);
-    marker(`AC_TIME_${index}_R`, p, half + 1);
+    marker(`AC_TIME_${index}_L`, p, -p.half - 1);
+    marker(`AC_TIME_${index}_R`, p, p.half + 1);
   };
   gate(0, line);
   if (circuit) {

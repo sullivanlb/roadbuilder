@@ -64,12 +64,12 @@ describe('barriers', () => {
   it('stand one offset beyond the kerb and stay clear of the centre of tight bends', () => {
     const project = template('club');
     const straight = sampleTrack(project).find((s) => Math.abs(s.curvature) < 0.005)!;
-    const edge = roadEdge(project.road);
+    const edge = roadEdge(project.road, straight);
     expect(barrierLateral(project, null, straight, 'right', 1)).toBeCloseTo(edge + 1, 5);
     expect(barrierLateral(project, null, straight, 'left', 10)).toBeCloseTo(-(edge + 10), 5);
 
     const tight = tightTurnProject();
-    const tightEdge = roadEdge(tight.road);
+    const tightEdge = roadEdge(tight.road, { half: tight.road.width / 2 });
     const bend = sampleTrack(tight).reduce((a, b) =>
       Math.abs(b.curvature) > Math.abs(a.curvature) ? b : a,
     );

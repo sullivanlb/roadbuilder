@@ -5,6 +5,7 @@ export type ProjectErrorDetail =
   | { code: 'not-a-project' }
   | { code: 'points-limit'; max: number }
   | { code: 'barriers-limit'; max: number }
+  | { code: 'width-zones-limit'; max: number }
   | { code: 'duplicate-id' }
   | { code: 'barrier-endpoint' }
   | { code: 'barrier-span' }

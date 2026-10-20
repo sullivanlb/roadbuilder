@@ -33,7 +33,7 @@ export const SOLID_COLLIDER_DEPTH = 1;
 const COLLIDER_BOTTOM = -0.4;
 
 /** Position, local frame and curvature of a point along a barrier. */
-export type Frame = Pick<Sample, 'x' | 'y' | 'z' | 'nx' | 'nz' | 's' | 'curvature'>;
+export type Frame = Pick<Sample, 'x' | 'y' | 'z' | 'nx' | 'nz' | 's' | 'curvature' | 'half'>;
 
 const sideSign = (side: Side): 1 | -1 => (side === 'right' ? 1 : -1);
 
@@ -44,7 +44,7 @@ const sideSign = (side: Side): 1 | -1 => (side === 'right' ? 1 : -1);
 export function barrierLateral(
   project: Project,
   lane: PitLaneLayout | null,
-  point: Pick<Sample, 'curvature' | 's'>,
+  point: Pick<Sample, 'curvature' | 's' | 'half'>,
   side: Side,
   offset: number,
 ): number {
@@ -109,6 +109,7 @@ export function walk(path: readonly Frame[], spacing: number, phase = 0): Frame[
         nz: a.nz,
         s: a.s + (sb - a.s) * t,
         curvature: a.curvature,
+        half: a.half + (b.half - a.half) * t,
       });
     }
   }

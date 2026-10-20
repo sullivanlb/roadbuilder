@@ -35,8 +35,7 @@ export function buildPitWall(project: Project, samples: readonly Sample[]): Mesh
 
   const { wall, wallGap } = LAYOUT.pitLane;
   const sign = lane.sign;
-  const edge = roadEdge(project.road);
-  const at = (offset: number) => () => sign * (edge + offset);
+  const at = (offset: number) => (p: Frame) => sign * (roadEdge(project.road, p) + offset);
   const decor = createMesh('divider_decor', 'concrete', 'barrier');
   solidWall(
     decor,

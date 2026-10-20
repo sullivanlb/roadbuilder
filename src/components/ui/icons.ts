@@ -20,6 +20,7 @@ export const ICONS = {
   wall: 'M4 4v16M12 4v16M20 4v16M3 9h18M3 15h18',
   flag: 'M5 22V3m0 1c5-4 9 4 15 0v10c-6 4-10-4-15 0',
   pits: 'M3 4v16M8 4v16M8 8h13M8 14h13M12 8v6M17 8v6',
+  width: 'M7 3v18M17 3v18M10 12H3m4-3-3 3 3 3m7-3h7m-4-3 3 3-3 3',
 } as const;
 
 export type IconName = keyof typeof ICONS;

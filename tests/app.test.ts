@@ -466,6 +466,42 @@ describe('editor interface', () => {
     expect((await saved()).pitLane).toBeNull();
   });
 
+  it('lays a width zone with the L tool, then adjusts and deletes it', async () => {
+    await mountApp();
+    expect($('width-status').textContent).toContain('largeur de base');
+    press('l');
+    await settle();
+    expect($('tool-width').getAttribute('aria-pressed')).toBe('true');
+    await clickPlan(trackSpot(150, 'left'));
+    expect($('width-status').textContent).toContain('fin de la portion');
+    pointer('pointermove', trackSpot(350, 'left'));
+    await settle();
+    strokes = [];
+    pointer('pointermove', trackSpot(360, 'left'));
+    await settle();
+    expect(strokes).toContain('#d3f47d');
+    await clickPlan(trackSpot(350, 'left'));
+    expect($('width-editor')).not.toBeNull();
+    expect($('width-count').textContent).toContain('01');
+    expect((await saved()).widthZones).toEqual([expect.objectContaining({ width: 16 })]);
+    await type('width-zone-width', '9');
+    expect((await saved()).widthZones[0].width).toBe(9);
+
+    await click('tool-select');
+    await clickPlan(trackSpot(500, 'left'));
+    expect($('width-editor')).toBeNull();
+    await clickPlan(trackSpot(250, 'left'));
+    expect($('width-row-0').classList.contains('active')).toBe(true);
+    await click('width-delete');
+    expect((await saved()).widthZones).toEqual([]);
+    press('l');
+    await settle();
+    await clickPlan(trackSpot(150, 'left'));
+    press('Escape');
+    await settle();
+    expect($('width-status').textContent).toContain('début de la portion');
+  });
+
   it('switches the whole interface to English and remembers it', async () => {
     await mountApp();
     expect($('locale-fr').getAttribute('aria-pressed')).toBe('true');

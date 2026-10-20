@@ -4,6 +4,7 @@ import { barrierTool } from './barrier';
 import { panTool } from './pan';
 import { pitsTool } from './pits';
 import { selectTool } from './select';
+import { widthTool } from './width';
 import type { Tool } from './tool';
 
 export const TOOLS: Record<ToolId, Tool> = {
@@ -11,6 +12,7 @@ export const TOOLS: Record<ToolId, Tool> = {
   add: addTool,
   barrier: barrierTool,
   pits: pitsTool,
+  width: widthTool,
   pan: panTool,
 };
 

@@ -159,7 +159,7 @@ describe('pit lane geometry', () => {
     const lane = pitLaneLayout(project, samples)!;
     for (const box of pitBoxPlaces(project, samples)) {
       expect(lane.along(box.sample.s)).not.toBeNull();
-      expect(Math.abs(box.lateral)).toBeGreaterThan(roadEdge(project.road));
+      expect(Math.abs(box.lateral)).toBeGreaterThan(roadEdge(project.road, box.sample));
     }
     const line = startLine(project, samples);
     const grid = gridPlaces(project, samples);

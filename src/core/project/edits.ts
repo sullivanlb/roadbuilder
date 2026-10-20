@@ -9,6 +9,8 @@ import type { NumericRule } from './rules';
 import { sampleTrack, trackLength } from '../track/centerline';
 import type { Sample } from '../track/centerline';
 import { positionAt, positionDistance, reanchorPosition } from '../track/positions';
+import { overlapStart, widthZoneRanges } from '../track/width';
+import type { TrackRange } from '../track/width';
 import { isCircuit } from './schema';
 import type {
   Barrier,
@@ -18,6 +20,7 @@ import type {
   RoadSettings,
   Side,
   TrackPosition,
+  WidthZone,
 } from './schema';
 
 /**
@@ -74,6 +77,10 @@ function mapPositions(draft: ProjectDraft, map: (position: TrackPosition) => Tra
     draft.pitLane.entry = map(draft.pitLane.entry);
     draft.pitLane.exit = map(draft.pitLane.exit);
   }
+  for (const zone of draft.widthZones) {
+    zone.from = map(zone.from);
+    zone.to = map(zone.to);
+  }
 }
 
 /** Pits only exist on a circuit: a road keeps a single car and no pit lane. */
@@ -102,6 +109,7 @@ export function removePoint(draft: ProjectDraft, id: Id) {
  * Drives the track the other way. A circuit keeps its first control point so the
  * start stays in place. Barriers keep covering the same ground: their span is
  * swapped and they change side, since left and right follow the direction.
+ * Width zones keep their ground too: their start becomes their end.
  */
 export function reverseTrack(draft: ProjectDraft) {
   const before = measured(draft);
@@ -111,6 +119,7 @@ export function reverseTrack(draft: ProjectDraft) {
     positionDistance(before.track, before.samples, position) ?? 0;
   const startLine = draft.startLine && distance(draft.startLine);
   const pits = draft.pitLane && [distance(draft.pitLane.entry), distance(draft.pitLane.exit)];
+  const zones = draft.widthZones.map((zone) => [distance(zone.from), distance(zone.to)]);
   if (isCircuit(draft)) draft.points = [draft.points[0], ...draft.points.slice(1).reverse()];
   else draft.points.reverse();
   for (const barrier of draft.barriers) {
@@ -126,17 +135,25 @@ export function reverseTrack(draft: ProjectDraft) {
     draft.pitLane.exit = mirrored(pits[0]);
     draft.pitLane.side = opposite(draft.pitLane.side);
   }
+  draft.widthZones.forEach((zone, index) => {
+    const [from, to] = zones[index];
+    zone.from = mirrored(to);
+    zone.to = mirrored(from);
+  });
 }
 
 /**
- * Turns the track into a circuit or a road. A barrier running through the start
- * of a circuit is split at the start, since a road has no way through it.
+ * Turns the track into a circuit or a road. A barrier or a width zone running
+ * through the start of a circuit is split at the start, since a road has no way
+ * through it.
  */
 export function setClosed(draft: ProjectDraft, closed: boolean) {
   const wasCircuit = isCircuit(draft);
+  const before = wasCircuit ? measured(draft) : null;
   draft.road.closed = closed;
   dropPitsUnlessCircuit(draft);
-  if (!wasCircuit || isCircuit(draft)) return;
+  if (!before || isCircuit(draft)) return;
+  splitWidthZonesAtStart(draft, before);
   const order = new Map(draft.points.map((point, index) => [point.id, index]));
   const first = draft.points[0].id,
     last = draft.points.at(-1)!.id;
@@ -145,6 +162,29 @@ export function setClosed(draft: ProjectDraft, closed: boolean) {
     const parts: Barrier[] = [];
     if (barrier.from !== last) parts.push({ ...barrier, to: last });
     if (barrier.to !== first) parts.push({ ...barrier, id: createId(), from: first });
+    return parts;
+  });
+}
+
+/**
+ * Splits the width zones that run through the start of a circuit about to become
+ * a road: one part up to the last control point, one from the first.
+ */
+function splitWidthZonesAtStart(
+  draft: ProjectDraft,
+  before: { track: Project; samples: Sample[] },
+) {
+  const first = draft.points[0].id,
+    last = draft.points.at(-1)!.id;
+  const distance = (position: TrackPosition) =>
+    positionDistance(before.track, before.samples, position) ?? 0;
+  draft.widthZones = draft.widthZones.flatMap((zone) => {
+    if (distance(zone.from) <= distance(zone.to)) return [zone];
+    const parts: WidthZone[] = [];
+    // A start on the last point lies on the closing segment, which the road loses.
+    if (zone.from.point !== last) parts.push({ ...zone, to: { point: last, distance: 0 } });
+    if (zone.to.point !== first || zone.to.distance > 0)
+      parts.push({ ...zone, id: createId(), from: { point: first, distance: 0 } });
     return parts;
   });
 }
@@ -217,6 +257,59 @@ export function removeBarrier(draft: ProjectDraft, id: Id) {
 }
 
 export const opposite = (side: Side): Side => (side === 'right' ? 'left' : 'right');
+
+/** Why a width zone cannot be laid over a stretch of track, or null when it can. */
+export function widthZoneRejection(
+  project: Project,
+  samples: readonly Sample[],
+  range: TrackRange,
+): 'width-zones-limit' | 'too-short' | 'overlap' | null {
+  if (project.widthZones.length >= RULES.widthZones.max) return 'width-zones-limit';
+  if (range.length < RULES.widthZoneLength) return 'too-short';
+  const total = trackLength(samples);
+  if (widthZoneRanges(project, samples).some((other) => overlapStart(other, range, total) !== null))
+    return 'overlap';
+  return null;
+}
+
+const clampPosition = (position: TrackPosition): TrackPosition => ({
+  ...position,
+  distance: within(RULES.positionDistance, position.distance),
+});
+
+/**
+ * Lays a width zone between two track positions, in track direction, and returns
+ * its ID. It starts 4 m wider than the base width. Check widthZoneRejection() first.
+ */
+export function addWidthZone(
+  draft: ProjectDraft,
+  zone: Pick<WidthZone, 'from' | 'to'> & { width?: number },
+): Id {
+  const id = createId();
+  draft.widthZones.push({
+    id,
+    from: clampPosition(zone.from),
+    to: clampPosition(zone.to),
+    width: within(RULES.width, zone.width ?? draft.road.width + 4),
+  });
+  return id;
+}
+
+export function updateWidthZone(
+  draft: ProjectDraft,
+  id: Id,
+  patch: Partial<Pick<WidthZone, 'from' | 'to' | 'width'>>,
+) {
+  const zone = draft.widthZones.find((candidate) => candidate.id === id);
+  if (!zone) return;
+  if (patch.from !== undefined) zone.from = clampPosition(patch.from);
+  if (patch.to !== undefined) zone.to = clampPosition(patch.to);
+  if (patch.width !== undefined) zone.width = within(RULES.width, patch.width);
+}
+
+export function removeWidthZone(draft: ProjectDraft, id: Id) {
+  draft.widthZones = draft.widthZones.filter((zone) => zone.id !== id);
+}
 
 export function setStartLine(draft: ProjectDraft, position: TrackPosition) {
   draft.startLine = { ...position, distance: within(RULES.positionDistance, position.distance) };

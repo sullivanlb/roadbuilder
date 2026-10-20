@@ -13,6 +13,7 @@ import PointSection from './PointSection.vue';
 import RoadSection from './RoadSection.vue';
 import TerrainSection from './TerrainSection.vue';
 import TrackSection from './TrackSection.vue';
+import WidthSection from './WidthSection.vue';
 
 const store = useProjectStore();
 const files = useFilesStore();
@@ -65,10 +66,11 @@ function onNameDone() {
 
     <TrackSection :index="1" />
     <RoadSection :index="2" />
-    <TerrainSection :index="3" />
-    <BarrierSection :index="4" />
-    <PitSection :index="5" />
-    <PointSection :index="6" />
+    <WidthSection :index="3" />
+    <TerrainSection :index="4" />
+    <BarrierSection :index="5" />
+    <PitSection :index="6" />
+    <PointSection :index="7" />
 
     <div class="tip">
       <AppIcon class="tip-icon" name="cursor" />

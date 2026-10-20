@@ -133,6 +133,30 @@ describe('editor', () => {
     expect(ui.notification?.message).toContain('circuits');
   });
 
+  it('lays a width zone in two clicks, refusing one too short or overlapping', () => {
+    const { project, editor, ui } = stores();
+    project.replace(template('club'));
+    editor.setTool('width');
+    editor.beginWidthZone(300);
+    editor.completeWidthZone(302);
+    expect(ui.notification?.error).toBe(true);
+    editor.completeWidthZone(120);
+    expect(project.project.widthZones).toEqual([expect.objectContaining({ width: 16 })]);
+    expect(editor.selectedWidthZone?.id).toBe(project.project.widthZones[0].id);
+    expect(editor.widthDraft).toBeNull();
+    expect(project.samples.find((sample) => sample.s > 210)!.half).toBeCloseTo(8, 6);
+    editor.beginWidthZone(200);
+    editor.completeWidthZone(400);
+    expect(ui.notification?.message).toContain('chevauche');
+    expect(project.project.widthZones).toHaveLength(1);
+    editor.setTool('select');
+    expect(editor.widthDraft).toBeNull();
+    editor.deleteSelectedWidthZone();
+    expect(project.project.widthZones).toEqual([]);
+    project.undo();
+    expect(project.project.widthZones).toHaveLength(1);
+  });
+
   it('leaves the 3D view for every tool but panning', () => {
     const { editor } = stores();
     editor.setView('3d');
