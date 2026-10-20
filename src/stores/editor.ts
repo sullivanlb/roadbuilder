@@ -170,7 +170,6 @@ export const useEditorStore = defineStore('editor', () => {
 
   /** Picks a tool; one that belongs to another layer moves to that layer first. */
   function setTool(next: ToolId) {
-    if (view.value === '3d' && next !== 'pan') view.value = '2d';
     const home = layerOfTool(next);
     if (home) setLayer(home);
     tool.value = next;

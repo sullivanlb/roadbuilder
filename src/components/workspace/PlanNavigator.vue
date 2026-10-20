@@ -4,12 +4,14 @@ import { computed, useTemplateRef, watch } from 'vue';
 import { bounds } from '../../core/math';
 import { formatTrackIssue, t } from '../../i18n';
 import { COLORS } from '../../rendering/theme';
+import { useEditorStore } from '../../stores/editor';
 import { useProjectStore } from '../../stores/project';
 import { useViewportStore } from '../../stores/viewport';
 
 /** A map of the whole track with the visible area, and a list of places to jump to. */
 const store = useProjectStore();
 const viewport = useViewportStore();
+const editor = useEditorStore();
 const canvas = useTemplateRef<HTMLCanvasElement>('canvas');
 const { pixelRatio } = useDevicePixelRatio();
 const SIZE = { width: 168, height: 112 };
@@ -49,6 +51,8 @@ function draw() {
     context.lineWidth = 2;
     context.stroke();
   }
+  // The visible area of the plan; the preview has its own camera.
+  if (editor.view !== '2d') return;
   const { width, height } = viewport.projection.size;
   const a = toMap(viewport.projection.toWorld({ x: 0, y: 0 }));
   const b = toMap(viewport.projection.toWorld({ x: width, y: height }));
@@ -56,9 +60,13 @@ function draw() {
   context.lineWidth = 1;
   context.strokeRect(a.x, a.y, b.x - a.x, b.y - a.y);
 }
-watch([() => store.samples, () => viewport.projection, canvas, pixelRatio], draw, {
-  immediate: true,
-});
+watch(
+  [() => store.samples, () => viewport.projection, () => editor.view, canvas, pixelRatio],
+  draw,
+  {
+    immediate: true,
+  },
+);
 
 function onClick(event: MouseEvent) {
   const rect = canvas.value!.getBoundingClientRect();

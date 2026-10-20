@@ -15,7 +15,11 @@ import { useProjectStore } from './project';
 import { useUiStore } from './ui';
 
 /** A request the 3D preview handles with its own camera. */
-export type PreviewCommand = { type: 'fit' } | { type: 'zoom'; factor: number };
+export type PreviewCommand =
+  | { type: 'fit' }
+  | { type: 'zoom'; factor: number }
+  | { type: 'focus'; points: readonly PlanPoint[] }
+  | { type: 'center'; at: PlanPoint };
 
 /**
  * Where the user is looking. The plan camera lives here so the plan, its hit
@@ -61,12 +65,15 @@ export const useViewportStore = defineStore('viewport', () => {
 
   /** Frames a stretch of track, e.g. a corner. */
   function focusRange(range: TrackRange) {
-    focus(rangeSamples(store.samples, range));
+    const points = rangeSamples(store.samples, range);
+    focus(points);
+    if (editor.view === '3d') void preview.trigger({ type: 'focus', points });
   }
 
-  /** Centres the plan on a place, keeping the zoom. */
+  /** Centres the plan, or the preview, on a place, keeping the zoom. */
   function centerOn(at: PlanPoint) {
     camera.value = { ...camera.value, x: at.x, z: at.z };
+    if (editor.view === '3d') void preview.trigger({ type: 'center', at });
   }
 
   function zoom(factor: number, at?: ScreenPoint) {

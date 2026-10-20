@@ -5,6 +5,9 @@ import { parseProjectFile, serializeProject } from '../src/core/project/schema';
 import { pitLaneLayout } from '../src/core/track/pitLane';
 import { positionDistance } from '../src/core/track/positions';
 import { pickInLayer } from '../src/editor/layers';
+import { previewClick, previewHover } from '../src/editor/previewInput';
+import { trackHitNear } from '../src/rendering/plan/hitTest';
+import { sampleAt } from '../src/core/track/centerline';
 import type { LayerId, TrackHit } from '../src/editor/layers';
 import { useEditorStore } from '../src/stores/editor';
 import { useExportStore } from '../src/stores/export';
@@ -249,13 +252,38 @@ describe('editor', () => {
     expect(lane.length).toBeCloseTo(200, 6);
   });
 
-  it('leaves the 3D view for every tool but panning', () => {
-    const { editor } = stores();
+  it('keeps the 3D view whatever the tool, and acts on clicks made in it', () => {
+    const { project, editor, ui } = stores();
+    project.replace(template('club'));
+    editor.reset();
     editor.setView('3d');
-    editor.setTool('pan');
+    editor.setTool('barrier');
     expect(editor.view).toBe('3d');
-    editor.setTool('add');
-    expect(editor.view).toBe('2d');
+    const context = { project, editor, ui };
+    const at = (s: number, side: 1 | -1 = -1) => {
+      const sample = sampleAt(project.samples, s)!;
+      const lateral = side * (sample.half + 1);
+      return trackHitNear(project.project, project.samples, {
+        x: sample.x + sample.nx * lateral,
+        z: sample.z + sample.nz * lateral,
+      });
+    };
+    // Two clicks on the left of the road lay a barrier there.
+    previewHover(context, at(100));
+    expect(editor.hoverS).toBeCloseTo(100, -1);
+    previewClick(context, at(100), false);
+    previewHover(context, at(260));
+    expect(editor.barrierTarget).toBeCloseTo(260, -1);
+    previewClick(context, at(260), false);
+    expect(project.project.barriers).toEqual([expect.objectContaining({ side: 'left' })]);
+    // Selecting picks in the active layer: the barrier now, a point on the track layer.
+    editor.setTool('select');
+    previewClick(context, at(180), false);
+    expect(editor.selection).toEqual({ kind: 'barrier', id: project.project.barriers[0].id });
+    editor.setLayer('track');
+    const point = project.project.points[2];
+    previewClick(context, trackHitNear(project.project, project.samples, point), false);
+    expect(editor.selectedPointId).toBe(point.id);
   });
 });
 

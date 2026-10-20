@@ -34,7 +34,7 @@ const views = computed(() => [
       <PlanCanvas v-show="editor.view === '2d'" />
       <PreviewCanvas v-if="editor.view === '3d'" />
       <LayerTools />
-      <PlanNavigator v-if="editor.view === '2d' && store.samples.length > 1" />
+      <PlanNavigator v-if="store.samples.length > 1" />
       <SegmentedControl
         v-model="view"
         class="views"

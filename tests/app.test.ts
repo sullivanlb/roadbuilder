@@ -302,8 +302,10 @@ describe('editor interface', () => {
     await settle(50);
     expect($('view-3d').getAttribute('aria-pressed')).toBe('true');
     expect($('preview-unavailable')).not.toBeNull();
+    // Tools work in the preview too: picking one keeps the 3D view.
     await click('tool-add');
-    expect($('view-2d').getAttribute('aria-pressed')).toBe('true');
+    expect($('view-3d').getAttribute('aria-pressed')).toBe('true');
+    await click('view-2d');
     await click('zoom-in');
     expect($('zoom-level').textContent).toBe('125 %');
     await click('fit-view');

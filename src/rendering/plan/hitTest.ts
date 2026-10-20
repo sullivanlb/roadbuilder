@@ -1,6 +1,6 @@
 import type { Id } from '../../core/ids';
-import { clamp } from '../../core/math';
-import type { Vec3 } from '../../core/math';
+import { clamp, planDistance } from '../../core/math';
+import type { PlanPoint, Vec3 } from '../../core/math';
 import type { Project, Side } from '../../core/project/schema';
 import { barrierPath } from '../../core/scene/barriers';
 import type { Sample } from '../../core/track/centerline';
@@ -130,4 +130,53 @@ export function trackHitAt(
     pointId: findPoint(view, project, at),
     barrierId: findBarrier(view, project, samples, at),
   };
+}
+
+/** How close, in metres, a place on the ground must be to count as on a point or a barrier. */
+const REACH = { point: 4, barrier: 2.5 };
+
+/**
+ * What lies at a place on the ground, for clicks made in the 3D preview. A
+ * control point already hit in the view (its post) wins over the nearest one.
+ */
+export function trackHitNear(
+  project: Project,
+  samples: readonly Sample[],
+  at: PlanPoint,
+  pointId: Id | null = null,
+): TrackHit {
+  let nearest: Sample | null = null,
+    best = Infinity;
+  for (const sample of samples) {
+    const d = planDistance(sample, at);
+    if (d < best) {
+      best = d;
+      nearest = sample;
+    }
+  }
+  const road =
+    nearest && best <= nearest.half + project.road.shoulder + 4
+      ? {
+          s: nearest.s,
+          side:
+            (at.x - nearest.x) * nearest.nx + (at.z - nearest.z) * nearest.nz >= 0
+              ? ('right' as const)
+              : ('left' as const),
+        }
+      : null;
+  const point =
+    pointId ??
+    project.points.find((candidate) => planDistance(candidate, at) <= REACH.point)?.id ??
+    null;
+  let barrierId: Id | null = null,
+    closest: number = REACH.barrier;
+  for (const barrier of project.barriers)
+    for (const p of barrierPath(project, samples, barrier)) {
+      const d = planDistance(p, at);
+      if (d < closest) {
+        closest = d;
+        barrierId = barrier.id;
+      }
+    }
+  return { road, pointId: point, barrierId };
 }

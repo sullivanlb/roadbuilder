@@ -39,7 +39,7 @@ export const enMessages: Record<MessageKey, string> = {
   'editor.locateTurn': 'Show the corner',
   'editor.privacy': 'Everything stays on your device',
 
-  'canvas.hint3d': 'Drag to orbit · Scroll to zoom · Back to the 2D plan to edit',
+  'canvas.hint3d': 'Drag to orbit · Scroll to zoom · Click to select or lay, as on the plan',
   'canvas.hintBarrierDraft': 'Click where the barrier ends · Escape cancels',
   'canvas.hintBarrier':
     'Click where the barrier starts, on the side you want · Escape leaves the tool',
@@ -101,6 +101,7 @@ export const enMessages: Record<MessageKey, string> = {
   'navigator.goto': 'Go to…',
   'navigator.corners': 'Turns',
   'navigator.issues': 'To fix',
+  'preview.addOnRoad': 'Click on the track to insert a point there.',
   'layers.aria': 'Layers',
   'layers.title': 'Layers',
   'layers.track': 'Track',

@@ -44,7 +44,8 @@ export const frMessages = {
   'editor.locateTurn': 'Voir le virage',
   'editor.privacy': 'Tout reste sur votre appareil',
 
-  'canvas.hint3d': 'Glissez pour tourner · Molette pour zoomer · Retour au plan 2D pour modifier',
+  'canvas.hint3d':
+    'Glissez pour tourner · Molette pour zoomer · Cliquez pour sélectionner ou poser, comme sur le plan',
   'canvas.hintBarrierDraft': 'Cliquez la fin de la barrière · Échap annule le tracé',
   'canvas.hintBarrier':
     'Cliquez le début de la barrière, sur la rive voulue · Échap quitte l’outil',
@@ -108,6 +109,7 @@ export const frMessages = {
   'navigator.goto': 'Aller à…',
   'navigator.corners': 'Virages',
   'navigator.issues': 'À corriger',
+  'preview.addOnRoad': 'Cliquez sur la piste pour y insérer un point.',
   'layers.aria': 'Couches',
   'layers.title': 'Couches',
   'layers.track': 'Tracé',
