@@ -303,20 +303,22 @@ export const frMessages = {
   'help.title': 'Les premiers tours de main.',
   'help.step1Title': 'Dessinez votre ligne.',
   'help.step1':
-    'Déplacez les points en vue 2D. L’outil + ajoute un point après celui sélectionné ; un double-clic sur la route l’insère à cet endroit.',
+    'Choisissez une couche à gauche (touches 1 à 6) : seuls ses éléments réagissent au clic. Dans Tracé, déplacez les points ; l’outil + en ajoute un, un double-clic sur la route l’insère à cet endroit.',
   'help.step2Title': 'Donnez-lui du caractère.',
   'help.step2':
-    'Réglez la largeur, les vibreurs et l’altitude de chaque point. L’aperçu 3D se fait pivoter par glisser-déposer.',
+    'Réglez la chaussée, l’altitude des points et les portions de largeur. Dans la bande sous le plan, glissez sur une plage pour y poser quelque chose. L’aperçu 3D (touche C) se fait pivoter par glisser-déposer.',
   'help.step3Title': 'Conservez votre travail.',
   'help.step3':
     'La sauvegarde locale est automatique. « Enregistrer » télécharge un projet JSON réutilisable avec « Ouvrir ».',
   'help.step4Title': 'Sécurisez les bords.',
   'help.step4Before': 'Dans ',
   'help.step4After':
-    ', choisissez glissière, pneus, TecPro ou mur béton, puis tracez en deux clics sur le plan : départ, puis arrivée. Échap annule le tracé en cours.',
+    ', choisissez glissière, pneus, TecPro ou mur béton, puis tracez en deux clics sur la piste : début, puis fin. Échap annule le tracé en cours.',
   'help.step5Title': 'Passez au simulateur.',
   'help.step5':
     'Exportez le ZIP Assetto Corsa, installez le dossier du circuit et lancez des essais libres en solo. L’export en jeu est encore expérimental.',
+  'help.shortcutLayers': 'Changer de couche',
+  'help.shortcutView': 'Plan / 3D',
   'help.shortcutSelect': 'Sélectionner',
   'help.shortcutAdd': 'Ajouter un point',
   'help.shortcutBarrier': 'Tracer une barrière',

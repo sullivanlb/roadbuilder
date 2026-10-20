@@ -9,6 +9,8 @@ const ui = useUiStore();
 
 /** Letter keys are shown as is; combinations are spelled in the interface language. */
 const shortcuts: { label: MessageKey; key: () => string }[] = [
+  { label: 'help.shortcutLayers', key: () => '1 – 6' },
+  { label: 'help.shortcutView', key: () => 'C' },
   { label: 'help.shortcutSelect', key: () => 'V' },
   { label: 'help.shortcutAdd', key: () => 'A' },
   { label: 'help.shortcutBarrier', key: () => 'B' },
@@ -46,7 +48,7 @@ const shortcuts: { label: MessageKey; key: () => string }[] = [
       </li>
       <li>
         <strong>{{ t('help.step4Title') }}</strong
-        >{{ t('help.step4Before') }}<em>{{ t('barriers.title') }}</em
+        >{{ t('help.step4Before') }}<em>{{ t('layers.edges') }}</em
         >{{ t('help.step4After') }}
       </li>
       <li>

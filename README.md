@@ -34,12 +34,12 @@ Le vocabulaire du domaine est défini dans [`CONTEXT.md`](CONTEXT.md), les déci
 
 - `src/core/` : le domaine, sans framework. `project/` contient le format v2 (schéma zod, règles et bornes, modèles, opérations d’édition immer), `track/` l’axe du tracé, les plages entre deux repères, les largeurs et les diagnostics, `scene/` la construction de la scène (chaussée, terrain, barrières, repères).
 - `src/export/` : archives Assetto Corsa (KN5, fichiers ini, carte) et OBJ, encodeurs binaires PNG/ZIP. Les textes des documents exportés sont fournis par l’appelant.
-- `src/rendering/` : dessin du plan 2D et du profil (Canvas 2D), aperçu 3D (Three.js, chargé à la demande), palette de couleurs.
+- `src/rendering/` : dessin du plan 2D et de la bande de piste (Canvas 2D), aperçu 3D (Three.js, chargé à la demande), palette de couleurs.
 - `src/workers/` : construction des archives dans un Web Worker (Comlink), pour que l’éditeur reste fluide pendant un export ; repli sur le thread principal si les workers ne sont pas disponibles.
 - `src/platform/` : accès au stockage et aux fichiers derrière une interface ; implémentation web aujourd’hui, Tauri ensuite.
-- `src/stores/` : état Pinia — projet et historique, éditeur (sélection, outil, barrière en cours), vue, fichiers et sauvegarde automatique, export, interface.
-- `src/editor/` : outils du plan (un module par outil), interactions au pointeur et raccourcis clavier.
-- `src/components/` : composants Vue avec styles scoped — `layout/`, `sidebar/`, `workspace/`, `dialogs/` et `ui/` (primitives partagées).
+- `src/stores/` : état Pinia — projet et historique, éditeur (couche, sélection, outil, tracés en cours, plage, survol), vue du plan et de la bande, fichiers et sauvegarde automatique, export, interface.
+- `src/editor/` : couches et ce que le clic y attrape, outils du plan (un module par outil), clics dans l’aperçu 3D, interactions au pointeur et raccourcis clavier.
+- `src/components/` : composants Vue avec styles scoped — `layout/` (barre du haut, couches), `inspector/` et `sidebar/` (réglages de la couche active), `workspace/` (plan, bande, 3D), `dialogs/` et `ui/` (primitives partagées).
 - `src/i18n/` : vue-i18n avec catalogues français et anglais typés.
 - `src/styles/` : jetons de design et styles de base uniquement.
 - `tests/` : Vitest — `core/` et `export/` sans DOM, `stores.test.ts` pour la logique de l’éditeur, `workers.test.ts` pour l’export en arrière-plan, `app.test.ts` pour l’interface (DOM et canvas simulés).
@@ -58,17 +58,20 @@ Les fichiers `.roadbuilder.json` sont au **format version 2** : les points de co
 
 La CI (GitHub Actions) vérifie le formatage, le lint, les types, les tests et la compilation à chaque push. Les tests couvrent le format de projet et ses références, les opérations d’édition, la géométrie et les diagnostics, la scène (valeurs finies, indices valides, colliders orientés vers la piste, bridage dans les virages), la structure des archives, l’historique, la sauvegarde automatique et sa récupération, ainsi que les parcours de l’interface. Les tailles de maillage et les statistiques des modèles sont figées dans des snapshots : après une modification volontaire de la géométrie, mettez-les à jour avec `npx vitest -u` et vérifiez l’export **dans Assetto Corsa**.
 
-Pour la vérification manuelle : ouvrir les trois modèles et une page blanche, déplacer/ajouter/supprimer des points, régler largeur et relief, tracer une portion plus large et une plus étroite, naviguer en 2D/3D, tester zoom et raccourcis, tracer des barrières des quatre types, enregistrer/recharger/importer un projet, puis télécharger les ZIP Assetto Corsa et OBJ. Comparer également le rendu aux dimensions bureau et mobile.
+Pour la vérification manuelle : ouvrir les trois modèles et une page blanche, parcourir les six couches, déplacer/ajouter/supprimer des points (seuls et en groupe), régler largeur et relief, tracer une portion plus large et une plus étroite, poser portions, barrières et voie des stands depuis le plan, la bande et la 3D, tirer leurs bords dans la bande, utiliser « Aller à » et la mini-carte, tester zoom et raccourcis, enregistrer/recharger/importer un projet, puis télécharger les ZIP Assetto Corsa et OBJ. Comparer également le rendu aux dimensions bureau et mobile.
 
 ## Fonctionnalités disponibles
 
 - Circuits fermés et routes ouvertes, avec modèles club, karting, montagne et page blanche.
-- Dessin en 2D : ajout, déplacement et suppression de points, zoom et navigation.
+- Édition par couches (tracé, chaussée, bords, stands et départ, terrain, décor à venir) : la couche active décide de ce que le clic attrape ; les autres restent visibles, atténuées, ou masquées.
+- Dessin en 2D : ajout, déplacement et suppression de points, seuls ou en groupe (rectangle de sélection, Maj + clic), zoom et navigation.
+- Bande de piste : la piste déroulée sous le plan, avec l’altitude, les largeurs, les barrières ou les stands selon la couche ; on y choisit une plage pour y poser un élément et on y étire les éléments par leurs bords.
+- Repérage sur les grands circuits : virages détectés et numérotés, mini-carte, menu « Aller à ».
 - Réglage de la largeur de base, des accotements, des vibreurs et de l’altitude par point.
 - Largeur variable : portions plus larges ou plus étroites, tracées en deux clics n’importe où sur la piste.
 - Barrières avec collision : glissières, pneus, blocs TecPro et murs en béton, tracés en deux clics le long de la piste.
 - Terrain complet en herbe, raccordé au relief, à l’intérieur et autour du tracé, avec une marge réglable de 50 à 500 m et des collisions dans Assetto Corsa.
-- Aperçu 3D orientable et profil d’altitude.
+- Aperçu 3D orientable, où l’on sélectionne et pose comme sur le plan.
 - Annulation et rétablissement des modifications.
 - Sauvegarde locale automatique et import/export de projets `.roadbuilder.json`.
 - Export ZIP Assetto Corsa avec modèle KN5, textures, surfaces, départ et stand.
@@ -78,11 +81,15 @@ Pour la vérification manuelle : ouvrir les trois modèles et une page blanche, 
 ## Créer et conserver un tracé
 
 1. Cliquez sur **Nouveau** et choisissez un modèle ou une page blanche.
-2. Déplacez les points en **Plan 2D**. L’outil **+** ajoute un point après celui sélectionné ; un double-clic sur la chaussée insère un point à cet endroit.
-3. Réglez la largeur et les accotements, puis sélectionnez les points pour modifier leur altitude. Dans **Le terrain**, choisissez la marge autour du tracé. Les unités sont en mètres.
-4. Sécurisez les bords dans **Les barrières** : choisissez un type, puis tracez un tronçon en deux clics sur la piste, du début à la fin. Réglez son écartement, changez-le de côté ou supprimez-le.
-5. Consultez **Aperçu 3D** pour observer le relief ; glissez pour tourner et utilisez la molette pour zoomer.
-6. Cliquez sur **Enregistrer** pour télécharger un fichier projet. Utilisez **Ouvrir** pour le reprendre plus tard.
+2. Choisissez une **couche** dans la colonne de gauche (touches **1** à **6**). Seuls ses éléments réagissent au clic, ses outils s’affichent au-dessus du plan et ses réglages à droite. Les outils en pointillés sont prévus : un clic explique ce qu’ils feront.
+3. Dans **Tracé**, déplacez les points. L’outil **+** ajoute un point après celui sélectionné ; un double-clic sur la chaussée insère un point à cet endroit. Glissez dans le vide pour sélectionner plusieurs points, ou Maj + clic pour en ajouter un : ils se déplacent ensemble et leur altitude se règle en groupe.
+4. Dans **Chaussée**, réglez la largeur de base, les accotements, les vibreurs et les portions de largeur. Dans **Terrain**, choisissez la marge autour du tracé. Les unités sont en mètres.
+5. Dans **Bords**, choisissez un type de barrière, puis tracez un tronçon en deux clics sur la piste, du début à la fin. Réglez son écartement, son début et sa fin, changez-le de côté ou supprimez-le.
+6. Sous le plan, la **bande de piste** déroule le circuit. Glissez sur une plage pour y poser une portion, des barrières ou la voie des stands selon la couche ; tirez les bords d’un bloc pour l’allonger. La molette zoome, un double-clic montre tout.
+7. Basculez sur l’**aperçu 3D** (touche **C**) pour observer le relief ; glissez pour tourner, molette pour zoomer. On y sélectionne et on y pose comme sur le plan ; les points ne se déplacent que sur le plan.
+8. Cliquez sur **Enregistrer** pour télécharger un fichier projet. Utilisez **Ouvrir** pour le reprendre plus tard.
+
+Sur un grand circuit, les virages sont détectés et numérotés en haut de la bande : un clic sur un nom cadre le virage. La mini-carte recentre le plan et le menu **Aller à** liste les virages et les problèmes à corriger.
 
 La sauvegarde automatique dépend du navigateur et de l’adresse de l’application. Enregistrez une copie du projet avant de déplacer l’application ou de supprimer les données du navigateur. L’historique d’annulation reste limité à la session en cours.
 
@@ -90,9 +97,9 @@ La sauvegarde automatique dépend du navigateur et de l’adresse de l’applica
 
 Le contrôle de largeur examine la courbe calculée **entre les points de contrôle**. Un problème peut donc se situer entre deux points, même si les points eux-mêmes semblent bien espacés.
 
-Les portions concernées sont surlignées en rouge avec un repère **!** dans les vues 2D et 3D. Leurs points de contrôle sont également signalés dans le plan 2D ; leur sélection affiche le diagnostic dans le panneau de gauche. Le message indique les deux numéros, y compris le dernier et le premier point pour la fermeture d’un circuit.
+Les portions concernées sont surlignées en rouge avec un repère **!** dans les vues 2D et 3D. Leurs points de contrôle sont également signalés dans le plan 2D ; leur sélection affiche le diagnostic dans le panneau de droite. Le message indique les deux numéros, y compris le dernier et le premier point pour la fermeture d’un circuit.
 
-Utilisez **Voir le virage**, sous le tracé ou dans le dialogue d’export, pour revenir au plan 2D, cadrer la portion et sélectionner son premier point. Les indications se mettent à jour après chaque modification, import, annulation ou rétablissement. Écartez les points du virage ou réduisez la largeur ; l’export reste bloqué tant que le contrôle détecte ce problème.
+Utilisez **Voir le virage**, dans l’en-tête de la bande, le menu **Aller à** ou le dialogue d’export, pour revenir au plan 2D, cadrer la portion et sélectionner son premier point. Les indications se mettent à jour après chaque modification, import, annulation ou rétablissement. Écartez les points du virage ou réduisez la largeur ; l’export reste bloqué tant que le contrôle détecte ce problème.
 
 ### Terrain complet
 
@@ -128,18 +135,22 @@ Les quatre types ont des hauteurs réalistes : glissière 0,78 m, pneus 0,85 m, 
 
 L’inversion du sens du tracé retourne les tronçons, la suppression d’un point garde les tronçons en place, et le passage en route ouverte scinde les tronçons qui bouclaient.
 
-| Action                                    | Raccourci                           |
-| ----------------------------------------- | ----------------------------------- |
-| Sélection / ajout / déplacement de la vue | V / A / H                           |
-| Tracer une barrière                       | B                                   |
-| Tracer la voie des stands                 | P                                   |
-| Tracer une portion de largeur             | L                                   |
-| Navigation temporaire                     | Espace + glisser, ou bouton central |
-| Cadrer le tracé                           | F                                   |
-| Grille de 5 m pendant un déplacement      | Maj                                 |
-| Annuler / rétablir                        | Ctrl+Z / Ctrl+Maj+Z ou Ctrl+Y       |
-| Enregistrer le projet                     | Ctrl+S                              |
-| Supprimer le point sélectionné            | Suppr                               |
+| Action                                      | Raccourci                           |
+| ------------------------------------------- | ----------------------------------- |
+| Changer de couche                           | 1 à 6                               |
+| Plan / aperçu 3D                            | C                                   |
+| Sélection / ajout / déplacement de la vue   | V / A / H                           |
+| Tracer une barrière                         | B                                   |
+| Tracer la voie des stands                   | P                                   |
+| Tracer une portion de largeur               | L                                   |
+| Navigation temporaire                       | Espace + glisser, ou bouton central |
+| Cadrer le tracé                             | F                                   |
+| Grille de 5 m pendant un déplacement        | Maj                                 |
+| Annuler / rétablir                          | Ctrl+Z / Ctrl+Maj+Z ou Ctrl+Y       |
+| Enregistrer le projet                       | Ctrl+S                              |
+| Ajouter ou retirer un point de la sélection | Maj + clic                          |
+| Supprimer les points sélectionnés           | Suppr                               |
+| Annuler un tracé, puis vider la plage       | Échap                               |
 
 Sur macOS, les raccourcis Ctrl acceptent aussi Cmd.
 

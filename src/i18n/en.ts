@@ -286,19 +286,22 @@ export const enMessages: Record<MessageKey, string> = {
   'help.title': 'The first few laps.',
   'help.step1Title': 'Draw your line.',
   'help.step1':
-    'Drag the points in the 2D view. The + tool adds a point after the selected one; a double-click on the road inserts it there.',
+    'Pick a layer on the left (keys 1 to 6): only its items answer clicks. On Track, drag the points; the + tool adds one, a double click on the road inserts one there.',
   'help.step2Title': 'Give it character.',
-  'help.step2': 'Set the width, kerbs and altitude of every point. Drag to orbit the 3D preview.',
+  'help.step2':
+    'Set the roadway, the elevation of the points and the width zones. In the band under the plan, drag across a stretch to lay something on it. Drag to orbit the 3D preview (key C).',
   'help.step3Title': 'Keep your work.',
   'help.step3':
     'The local save is automatic. “Save” downloads a JSON project you can reopen with “Open”.',
   'help.step4Title': 'Secure the edges.',
   'help.step4Before': 'In ',
   'help.step4After':
-    ', pick guardrail, tyres, TecPro or concrete wall, then draw with two clicks on the plan: start, then finish. Escape cancels the span in progress.',
+    ', pick guardrail, tyres, TecPro or concrete wall, then lay it in two clicks on the track: start, then end. Escape cancels the barrier being laid.',
   'help.step5Title': 'Head to the simulator.',
   'help.step5':
     'Export the Assetto Corsa ZIP, install the track folder and start a solo free practice. The in-game export is still experimental.',
+  'help.shortcutLayers': 'Switch layer',
+  'help.shortcutView': 'Plan / 3D',
   'help.shortcutSelect': 'Select',
   'help.shortcutAdd': 'Add a point',
   'help.shortcutBarrier': 'Draw a barrier',

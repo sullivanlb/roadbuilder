@@ -39,6 +39,7 @@ export function useShortcuts() {
     { key: 'l', run: tool('width') },
     { key: 'h', run: tool('pan') },
     { key: 'f', run: viewport.fit },
+    { key: 'c', run: () => editor.setView(editor.view === '3d' ? '2d' : '3d') },
     ...editor.layers.map((layer) => ({ key: layer.key, run: () => editor.setLayer(layer.id) })),
     { key: 'delete', run: editor.deleteSelectedPoint },
     { key: 'backspace', run: editor.deleteSelectedPoint },

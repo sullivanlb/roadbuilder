@@ -14,6 +14,20 @@ _Avoid_: save, file, circuit file
 A ready-made project offered when starting a new one.
 _Avoid_: preset, example
 
+### The editor
+
+**Layer** (couche):
+One of the subjects the editor works on: track, roadway, edges, pits and start, terrain, scenery. The active layer decides what a click picks and which tools are offered; the others stay visible, dimmed, and can be hidden.
+_Avoid_: mode, tab, panel
+
+**Track band** (bande de piste):
+The track unrolled along its track distance under the plan, with one row per subject of the active layer; ranges show as blocks and new ones are picked by dragging across it.
+_Avoid_: timeline, profile (except for the elevation row)
+
+**Corner** (virage):
+A bend found from the curvature of the centerline, numbered in track direction. Corners are detected, not stored.
+_Avoid_: turn (in French texts), curve
+
 ### The track
 
 **Track** (tracé):
