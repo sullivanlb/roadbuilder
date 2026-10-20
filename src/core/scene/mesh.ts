@@ -1,3 +1,4 @@
+import { clamp } from '../math';
 import type { Vec3 } from '../math';
 import type { MaterialId } from './materials';
 
@@ -73,13 +74,26 @@ export function addQuad(mesh: Mesh, corners: Triple[], uvs: Pair[] = DEFAULT_UVS
   mesh.indices.push(first, first + 1, first + 2, first, first + 2, first + 3);
 }
 
-/** A point beside the centerline: `lateral` metres to the right (negative: left), lifted by `height`. */
-export function offsetPoint(
-  sample: Vec3 & { nx: number; nz: number },
-  lateral: number,
-  height = 0,
-): Triple {
-  return [sample.x + sample.nx * lateral, sample.y + height, sample.z + sample.nz * lateral];
+/** A place on the centerline with what is needed to step across the track. */
+export type CrossFrame = Vec3 & { nx: number; nz: number; bank: number; edge: number };
+
+/**
+ * Height of the ground `lateral` metres to the right of the centerline (negative:
+ * left), above the centerline. A bank zone tilts the roadway and kerbs about their
+ * low edge, which keeps the altitude of the track, so the raised side climbs and
+ * nothing sinks into the ground; beyond the kerbs the ground stays flat at the
+ * height of their edge.
+ */
+export const bankLift = (frame: Pick<CrossFrame, 'bank' | 'edge'>, lateral: number) =>
+  (clamp(lateral, -frame.edge, frame.edge) + Math.sign(frame.bank) * frame.edge) * frame.bank;
+
+/** A point beside the centerline: `lateral` metres to the right (negative: left), lifted by `height` above the ground. */
+export function offsetPoint(frame: CrossFrame, lateral: number, height = 0): Triple {
+  return [
+    frame.x + frame.nx * lateral,
+    frame.y + bankLift(frame, lateral) + height,
+    frame.z + frame.nz * lateral,
+  ];
 }
 
 /** KN5 indexes vertices with 16 bits: larger meshes are split. */

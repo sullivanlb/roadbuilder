@@ -3,6 +3,7 @@ import { useDevicePixelRatio, useElementSize } from '@vueuse/core';
 import { computed, ref, useTemplateRef, watch } from 'vue';
 import {
   setStartLine,
+  updateBankZone,
   updateBarrier,
   updatePitLane,
   updateWidthZone,
@@ -43,6 +44,8 @@ const labels = computed<BandLabels>(() => ({
     altitude: t('band.altitude'),
     width: t('band.width'),
     zones: t('band.zones'),
+    bank: t('band.bank'),
+    bankZones: t('band.bankZones'),
     left: t('band.left'),
     right: t('band.right'),
     lane: t('band.lane'),
@@ -56,6 +59,11 @@ const labels = computed<BandLabels>(() => ({
     wall: t('barriers.wall'),
   },
   width: (metres) => `${formatNumber(metres, metres % 1 ? 1 : 0)} m`,
+  bank: (zone) =>
+    t('banks.block', {
+      angle: formatNumber(zone.angle, zone.angle % 1 ? 1 : 0),
+      high: zone.high === 'right' ? t('barriers.sideRight') : t('barriers.sideLeft'),
+    }),
   lane: t('band.laneBlock'),
   start: t('band.startBlock'),
   empty: t('band.empty'),
@@ -69,7 +77,12 @@ const blocks = computed(() => bandBlocks(store.project, store.samples, editor.la
 /** The block that holds the selection, when the selection is laid along the track. */
 const selectedBlockId = computed(() => {
   const selection = editor.selection;
-  if (selection?.kind === 'barrier' || selection?.kind === 'widthZone') return selection.id;
+  if (
+    selection?.kind === 'barrier' ||
+    selection?.kind === 'widthZone' ||
+    selection?.kind === 'bankZone'
+  )
+    return selection.id;
   return selection?.kind === 'pitLane' ? 'pitLane' : null;
 });
 
@@ -144,6 +157,7 @@ function moveEdge(block: BandBlock, edge: 'start' | 'end', s: number) {
   store.edit(
     (draft) => {
       if (block.kind === 'widthZone') updateWidthZone(draft, block.id, { [end]: at });
+      else if (block.kind === 'bankZone') updateBankZone(draft, block.id, { [end]: at });
       else if (block.kind === 'barrier') updateBarrier(draft, block.id, { [end]: at });
       else if (block.kind === 'pitLane')
         updatePitLane(draft, edge === 'start' ? { entry: at } : { exit: at });
@@ -170,6 +184,7 @@ function onPointerDown(event: PointerEvent) {
   const block = hit.block;
   if (block) {
     if (block.kind === 'widthZone') editor.selectWidthZone(block.id);
+    else if (block.kind === 'bankZone') editor.selectBankZone(block.id);
     else if (block.kind === 'barrier') editor.selectBarrier(block.id);
     else if (block.kind === 'pitLane') editor.select({ kind: 'pitLane' });
     if (hit.edge) drag.value = { kind: 'edge', block, edge: hit.edge };

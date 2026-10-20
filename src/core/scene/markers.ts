@@ -60,15 +60,21 @@ export function buildMarkers(project: Project, samples: readonly Sample[]): Mark
   const at = (s: number) => placeAt(project, samples, s);
   const marker = (name: string, p: Sample, lateral = 0, lift = 0) => {
     const [x, y, z] = offsetPoint(p, lateral, lift);
-    // Assetto Corsa convention: local Y up, local -Z forward, following the road grade.
-    const tangent = [p.nz, p.grade, -p.nx];
-    const l = Math.hypot(...tangent),
-      forward = tangent.map((v) => v / l);
-    const right = [p.nx, 0, p.nz];
+    // Assetto Corsa convention: local Y up, local -Z forward, following the road
+    // grade, and its bank on the roadway (beyond the kerbs the ground is flat).
+    const unit = (v: number[]) => {
+      const l = Math.hypot(...v);
+      return v.map((c) => c / l);
+    };
+    const forward = unit([p.nz, p.grade, -p.nx]);
+    const tilted = [p.nx, Math.abs(lateral) <= p.edge ? p.bank : 0, p.nz];
+    // Square the tilted right with forward, so the frame stays orthonormal on a banked slope.
+    const along = tilted.reduce((sum, c, k) => sum + c * forward[k], 0);
+    const right = unit(tilted.map((c, k) => c - along * forward[k]));
     const up = [
-      -forward[1] * right[2],
+      right[1] * forward[2] - right[2] * forward[1],
       right[2] * forward[0] - right[0] * forward[2],
-      right[0] * forward[1],
+      right[0] * forward[1] - right[1] * forward[0],
     ];
     markers.push({
       name,

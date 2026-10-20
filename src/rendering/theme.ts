@@ -30,6 +30,7 @@ export const COLORS = {
   },
   selection: '#d3f47d44',
   widthZone: '#e4e9d6aa',
+  bankZone: '#e0a85aaa',
   band: {
     row: '#141d20',
     range: '#d3f47d24',

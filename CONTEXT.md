@@ -82,6 +82,14 @@ The roadway width wherever no width zone applies.
 A stretch of track between two track positions where the roadway takes another width, on both edges alike. The width eases in and out over a fixed length at each end; where zones overlap, the later one wins.
 _Avoid_: section, segment, width span
 
+**Banking** (dévers):
+The tilt of the roadway across the track, raising one edge while the other keeps the altitude of the track. It covers the roadway and the kerbs; beyond them the ground stays flat at the height of the kerb edge.
+_Avoid_: camber, superelevation, cant
+
+**Bank zone** (portion de dévers):
+A stretch of track between two track positions where the roadway is banked by an angle, with one edge raised. The bank eases in and out over the zone's transition length at each end; where zones overlap, the later one wins.
+_Avoid_: banked section, banking span
+
 **Kerb** (vibreur):
 The striped strip running along each edge of the roadway.
 _Avoid_: curb, rumble strip

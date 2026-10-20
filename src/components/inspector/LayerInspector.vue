@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { t } from '../../i18n';
 import { useEditorStore } from '../../stores/editor';
+import BankSection from '../sidebar/BankSection.vue';
 import BarrierSection from '../sidebar/BarrierSection.vue';
 import PitSection from '../sidebar/PitSection.vue';
 import PointSection from '../sidebar/PointSection.vue';
@@ -28,6 +29,7 @@ const editor = useEditorStore();
     <template v-else-if="editor.layer === 'road'">
       <RoadSection />
       <WidthSection />
+      <BankSection />
     </template>
     <BarrierSection v-else-if="editor.layer === 'edges'" />
     <template v-else-if="editor.layer === 'pits'">

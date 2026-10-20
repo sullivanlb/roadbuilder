@@ -9,6 +9,8 @@ import type { Sample } from './centerline';
 import { LAYOUT } from './layout';
 import { pitBoxCapacity, pitLaneLayout } from './pitLane';
 import { overlapStart } from './ranges';
+import type { TrackRange } from './ranges';
+import { bankZoneRanges } from './bank';
 import { widthZoneRanges } from './width';
 
 /** Thresholds of the track checks. */
@@ -34,7 +36,8 @@ export type TrackIssue =
   | { code: 'track-crossing' }
   | { code: 'pit-lane-too-short'; cars: number; capacity: number }
   | { code: 'pit-lane-too-tight'; from: number; to: number }
-  | { code: 'width-zones-overlap' };
+  | { code: 'width-zones-overlap' }
+  | { code: 'bank-zones-overlap' };
 
 /** The worst bend of one segment that is too tight for the road width. */
 export interface TightTurn {
@@ -121,27 +124,34 @@ export function trackIssues(
     errors.push(location.issue);
     if (location.sampleIndex >= 0) locations.push(location);
   }
-  const overlap = widthZonesOverlap(project, samples);
-  if (overlap) {
-    warnings.push(overlap.issue);
-    locations.push(overlap);
-  }
+  for (const overlap of [
+    zonesOverlap(widthZoneRanges(project, samples), samples, { code: 'width-zones-overlap' }),
+    zonesOverlap(bankZoneRanges(project, samples), samples, { code: 'bank-zones-overlap' }),
+  ])
+    if (overlap) {
+      warnings.push(overlap.issue);
+      locations.push(overlap);
+    }
   return { errors, warnings, tightTurns, locations };
 }
 
 /**
- * Width zones are laid without overlapping, but moving their positions can make
- * them overlap; the later zone then wins. Located where the first overlap starts.
+ * Width and bank zones are laid without overlapping, but moving their positions
+ * can make them overlap; the later zone then wins. Located where the first
+ * overlap starts.
  */
-function widthZonesOverlap(project: Project, samples: readonly Sample[]): IssueLocation | null {
-  const ranges = widthZoneRanges(project, samples);
+function zonesOverlap(
+  ranges: readonly TrackRange[],
+  samples: readonly Sample[],
+  issue: TrackIssue,
+): IssueLocation | null {
   const total = samples.at(-1)?.s ?? 0;
   for (let i = 0; i < ranges.length; i++)
     for (let j = i + 1; j < ranges.length; j++) {
       const s = overlapStart(ranges[i], ranges[j], total);
       if (s === null) continue;
       return {
-        issue: { code: 'width-zones-overlap' },
+        issue,
         sampleIndex: Math.max(
           0,
           samples.findIndex((sample) => sample.s >= s),

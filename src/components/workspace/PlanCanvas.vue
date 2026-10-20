@@ -38,6 +38,9 @@ const scene = computed<PlanScene>(() => ({
   selectedWidthZoneId: editor.selectedWidthZoneId,
   widthDraft: editor.widthDraft,
   widthTarget: editor.widthDraft !== null ? editor.widthTarget : null,
+  selectedBankZoneId: editor.selectedBankZoneId,
+  bankDraft: editor.bankDraft,
+  bankTarget: editor.bankDraft !== null ? editor.bankTarget : null,
   range: editor.range,
   hoverS: editor.hoverS,
   labels: {

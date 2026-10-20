@@ -1,4 +1,4 @@
-import { planDistance } from '../math';
+import { clamp, planDistance } from '../math';
 import { isCircuit } from '../project/schema';
 import type { TrackPosition } from '../project/schema';
 import { sampleAt, trackLength } from './centerline';
@@ -56,6 +56,22 @@ export function rangeBetween(
 /** Distance from the start of a range to track distance `s`, going forward around a circuit. */
 export const offsetIn = (range: TrackRange, total: number, s: number) =>
   (((s - range.start) % total) + total) % total;
+
+/**
+ * How far into a range track distance `s` has eased: 0 outside it, rising
+ * smoothly to 1 over `taper` metres after its start and falling back to 0 over
+ * the same length before its end. The taper is shortened to half a short range.
+ */
+export function rangeEase(range: TrackRange, total: number, s: number, taper: number): number {
+  const offset = offsetIn(range, total, s);
+  if (offset > range.length) return 0;
+  const t = clamp(
+    Math.min(offset, range.length - offset) / Math.min(taper, range.length / 2),
+    0,
+    1,
+  );
+  return t * t * (3 - 2 * t);
+}
 
 /** Whether track distance `s` lies within a range. */
 export const rangeContains = (range: TrackRange, total: number, s: number) =>

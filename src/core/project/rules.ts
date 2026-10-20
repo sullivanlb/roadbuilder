@@ -15,7 +15,8 @@ export const RULES = {
   points: { max: 160 },
   barriers: { max: 120 },
   widthZones: { max: 40 },
-  /** Shortest width zone or barrier accepted, along the track. */
+  bankZones: { max: 40 },
+  /** Shortest width zone, bank zone or barrier accepted, along the track. */
   rangeLength: 5,
   /** Two control points closer than this on the ground plane are rejected. */
   pointSpacing: 2,
@@ -28,6 +29,10 @@ export const RULES = {
   /** Distance of a track position after its control point. */
   positionDistance: { min: 0, max: 10000, step: 1 },
   pitLaneWidth: { min: 5, max: 12, step: 0.5 },
+  /** Bank angle of the roadway across the track, in degrees. */
+  bankAngle: { min: 0, max: 35, step: 0.5 },
+  /** Length over which the roadway tilts at each end of a bank zone. */
+  bankTransition: { min: 5, max: 200, step: 5 },
   cars: { min: 1, max: 24, step: 1 },
 } as const satisfies Record<string, NumericRule | { max: number } | number>;
 
@@ -37,6 +42,10 @@ export const DEFAULTS = {
   terrainMargin: 150,
   barrierOffset: 1,
   pitLaneWidth: 7,
+  /** Angle of a new bank zone, in degrees. */
+  bankAngle: 8,
+  /** Transition of a new bank zone, and of those saved before it could be set. */
+  bankTransition: 60,
   /** Distance of the start line after the first control point. */
   startLine: 28,
 } as const;

@@ -2,6 +2,7 @@ import type { Id } from '../../core/ids';
 import type { Project } from '../../core/project/schema';
 import type { MeshKind } from '../../core/scene/mesh';
 import { barrierLateral, barrierSamples } from '../../core/scene/barriers';
+import { offsetPoint } from '../../core/scene/mesh';
 import { sampleAt } from '../../core/track/centerline';
 import type { Sample } from '../../core/track/centerline';
 import { kerbWidth } from '../../core/track/layout';
@@ -39,8 +40,16 @@ export interface OverlayPost {
 export interface PreviewOverlay {
   strips: OverlayStrip[];
   posts: OverlayPost[];
-  /** Where the pointer is along the track: a bar across the road. */
-  cursor: { x: number; y: number; z: number; nx: number; nz: number; reach: number } | null;
+  /** Where the pointer is along the track: a bar across the road, tilted with its bank. */
+  cursor: {
+    x: number;
+    y: number;
+    z: number;
+    nx: number;
+    nz: number;
+    bank: number;
+    reach: number;
+  } | null;
 }
 
 /** What the overlay shows, read from the editor. */
@@ -50,6 +59,7 @@ export interface OverlayState {
     | { kind: 'points'; ids: readonly Id[] }
     | { kind: 'barrier'; id: Id }
     | { kind: 'widthZone'; id: Id }
+    | { kind: 'bankZone'; id: Id }
     | { kind: 'pitLane' }
     | null;
   range: TrackRange | null;
@@ -69,11 +79,7 @@ function strip(
   opacity: number,
 ): OverlayStrip {
   const positions: number[] = [];
-  const at = (sample: Sample, lateral: number) => [
-    sample.x + sample.nx * lateral,
-    sample.y + LIFT,
-    sample.z + sample.nz * lateral,
-  ];
+  const at = (sample: Sample, lateral: number) => offsetPoint(sample, lateral, LIFT);
   for (let i = 1; i < along.length; i++) {
     const a = along[i - 1],
       b = along[i];
@@ -105,8 +111,9 @@ export function buildOverlay(
       ),
     );
   const selection = state.selection;
-  if (selection?.kind === 'widthZone') {
-    const zone = project.widthZones.find((candidate) => candidate.id === selection.id);
+  if (selection?.kind === 'widthZone' || selection?.kind === 'bankZone') {
+    const zones = selection.kind === 'widthZone' ? project.widthZones : project.bankZones;
+    const zone = zones.find((candidate) => candidate.id === selection.id);
     const range = zone && positionRange(project, samples, zone.from, zone.to);
     if (range) across(rangeSamples(samples, range), COLORS.accent, 0.35, 0);
   }
@@ -158,7 +165,7 @@ export function buildOverlay(
   }
   if (state.hoverS !== null) {
     const sample = sampleAt(samples, state.hoverS)!;
-    overlay.cursor = { ...sample, reach: sample.half + kerb + 4 };
+    overlay.cursor = { ...sample, y: offsetPoint(sample, 0)[1], reach: sample.half + kerb + 4 };
   }
   return overlay;
 }

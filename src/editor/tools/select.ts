@@ -96,7 +96,9 @@ export const selectTool: Tool = {
       return dragPoints(context, id, at);
     }
     const hit = trackHitAt(view, project.project, project.samples, at);
-    editor.select(pickInLayer(editor.layer, hit, project.project, project.samples));
+    editor.select(
+      pickInLayer(editor.layer, hit, project.project, project.samples, editor.selection),
+    );
   },
   hover({ project, editor, viewport }, { at }) {
     editor.hoveredPointId =

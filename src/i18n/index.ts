@@ -99,6 +99,8 @@ export function formatProjectError(detail: ProjectErrorDetail, target?: Locale):
       return tr('projectError.barriersLimit', { max: detail.max });
     case 'width-zones-limit':
       return tr('projectError.widthZonesLimit', { max: detail.max });
+    case 'bank-zones-limit':
+      return tr('projectError.bankZonesLimit', { max: detail.max });
     case 'duplicate-id':
       return tr('projectError.duplicateId');
     case 'barrier-endpoint':
@@ -142,6 +144,8 @@ export function formatTrackIssue(issue: TrackIssue, target?: Locale): string {
       return tr('trackIssue.pitLaneTooTight', { from: issue.from + 1, to: issue.to + 1 });
     case 'width-zones-overlap':
       return tr('trackIssue.widthZonesOverlap');
+    case 'bank-zones-overlap':
+      return tr('trackIssue.bankZonesOverlap');
   }
 }
 

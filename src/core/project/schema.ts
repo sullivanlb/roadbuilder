@@ -1,6 +1,6 @@
 import type { Immutable } from 'immer';
 import { z } from 'zod';
-import { RULES } from './rules';
+import { DEFAULTS, RULES } from './rules';
 import type { NumericRule } from './rules';
 import { ProjectError } from './errors';
 import type { ProjectErrorDetail } from './errors';
@@ -51,6 +51,21 @@ const widthZone = z.object({
   width: ranged(RULES.width),
 });
 
+/** A stretch where the roadway is banked across the track, raised on one side. */
+const bankZone = z.object({
+  id,
+  /** Where the zone starts, in track direction. */
+  from: trackPosition,
+  /** Where the zone ends, in track direction. */
+  to: trackPosition,
+  /** Bank angle in degrees. */
+  angle: ranged(RULES.bankAngle),
+  /** The raised edge of the roadway. */
+  high: z.enum(SIDES),
+  /** Length over which the roadway tilts at each end, shortened to half a short zone. */
+  transition: ranged(RULES.bankTransition).default(DEFAULTS.bankTransition),
+});
+
 const pitLane = z.object({
   side: z.enum(SIDES),
   entry: trackPosition,
@@ -74,6 +89,7 @@ const projectShape = z.object({
   points: z.array(controlPoint).max(RULES.points.max),
   barriers: z.array(barrier).max(RULES.barriers.max),
   widthZones: z.array(widthZone).max(RULES.widthZones.max).default([]),
+  bankZones: z.array(bankZone).max(RULES.bankZones.max).default([]),
   /** Absent until set: the start line then sits a little after the first control point. */
   startLine: trackPosition.optional(),
   pitLane: pitLane.nullable().default(null),
@@ -88,7 +104,12 @@ function checkReferences(project: ProjectShape, ctx: z.RefinementCtx<ProjectShap
     ctx.addIssue({ code: 'custom', path, params: { reason } });
   const order = new Map(project.points.map((point, index) => [point.id, index]));
   const ids = new Set<string>();
-  for (const item of [...project.points, ...project.barriers, ...project.widthZones]) {
+  for (const item of [
+    ...project.points,
+    ...project.barriers,
+    ...project.widthZones,
+    ...project.bankZones,
+  ]) {
     if (ids.has(item.id)) return fail('duplicate-id', []);
     ids.add(item.id);
   }
@@ -113,6 +134,10 @@ function checkReferences(project: ProjectShape, ctx: z.RefinementCtx<ProjectShap
       ['widthZones', zone.from] as const,
       ['widthZones', zone.to] as const,
     ]),
+    ...project.bankZones.flatMap((zone) => [
+      ['bankZones', zone.from] as const,
+      ['bankZones', zone.to] as const,
+    ]),
   ] as const;
   for (const [field, position] of positions)
     if (position && !order.has(position.point)) return fail('position-point', [field]);
@@ -129,6 +154,7 @@ export type Barrier = Project['barriers'][number];
 export type BarrierType = Barrier['type'];
 export type Side = Barrier['side'];
 export type WidthZone = Project['widthZones'][number];
+export type BankZone = Project['bankZones'][number];
 export type RoadSettings = Project['road'];
 export type TrackPosition = NonNullable<Project['startLine']>;
 export type PitLane = NonNullable<Project['pitLane']>;
@@ -148,6 +174,7 @@ function toDetail(error: z.ZodError): ProjectErrorDetail {
     if (head === 'points') return { code: 'points-limit', max: RULES.points.max };
     if (head === 'barriers') return { code: 'barriers-limit', max: RULES.barriers.max };
     if (head === 'widthZones') return { code: 'width-zones-limit', max: RULES.widthZones.max };
+    if (head === 'bankZones') return { code: 'bank-zones-limit', max: RULES.bankZones.max };
   }
   return { code: 'invalid-value', path: issue.path.join('.') };
 }

@@ -32,7 +32,7 @@ Pour distribuer l’application, servez le contenu de **`dist/`** sur un héberg
 
 Le vocabulaire du domaine est défini dans [`CONTEXT.md`](CONTEXT.md), les décisions d’architecture dans [`docs/adr/`](docs/adr/) et ce qu’Assetto Corsa attend d’un export — appris en jeu ou documenté — dans [`docs/assetto-corsa.md`](docs/assetto-corsa.md). Complétez ce dernier après chaque test en jeu. Chaque couche n’importe que les couches inférieures ; ESLint le vérifie.
 
-- `src/core/` : le domaine, sans framework. `project/` contient le format v2 (schéma zod, règles et bornes, modèles, opérations d’édition immer), `track/` l’axe du tracé, les plages entre deux repères, les largeurs et les diagnostics, `scene/` la construction de la scène (chaussée, terrain, barrières, repères).
+- `src/core/` : le domaine, sans framework. `project/` contient le format v2 (schéma zod, règles et bornes, modèles, opérations d’édition immer), `track/` l’axe du tracé, les plages entre deux repères, les largeurs, les dévers et les diagnostics, `scene/` la construction de la scène (chaussée, terrain, barrières, repères).
 - `src/export/` : archives Assetto Corsa (KN5, fichiers ini, carte) et OBJ, encodeurs binaires PNG/ZIP. Les textes des documents exportés sont fournis par l’appelant.
 - `src/rendering/` : dessin du plan 2D et de la bande de piste (Canvas 2D), aperçu 3D (Three.js, chargé à la demande), palette de couleurs.
 - `src/workers/` : construction des archives dans un Web Worker (Comlink), pour que l’éditeur reste fluide pendant un export ; repli sur le thread principal si les workers ne sont pas disponibles.
@@ -58,7 +58,7 @@ Les fichiers `.roadbuilder.json` sont au **format version 2** : les points de co
 
 La CI (GitHub Actions) vérifie le formatage, le lint, les types, les tests et la compilation à chaque push. Les tests couvrent le format de projet et ses références, les opérations d’édition, la géométrie et les diagnostics, la scène (valeurs finies, indices valides, colliders orientés vers la piste, bridage dans les virages), la structure des archives, l’historique, la sauvegarde automatique et sa récupération, ainsi que les parcours de l’interface. Les tailles de maillage et les statistiques des modèles sont figées dans des snapshots : après une modification volontaire de la géométrie, mettez-les à jour avec `npx vitest -u` et vérifiez l’export **dans Assetto Corsa**.
 
-Pour la vérification manuelle : ouvrir les trois modèles et une page blanche, parcourir les six couches, déplacer/ajouter/supprimer des points (seuls et en groupe), régler largeur et relief, tracer une portion plus large et une plus étroite, poser portions, barrières et voie des stands depuis le plan, la bande et la 3D, tirer leurs bords dans la bande, utiliser « Aller à » et la mini-carte, tester zoom et raccourcis, enregistrer/recharger/importer un projet, puis télécharger les ZIP Assetto Corsa et OBJ. Comparer également le rendu aux dimensions bureau et mobile.
+Pour la vérification manuelle : ouvrir les trois modèles et une page blanche, parcourir les six couches, déplacer/ajouter/supprimer des points (seuls et en groupe), régler largeur et relief, tracer une portion plus large et une plus étroite, poser un dévers dans un virage et le vérifier en 3D, poser portions, barrières et voie des stands depuis le plan, la bande et la 3D, tirer leurs bords dans la bande, utiliser « Aller à » et la mini-carte, tester zoom et raccourcis, enregistrer/recharger/importer un projet, puis télécharger les ZIP Assetto Corsa et OBJ. Comparer également le rendu aux dimensions bureau et mobile.
 
 ## Fonctionnalités disponibles
 
@@ -69,6 +69,7 @@ Pour la vérification manuelle : ouvrir les trois modèles et une page blanche, 
 - Repérage sur les grands circuits : virages détectés et numérotés, mini-carte, menu « Aller à ».
 - Réglage de la largeur de base, des accotements, des vibreurs et de l’altitude par point.
 - Largeur variable : portions plus larges ou plus étroites, tracées en deux clics n’importe où sur la piste.
+- Dévers : la chaussée s’incline par portions dans les virages, jusqu’au virage relevé d’un ovale (35°).
 - Barrières avec collision : glissières, pneus, blocs TecPro et murs en béton, tracés en deux clics le long de la piste.
 - Terrain complet en herbe, raccordé au relief, à l’intérieur et autour du tracé, avec une marge réglable de 50 à 500 m et des collisions dans Assetto Corsa.
 - Aperçu 3D orientable, où l’on sélectionne et pose comme sur le plan.
@@ -83,7 +84,7 @@ Pour la vérification manuelle : ouvrir les trois modèles et une page blanche, 
 1. Cliquez sur **Nouveau** et choisissez un modèle ou une page blanche.
 2. Choisissez une **couche** dans la colonne de gauche (touches **1** à **6**). Seuls ses éléments réagissent au clic, ses outils s’affichent au-dessus du plan et ses réglages à droite. Les outils en pointillés sont prévus : un clic explique ce qu’ils feront.
 3. Dans **Tracé**, déplacez les points. L’outil **+** ajoute un point après celui sélectionné ; un double-clic sur la chaussée insère un point à cet endroit. Glissez dans le vide pour sélectionner plusieurs points, ou Maj + clic pour en ajouter un : ils se déplacent ensemble et leur altitude se règle en groupe.
-4. Dans **Chaussée**, réglez la largeur de base, les accotements, les vibreurs et les portions de largeur. Dans **Terrain**, choisissez la marge autour du tracé. Les unités sont en mètres.
+4. Dans **Chaussée**, réglez la largeur de base, les accotements, les vibreurs, les portions de largeur et les dévers. Dans **Terrain**, choisissez la marge autour du tracé. Les unités sont en mètres.
 5. Dans **Bords**, choisissez un type de barrière, puis tracez un tronçon en deux clics sur la piste, du début à la fin. Réglez son écartement, son début et sa fin, changez-le de côté ou supprimez-le.
 6. Sous le plan, la **bande de piste** déroule le circuit. Glissez sur une plage pour y poser une portion, des barrières ou la voie des stands selon la couche ; tirez les bords d’un bloc pour l’allonger. La molette zoome, un double-clic montre tout.
 7. Basculez sur l’**aperçu 3D** (touche **C**) pour observer le relief ; glissez pour tourner, molette pour zoomer. On y sélectionne et on y pose comme sur le plan ; les points ne se déplacent que sur le plan.
@@ -126,6 +127,14 @@ La largeur réglée dans **La chaussée** est la **largeur de base**. Pour élar
 La largeur change progressivement sur 20 m à chaque bout, sans marche. Les deux bords s’écartent de la même façon : l’axe reste au milieu de la chaussée. Vibreurs, accotements, voie des stands, barrières, grille et chronométrage suivent la largeur locale. Le contrôle des virages serrés compare chaque virage à la largeur locale : resserrer une épingle peut donc débloquer l’export.
 
 Une nouvelle portion ne peut pas en chevaucher une autre (maximum **40 portions**). Si un réglage les fait se chevaucher, la dernière de la liste l’emporte et un avertissement le signale. Un clic sur la chaussée avec l’outil de sélection sélectionne la portion qui s’y trouve. L’inversion du sens du tracé garde chaque portion à sa place, et le passage en route ouverte scinde une portion qui traverse le départ.
+
+### Dévers et virages relevés
+
+Pour incliner la chaussée dans un virage, utilisez l’outil **D** ou le bouton **Tracer un dévers** de la section **Les dévers** : un premier clic marque le début, un second la fin. On peut aussi choisir une plage dans la bande de piste (un clic sur le nom d’un virage la cadre) puis **Portion de dévers**. Le dévers démarre à 8°, relevé à l’extérieur du virage ; réglez ensuite son angle (0 à 35°), sa transition, le bord relevé, son début et sa fin.
+
+La chaussée s’incline progressivement sur la longueur de la **transition**, à chaque bout : 60 m par défaut, de 5 à 200 m. Une portion plus courte que deux transitions les raccourcit à sa moitié. Elle pivote autour de son bord bas, qui garde l’altitude du tracé : seul le bord relevé monte, rien ne s’enfonce dans le sol. La pente couvre la chaussée et les vibreurs ; au-delà, accotements, voie des stands, muret, barrières et terrain restent à la hauteur du bord des vibreurs. La grille de départ et les emplacements de stand posés sur la chaussée suivent la pente. La bande de piste montre l’angle le long du tracé, au-dessus de la ligne médiane quand la droite est relevée.
+
+Comme pour les largeurs, un nouveau dévers ne peut pas en chevaucher un autre (maximum **40 portions**) ; si un réglage les fait se chevaucher, le dernier l’emporte et un avertissement le signale. Là où une portion de largeur et un dévers se superposent, un clic sur la chaussée garde le type déjà sélectionné, et un second clic passe à l’autre. L’inversion du sens du tracé change le bord relevé de côté, pour que le même bord reste en haut.
 
 ### Barrières et collisions
 

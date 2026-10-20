@@ -12,6 +12,7 @@ import type { TightTurn } from '../../core/track/issues';
 import { kerbWidth, LAYOUT, roadEdge, terrainBounds } from '../../core/track/layout';
 import { pitLaneLayout } from '../../core/track/pitLane';
 import { rangeBetween, rangeSamples } from '../../core/track/ranges';
+import { bankZoneRanges } from '../../core/track/bank';
 import { widthZoneRanges } from '../../core/track/width';
 import type { TrackRange } from '../../core/track/ranges';
 import { INACTIVE_LAYER_ALPHA } from '../layers';
@@ -46,6 +47,11 @@ export interface PlanScene {
   widthDraft: number | null;
   /** Where the next width zone click would land. */
   widthTarget: number | null;
+  selectedBankZoneId: Id | null;
+  /** First click of the bank zone being laid, as a track distance. */
+  bankDraft: number | null;
+  /** Where the next bank zone click would land. */
+  bankTarget: number | null;
   /** The stretch picked in the band. */
   range: TrackRange | null;
   /** Track distance under the pointer, here or in the band. */
@@ -321,44 +327,66 @@ function drawPits(ctx: Context, view: PlanProjection, scene: PlanScene) {
   }
 }
 
-/**
- * The roadway edges of every width zone, the selected one highlighted, and the
- * zone being laid as dashed edges.
- */
-function drawWidthZones(ctx: Context, view: PlanProjection, scene: PlanScene) {
-  const { project, samples } = scene;
-  const edges = (range: TrackRange) => {
-    const path = rangeSamples(samples, range);
-    ctx.beginPath();
-    for (const side of [-1, 1])
-      path.forEach((sample, i) => {
-        const p = view.toScreen({
-          x: sample.x + sample.nx * side * sample.half,
-          z: sample.z + sample.nz * side * sample.half,
-        });
-        if (i === 0) ctx.moveTo(p.x, p.y);
-        else ctx.lineTo(p.x, p.y);
+/** Starts a path along the roadway edges of a range, on the given sides (-1 left, 1 right). */
+function roadwayEdges(
+  ctx: Context,
+  view: PlanProjection,
+  samples: readonly Sample[],
+  range: TrackRange,
+  sides: readonly number[],
+) {
+  const path = rangeSamples(samples, range);
+  ctx.beginPath();
+  for (const side of sides)
+    path.forEach((sample, i) => {
+      const p = view.toScreen({
+        x: sample.x + sample.nx * side * sample.half,
+        z: sample.z + sample.nz * side * sample.half,
       });
-  };
-  ctx.save();
-  ctx.lineCap = 'round';
-  for (const range of widthZoneRanges(project, samples)) {
-    edges(range);
-    if (range.zone.id === scene.selectedWidthZoneId) {
+      if (i === 0) ctx.moveTo(p.x, p.y);
+      else ctx.lineTo(p.x, p.y);
+    });
+}
+
+/**
+ * Zones laid on the roadway: the edges of every width zone and the raised edge of
+ * every bank zone, the selected one highlighted, and the zone being laid as dashed
+ * edges.
+ */
+function drawRoadZones(ctx: Context, view: PlanProjection, scene: PlanScene) {
+  const { project, samples } = scene;
+  const zone = (range: TrackRange, sides: readonly number[], color: string, selected: boolean) => {
+    roadwayEdges(ctx, view, samples, range, sides);
+    if (selected) {
       ctx.strokeStyle = COLORS.selection;
       ctx.lineWidth = 6;
       ctx.stroke();
     }
-    ctx.strokeStyle = COLORS.widthZone;
+    ctx.strokeStyle = color;
     ctx.lineWidth = 1.5;
     ctx.stroke();
-  }
-  if (scene.widthDraft !== null && scene.widthTarget !== null) {
-    edges(rangeBetween(project, samples, scene.widthDraft, scene.widthTarget));
-    ctx.strokeStyle = COLORS.accent;
-    ctx.lineWidth = 2.5;
-    dashed(ctx, [6, 5], () => ctx.stroke());
-  }
+  };
+  ctx.save();
+  ctx.lineCap = 'round';
+  for (const range of widthZoneRanges(project, samples))
+    zone(range, [-1, 1], COLORS.widthZone, range.zone.id === scene.selectedWidthZoneId);
+  for (const range of bankZoneRanges(project, samples))
+    zone(
+      range,
+      [range.zone.high === 'right' ? 1 : -1],
+      COLORS.bankZone,
+      range.zone.id === scene.selectedBankZoneId,
+    );
+  for (const [draft, target] of [
+    [scene.widthDraft, scene.widthTarget],
+    [scene.bankDraft, scene.bankTarget],
+  ])
+    if (draft !== null && target !== null) {
+      roadwayEdges(ctx, view, samples, rangeBetween(project, samples, draft, target), [-1, 1]);
+      ctx.strokeStyle = COLORS.accent;
+      ctx.lineWidth = 2.5;
+      dashed(ctx, [6, 5], () => ctx.stroke());
+    }
   ctx.restore();
 }
 
@@ -553,7 +581,7 @@ export function drawPlan(ctx: Context, view: PlanProjection, scene: PlanScene, d
   if (scene.samples.length > 1) {
     drawTrack(ctx, view, scene);
     inLayer(ctx, scene, 'pits', () => drawPits(ctx, view, scene));
-    inLayer(ctx, scene, 'road', () => drawWidthZones(ctx, view, scene));
+    inLayer(ctx, scene, 'road', () => drawRoadZones(ctx, view, scene));
     drawStart(ctx, view, scene);
     drawTightTurns(ctx, view, scene);
     inLayer(ctx, scene, 'edges', () => drawBarriers(ctx, view, scene));

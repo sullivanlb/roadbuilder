@@ -147,7 +147,13 @@ export class PreviewRenderer {
     if (cursor) {
       this.cursorMesh.position.set(cursor.x, cursor.y + 0.3, cursor.z);
       this.cursorMesh.scale.set(2 * cursor.reach, 1, 1);
-      this.cursorMesh.rotation.y = Math.atan2(-cursor.nz, cursor.nx);
+      // Turned across the track, then rolled about it so the bar lies on a banked roadway.
+      this.cursorMesh.rotation.set(
+        0,
+        Math.atan2(-cursor.nz, cursor.nx),
+        Math.atan(cursor.bank),
+        'YXZ',
+      );
     }
     this.requestRender();
   }

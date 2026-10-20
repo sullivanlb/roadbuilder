@@ -10,7 +10,7 @@ import { serializeProject } from '../src/core/project/schema';
 import { barrierPath } from '../src/core/scene/barriers';
 import { controlPointSample, sampleAt, trackLength } from '../src/core/track/centerline';
 import { widthZoneRanges } from '../src/core/track/width';
-import { bandX } from '../src/rendering/band';
+import { bandRows, bandX } from '../src/rendering/band';
 import { pointDistance, positionDistance } from '../src/core/track/positions';
 import { i18n, setLocale } from '../src/i18n';
 import { installPlatform } from '../src/platform/platform';
@@ -626,10 +626,16 @@ describe('editor interface', () => {
       band.dispatchEvent(
         new MouseEvent(type, { clientX: x, clientY: y, button: 0, bubbles: true }),
       );
-    // Rows: width on top, zones below; drag across the zones row.
-    at('pointerdown', 300, 100);
-    at('pointermove', 420, 100);
-    at('pointerup', 420, 100);
+    // Rows: the width, its zones, the bank, its zones; drag across the width zones row.
+    const size = { width: SIZE.width, height: SIZE.band };
+    const middle = (id: string) => {
+      const row = bandRows('road', size).find((candidate) => candidate.id === id)!;
+      return row.y + row.height / 2;
+    };
+    const y = middle('zones');
+    at('pointerdown', 300, y);
+    at('pointermove', 420, y);
+    at('pointerup', 420, y);
     await settle();
     expect($('range-inspector')).not.toBeNull();
     await click('range-width-zone');
@@ -641,19 +647,51 @@ describe('editor interface', () => {
     // Stretch the zone by its end, in one undo step.
     const total = trackLength(project.samples);
     const view = { start: 0, end: total };
-    const size = { width: SIZE.width, height: SIZE.band };
     const zone = widthZoneRanges(project.project, project.samples)[0];
     const endX = bandX(size, view, zone.start + zone.length);
-    at('pointerdown', endX, 100);
-    at('pointermove', endX + 60, 100);
-    at('pointermove', endX + 80, 100);
-    at('pointerup', endX + 80, 100);
+    at('pointerdown', endX, y);
+    at('pointermove', endX + 60, y);
+    at('pointermove', endX + 80, y);
+    at('pointerup', endX + 80, y);
     await settle();
     const longer = widthZoneRanges(project.project, project.samples)[0];
     expect(longer.length).toBeGreaterThan(zone.length + 20);
     await click('undo');
     expect(widthZoneRanges(project.project, project.samples)[0].length).toBeCloseTo(zone.length, 3);
     expect(viewport.bandView).toBeNull();
+  });
+
+  it('lays banking on a corner from the band, raised outside, and adjusts it', async () => {
+    await mountApp();
+    await click('layer-road');
+    const { project } = stores();
+    const corner = project.corners[0];
+    const size = { width: SIZE.width, height: SIZE.band };
+    const view = { start: 0, end: trackLength(project.samples) };
+    const row = bandRows('road', size).find((candidate) => candidate.id === 'bankZones')!;
+    const y = row.y + row.height / 2;
+    const at = (type: string, s: number) =>
+      $('band-canvas').dispatchEvent(
+        new MouseEvent(type, {
+          clientX: bandX(size, view, s),
+          clientY: y,
+          button: 0,
+          bubbles: true,
+        }),
+      );
+    at('pointerdown', corner.start);
+    at('pointermove', corner.start + corner.length);
+    at('pointerup', corner.start + corner.length);
+    await settle();
+    await click('range-bank-zone');
+    const [zone] = project.project.bankZones;
+    expect(zone).toMatchObject({ angle: 8, high: corner.direction === 'left' ? 'right' : 'left' });
+    expect($('bank-row-0').classList.contains('active')).toBe(true);
+    await type('bank-angle', '12');
+    await click(`bank-high-${zone.high === 'left' ? 'right' : 'left'}`);
+    expect(project.project.bankZones[0]).toMatchObject({ angle: 12, high: corner.direction });
+    await click('bank-delete');
+    expect(project.project.bankZones).toEqual([]);
   });
 
   it('switches the whole interface to English and remembers it', async () => {

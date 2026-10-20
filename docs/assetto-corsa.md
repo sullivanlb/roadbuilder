@@ -18,6 +18,8 @@ Add to this file every time a test in game teaches something, and update the sta
 
 **`IS_PITLANE=1` on the `PIT` surface marks the pit lane** (`1PIT_lane`, or `1PIT_spawn` without a lane): the pit limiter works along `1PIT_lane`. _Confirmed in game._
 
+**A banked roadway up to 35° is driveable**, with grid places and pit boxes tilted with the bank (local X along the slope). _Assumed_: built so, not yet driven in game.
+
 ## Colliders
 
 **An invisible collider works**: a `1WALL_*` mesh written with `IsRenderable = 0` in the KN5 keeps its collisions and is not drawn, like the walls of the official tracks. _Confirmed in game_ (guardrail, tyre, TecPro, concrete and pit wall colliders).

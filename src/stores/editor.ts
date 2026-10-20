@@ -3,12 +3,15 @@ import { computed, ref, watch } from 'vue';
 import type { Id } from '../core/ids';
 import type { Vec3 } from '../core/math';
 import {
+  addBankZone,
   addBarrier,
   addWidthZone,
+  bankZoneRejection,
   barrierRejection,
   insertPoint,
   opposite,
   pointRejection,
+  removeBankZone,
   removeBarrier,
   removePoint,
   removePoints,
@@ -22,11 +25,12 @@ import {
 import { RULES } from '../core/project/rules';
 import { isCircuit } from '../core/project/schema';
 import type { BarrierType, Side } from '../core/project/schema';
+import { outsideOf } from '../core/track/bank';
 import { trackLength } from '../core/track/centerline';
 import { LAYOUT } from '../core/track/layout';
 import { positionAt } from '../core/track/positions';
 import { pointDistance } from '../core/track/positions';
-import { rangeBetween, rangeContains } from '../core/track/ranges';
+import { rangeBetween, rangeContains, rangeSamples } from '../core/track/ranges';
 import type { TrackRange } from '../core/track/ranges';
 import { LAYERS, layerOfSelection, layerOfTool } from '../editor/layers';
 import type { LayerId, Selection } from '../editor/layers';
@@ -34,7 +38,7 @@ import { t } from '../i18n';
 import { useProjectStore } from './project';
 import { useUiStore } from './ui';
 
-export type ToolId = 'select' | 'add' | 'barrier' | 'pits' | 'width' | 'pan';
+export type ToolId = 'select' | 'add' | 'barrier' | 'pits' | 'width' | 'bank' | 'pan';
 export type ViewMode = '2d' | '3d';
 
 /** A place on the road and the side it points at, as a track distance. */
@@ -74,6 +78,9 @@ export const useEditorStore = defineStore('editor', () => {
   /** Track distance of the first click of the width zone being laid; the second is awaited. */
   const widthDraft = ref<number | null>(null);
   const widthTarget = ref<number | null>(null);
+  /** Track distance of the first click of the bank zone being laid; the second is awaited. */
+  const bankDraft = ref<number | null>(null);
+  const bankTarget = ref<number | null>(null);
 
   const selected = <K extends NonNullable<Selection>['kind']>(kind: K) =>
     computed(() => {
@@ -88,6 +95,7 @@ export const useEditorStore = defineStore('editor', () => {
   const selectedPointId = computed(() => selectedPoints.value?.ids[0] ?? null);
   const selectedBarrierId = computed(() => selected('barrier').value?.id ?? null);
   const selectedWidthZoneId = computed(() => selected('widthZone').value?.id ?? null);
+  const selectedBankZoneId = computed(() => selected('bankZone').value?.id ?? null);
   const selectedIndex = computed(() =>
     selectedPointId.value === null ? -1 : (store.pointIndex.get(selectedPointId.value) ?? -1),
   );
@@ -97,6 +105,9 @@ export const useEditorStore = defineStore('editor', () => {
   );
   const selectedWidthZone = computed(() =>
     store.project.widthZones.find((zone) => zone.id === selectedWidthZoneId.value),
+  );
+  const selectedBankZone = computed(() =>
+    store.project.bankZones.find((zone) => zone.id === selectedBankZoneId.value),
   );
   /** Located issues around the selected control point. */
   const selectedIssues = computed(() =>
@@ -122,6 +133,8 @@ export const useEditorStore = defineStore('editor', () => {
         return project.barriers.some((b) => b.id === current.id) ? current : null;
       case 'widthZone':
         return project.widthZones.some((z) => z.id === current.id) ? current : null;
+      case 'bankZone':
+        return project.bankZones.some((z) => z.id === current.id) ? current : null;
       case 'pitLane':
         return project.pitLane ? current : null;
       case undefined:
@@ -149,6 +162,8 @@ export const useEditorStore = defineStore('editor', () => {
     pitTarget.value = null;
     widthDraft.value = null;
     widthTarget.value = null;
+    bankDraft.value = null;
+    bankTarget.value = null;
   }
 
   /** Works on another layer: its tools, its elements, and what was selected in it before. */
@@ -184,6 +199,10 @@ export const useEditorStore = defineStore('editor', () => {
     if (next !== 'width') {
       widthDraft.value = null;
       widthTarget.value = null;
+    }
+    if (next !== 'bank') {
+      bankDraft.value = null;
+      bankTarget.value = null;
     }
   }
 
@@ -254,6 +273,23 @@ export const useEditorStore = defineStore('editor', () => {
     return true;
   }
 
+  /**
+   * Lays a bank zone over a stretch, raised on the outside of its bend, and
+   * selects it; false when it is refused.
+   */
+  function layBankZone(stretch: TrackRange): boolean {
+    const rejection = bankZoneRejection(store.project, store.samples, stretch);
+    if (rejection === 'bank-zones-limit')
+      return refuse(t('toast.bankZonesLimit', { max: RULES.bankZones.max }));
+    if (rejection === 'too-short')
+      return refuse(t('toast.bankZoneTooShort', { min: RULES.rangeLength }));
+    if (rejection === 'overlap') return refuse(t('toast.bankZoneOverlap'));
+    const high = outsideOf(rangeSamples(store.samples, stretch));
+    const id = store.edit((project) => addBankZone(project, { ...rangeEnds(stretch), high }));
+    selection.value = { kind: 'bankZone', id };
+    return true;
+  }
+
   /** Lays the pit lane over a stretch, entry first; false when it is refused. */
   function layPitLane(stretch: TrackRange, side: Side): boolean {
     if (!isCircuit(store.project)) return refuse(t('pits.roadOnly'));
@@ -279,6 +315,13 @@ export const useEditorStore = defineStore('editor', () => {
     if (range.value && layWidthZone(range.value)) {
       range.value = null;
       ui.notify(t('toast.widthZoneAdded'));
+    }
+  }
+
+  function bankZoneOnRange() {
+    if (range.value && layBankZone(range.value)) {
+      range.value = null;
+      ui.notify(t('toast.bankZoneAdded'));
     }
   }
 
@@ -314,6 +357,7 @@ export const useEditorStore = defineStore('editor', () => {
 
   const selectBarrier = (id: Id | null) => select(id ? { kind: 'barrier', id } : null);
   const selectWidthZone = (id: Id | null) => select(id ? { kind: 'widthZone', id } : null);
+  const selectBankZone = (id: Id | null) => select(id ? { kind: 'bankZone', id } : null);
 
   /** Adds a control point after `index` (by default after the selection) and selects it. */
   function addPoint(at: Pick<Vec3, 'x' | 'z'> & { y?: number }, after = selectedIndex.value) {
@@ -429,6 +473,34 @@ export const useEditorStore = defineStore('editor', () => {
     selectWidthZone(store.project.widthZones[Math.min(index, zones.length - 2)]?.id ?? null);
   }
 
+  /** First click of a bank zone: one end. */
+  function beginBankZone(s: number) {
+    bankDraft.value = s;
+  }
+
+  function cancelBankZone() {
+    bankDraft.value = null;
+  }
+
+  /** Second click: the other end. The zone covers the stretch between the two clicks. */
+  function completeBankZone(s: number) {
+    const first = bankDraft.value;
+    if (first === null) return;
+    if (!layBankZone(rangeBetween(store.project, store.samples, first, s))) return;
+    bankDraft.value = null;
+    bankTarget.value = null;
+    ui.notify(t('toast.bankZoneAdded'));
+  }
+
+  function deleteSelectedBankZone() {
+    const zone = selectedBankZone.value;
+    if (!zone) return;
+    const zones = store.project.bankZones;
+    const index = zones.indexOf(zone);
+    store.edit((draft) => removeBankZone(draft, zone.id));
+    selectBankZone(store.project.bankZones[Math.min(index, zones.length - 2)]?.id ?? null);
+  }
+
   /** Chooses the type of the next barrier, and of the selected one if any. */
   function setBarrierType(type: BarrierType) {
     barrierType.value = type;
@@ -475,10 +547,14 @@ export const useEditorStore = defineStore('editor', () => {
     selectedWidthZoneId,
     widthDraft,
     widthTarget,
+    selectedBankZoneId,
+    bankDraft,
+    bankTarget,
     selectedIndex,
     selectedPoint,
     selectedBarrier,
     selectedWidthZone,
+    selectedBankZone,
     selectedIssues,
     setLayer,
     toggleLayer,
@@ -489,6 +565,7 @@ export const useEditorStore = defineStore('editor', () => {
     setRange,
     selectPointsInRange,
     widthZoneOnRange,
+    bankZoneOnRange,
     barriersOnRange,
     pitLaneOnRange,
     selectPoint,
@@ -498,6 +575,7 @@ export const useEditorStore = defineStore('editor', () => {
     selectPointAt,
     selectBarrier,
     selectWidthZone,
+    selectBankZone,
     addPoint,
     deleteSelectedPoint,
     beginBarrier,
@@ -510,6 +588,10 @@ export const useEditorStore = defineStore('editor', () => {
     cancelWidthZone,
     completeWidthZone,
     deleteSelectedWidthZone,
+    beginBankZone,
+    cancelBankZone,
+    completeBankZone,
+    deleteSelectedBankZone,
     setBarrierType,
     swapSelectedBarrierSide,
     deleteSelectedBarrier,

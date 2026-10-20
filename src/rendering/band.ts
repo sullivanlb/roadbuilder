@@ -1,4 +1,5 @@
-import type { BarrierType, Project } from '../core/project/schema';
+import { RULES } from '../core/project/rules';
+import type { BankZone, BarrierType, Project } from '../core/project/schema';
 import { startLine } from '../core/scene/road';
 import { controlPointSample, trackLength, trackStats } from '../core/track/centerline';
 import type { Sample } from '../core/track/centerline';
@@ -6,6 +7,7 @@ import type { Corner } from '../core/track/corners';
 import { pitLaneLayout } from '../core/track/pitLane';
 import { positionRange } from '../core/track/ranges';
 import type { TrackRange } from '../core/track/ranges';
+import { bankZoneRanges } from '../core/track/bank';
 import { widthZoneRanges } from '../core/track/width';
 import type { LayerId } from './layers';
 import { BARRIER_STYLE, COLORS } from './theme';
@@ -31,7 +33,16 @@ export interface BandView {
 }
 
 export type BandRowId =
-  'altitude' | 'width' | 'zones' | 'left' | 'right' | 'lane' | 'start' | 'empty';
+  | 'altitude'
+  | 'width'
+  | 'zones'
+  | 'bank'
+  | 'bankZones'
+  | 'left'
+  | 'right'
+  | 'lane'
+  | 'start'
+  | 'empty';
 
 export interface BandRow {
   id: BandRowId;
@@ -39,7 +50,7 @@ export interface BandRow {
   height: number;
 }
 
-export type BandBlockKind = 'widthZone' | 'barrier' | 'pitLane' | 'startLine';
+export type BandBlockKind = 'widthZone' | 'bankZone' | 'barrier' | 'pitLane' | 'startLine';
 
 /** Something laid along the track, as drawn in the band. A start line is a block of no length. */
 export interface BandBlock {
@@ -56,6 +67,7 @@ export interface BandLabels {
   rows: Record<BandRowId, string>;
   barrier: Record<BarrierType, string>;
   width: (width: number) => string;
+  bank: (zone: Pick<BankZone, 'angle' | 'high'>) => string;
   lane: string;
   start: string;
   empty: string;
@@ -66,8 +78,10 @@ export interface BandLabels {
 const ROWS: Record<LayerId, [BandRowId, number][]> = {
   track: [['altitude', 1]],
   road: [
-    ['width', 0.55],
-    ['zones', 0.45],
+    ['width', 0.3],
+    ['zones', 0.2],
+    ['bank', 0.3],
+    ['bankZones', 0.2],
   ],
   edges: [
     ['left', 1],
@@ -103,14 +117,24 @@ export function bandBlocks(
 ): BandBlock[] {
   if (samples.length < 2) return [];
   if (layer === 'road')
-    return widthZoneRanges(project, samples).map(({ zone, start, length }) => ({
-      kind: 'widthZone',
-      id: zone.id,
-      row: 'zones',
-      range: { start, length },
-      color: COLORS.widthZone,
-      label: labels.width(zone.width),
-    }));
+    return [
+      ...widthZoneRanges(project, samples).map(({ zone, start, length }) => ({
+        kind: 'widthZone' as const,
+        id: zone.id,
+        row: 'zones' as const,
+        range: { start, length },
+        color: COLORS.widthZone,
+        label: labels.width(zone.width),
+      })),
+      ...bankZoneRanges(project, samples).map(({ zone, start, length }) => ({
+        kind: 'bankZone' as const,
+        id: zone.id,
+        row: 'bankZones' as const,
+        range: { start, length },
+        color: COLORS.bankZone,
+        label: labels.bank(zone),
+      })),
+    ];
   if (layer === 'edges')
     return project.barriers.flatMap((barrier) => {
       const range = positionRange(project, samples, barrier.from, barrier.to);
@@ -353,6 +377,27 @@ function drawRow(ctx: Context, size: BandSize, scene: BandScene, row: BandRow) {
       i ? ctx.lineTo(x(sample.s), y(2 * sample.half)) : ctx.moveTo(x(sample.s), y(2 * sample.half)),
     );
     ctx.strokeStyle = COLORS.widthZone;
+    ctx.lineWidth = 1.5;
+    ctx.stroke();
+  }
+  if (row.id === 'bank' && visible.length > 1) {
+    // Bank angle in degrees, right edge raised above the middle line, left below.
+    const max = RULES.bankAngle.max;
+    const y = (bank: number) =>
+      row.y + row.height / 2 - ((Math.atan(bank) * 180) / Math.PI / max) * (row.height / 2 - 3);
+    ctx.setLineDash([3, 4]);
+    ctx.strokeStyle = COLORS.band.base;
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(BAND.left, y(0));
+    ctx.lineTo(size.width, y(0));
+    ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.beginPath();
+    visible.forEach((sample, i) =>
+      i ? ctx.lineTo(x(sample.s), y(sample.bank)) : ctx.moveTo(x(sample.s), y(sample.bank)),
+    );
+    ctx.strokeStyle = COLORS.bankZone;
     ctx.lineWidth = 1.5;
     ctx.stroke();
   }

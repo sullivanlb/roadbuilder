@@ -5,7 +5,7 @@ import { clampToBend } from '../track/layout';
 import { pitLaneLayout, sideEdge } from '../track/pitLane';
 import type { PitLaneLayout } from '../track/pitLane';
 import { positionRange, rangeSamples } from '../track/ranges';
-import { addQuad, createMesh } from './mesh';
+import { addQuad, bankLift, createMesh, offsetPoint } from './mesh';
 import type { Mesh, Pair, Triple } from './mesh';
 
 /**
@@ -33,7 +33,10 @@ export const SOLID_COLLIDER_DEPTH = 1;
 const COLLIDER_BOTTOM = -0.4;
 
 /** Position, local frame and curvature of a point along a barrier. */
-export type Frame = Pick<Sample, 'x' | 'y' | 'z' | 'nx' | 'nz' | 's' | 'curvature' | 'half'>;
+export type Frame = Pick<
+  Sample,
+  'x' | 'y' | 'z' | 'nx' | 'nz' | 's' | 'curvature' | 'half' | 'bank' | 'edge'
+>;
 
 const sideSign = (side: Side): 1 | -1 => (side === 'right' ? 1 : -1);
 
@@ -74,7 +77,8 @@ export function barrierLine(
   const lane = pitLaneLayout(project, samples);
   return along.map((sample) => {
     const lateral = barrierLateral(project, lane, sample, barrier.side, barrier.offset);
-    return { x: sample.x + sample.nx * lateral, y: sample.y, z: sample.z + sample.nz * lateral };
+    const [x, y, z] = offsetPoint(sample, lateral);
+    return { x, y, z };
   });
 }
 
@@ -91,11 +95,8 @@ const along = (p: Frame, distance: number): Frame => ({
   x: p.x + p.nz * distance,
   z: p.z - p.nx * distance,
 });
-export const at = (p: Frame, lateral: number, height: number): Triple => [
-  p.x + p.nx * lateral,
-  p.y + height,
-  p.z + p.nz * lateral,
-];
+export const at = (p: Frame, lateral: number, height: number): Triple =>
+  offsetPoint(p, lateral, height);
 const edgeUvs = (a: number, b: number, low: number, high: number): Pair[] => [
   [a / 4, low / 4],
   [a / 4, high / 4],
@@ -128,6 +129,8 @@ export function walk(path: readonly Frame[], spacing: number, phase = 0): Frame[
         s: a.s + (sb - a.s) * t,
         curvature: a.curvature,
         half: a.half + (b.half - a.half) * t,
+        bank: a.bank + (b.bank - a.bank) * t,
+        edge: a.edge + (b.edge - a.edge) * t,
       });
     }
   }
@@ -251,7 +254,7 @@ function tire(
     cz = base.z + base.nz * lateral,
     tx = base.nz,
     tz = -base.nx,
-    y0 = base.y + bottom,
+    y0 = base.y + bankLift(base, lateral) + bottom,
     y1 = y0 + height;
   const rim = (angle: number, y: number): Triple => [
     cx + (base.nx * Math.cos(angle) + tx * Math.sin(angle)) * radius,

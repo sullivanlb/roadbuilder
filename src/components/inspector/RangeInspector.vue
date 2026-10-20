@@ -40,14 +40,18 @@ const barrierName = computed(() => t(`barriers.${editor.barrierType}`));
         @click="editor.selectPointsInRange()"
         >{{ t('range.selectPoints', { count: pointCount }, pointCount) }}</AppButton
       >
-      <AppButton
-        v-else-if="editor.layer === 'road'"
-        id="range-width-zone"
-        variant="primary"
-        small
-        @click="editor.widthZoneOnRange()"
-        >{{ t('range.widthZone') }}</AppButton
-      >
+      <template v-else-if="editor.layer === 'road'">
+        <AppButton
+          id="range-width-zone"
+          variant="primary"
+          small
+          @click="editor.widthZoneOnRange()"
+          >{{ t('range.widthZone') }}</AppButton
+        >
+        <AppButton id="range-bank-zone" variant="primary" small @click="editor.bankZoneOnRange()">{{
+          t('range.bankZone')
+        }}</AppButton>
+      </template>
       <template v-else-if="editor.layer === 'edges'">
         <AppButton
           id="range-barrier-left"

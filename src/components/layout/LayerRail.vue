@@ -12,7 +12,7 @@ const editor = useEditorStore();
 function count(id: LayerId): number | null {
   const project = store.project;
   if (id === 'track') return project.points.length;
-  if (id === 'road') return project.widthZones.length;
+  if (id === 'road') return project.widthZones.length + project.bankZones.length;
   if (id === 'edges') return project.barriers.length;
   return null;
 }

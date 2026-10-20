@@ -1,9 +1,8 @@
-import { clamp } from '../math';
 import type { WidthZone } from '../project/schema';
 import { trackLength } from './centerline';
 import type { Sample, Track } from './centerline';
 import { LAYOUT } from './layout';
-import { offsetIn, positionRange, rangeContains } from './ranges';
+import { positionRange, rangeContains, rangeEase } from './ranges';
 import type { TrackRange } from './ranges';
 
 /** A width zone resolved on the current track. */
@@ -44,12 +43,7 @@ export function halfWidthAt(
   s: number,
 ): number {
   let half = base;
-  for (const range of ranges) {
-    const offset = offsetIn(range, total, s);
-    if (offset > range.length) continue;
-    const taper = Math.min(LAYOUT.widthTaper, range.length / 2);
-    const t = clamp(Math.min(offset, range.length - offset) / taper, 0, 1);
-    half += (range.zone.width / 2 - half) * t * t * (3 - 2 * t);
-  }
+  for (const range of ranges)
+    half += (range.zone.width / 2 - half) * rangeEase(range, total, s, LAYOUT.widthTaper);
   return half;
 }

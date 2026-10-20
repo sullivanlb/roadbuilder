@@ -10,10 +10,12 @@ import { sampleTrack, trackLength } from '../track/centerline';
 import type { Sample } from '../track/centerline';
 import { positionAt, positionDistance, reanchorPosition } from '../track/positions';
 import { overlapStart } from '../track/ranges';
+import { bankZoneRanges } from '../track/bank';
 import { widthZoneRanges } from '../track/width';
 import type { TrackRange } from '../track/ranges';
 import { isCircuit } from './schema';
 import type {
+  BankZone,
   Barrier,
   PitLane,
   Project,
@@ -82,7 +84,7 @@ function mapPositions(draft: ProjectDraft, map: (position: TrackPosition) => Tra
     draft.pitLane.entry = map(draft.pitLane.entry);
     draft.pitLane.exit = map(draft.pitLane.exit);
   }
-  for (const item of [...draft.barriers, ...draft.widthZones]) {
+  for (const item of [...draft.barriers, ...draft.widthZones, ...draft.bankZones]) {
     item.from = map(item.from);
     item.to = map(item.to);
   }
@@ -96,8 +98,8 @@ function dropPitsUnlessCircuit(draft: ProjectDraft) {
 }
 
 /**
- * Removes a control point. The track positions anchored on it, barrier and width
- * zone ends included, move to the previous point and keep their place.
+ * Removes a control point. The track positions anchored on it, barrier and zone
+ * ends included, move to the previous point and keep their place.
  */
 export function removePoint(draft: ProjectDraft, id: Id) {
   const { track, samples } = measured(draft);
@@ -127,9 +129,9 @@ export function setAltitude(draft: ProjectDraft, ids: readonly Id[], y: number) 
 
 /**
  * Drives the track the other way. A circuit keeps its first control point so the
- * start stays in place. Barriers and width zones keep covering the same ground:
- * their start becomes their end, and barriers change side, since left and right
- * follow the direction.
+ * start stays in place. Barriers, width and bank zones keep covering the same
+ * ground: their start becomes their end, and barriers and the raised edge of bank
+ * zones change side, since left and right follow the direction.
  */
 export function reverseTrack(draft: ProjectDraft) {
   const before = measured(draft);
@@ -139,13 +141,14 @@ export function reverseTrack(draft: ProjectDraft) {
     positionDistance(before.track, before.samples, position) ?? 0;
   const startLine = draft.startLine && distance(draft.startLine);
   const pits = draft.pitLane && [distance(draft.pitLane.entry), distance(draft.pitLane.exit)];
-  const ranges = [...draft.barriers, ...draft.widthZones].map((item) => [
+  const ranges = [...draft.barriers, ...draft.widthZones, ...draft.bankZones].map((item) => [
     distance(item.from),
     distance(item.to),
   ]);
   if (isCircuit(draft)) draft.points = [draft.points[0], ...draft.points.slice(1).reverse()];
   else draft.points.reverse();
   for (const barrier of draft.barriers) barrier.side = opposite(barrier.side);
+  for (const zone of draft.bankZones) zone.high = opposite(zone.high);
   const after = measured(draft);
   const mirrored = (s: number) => positionAt(after.track, after.samples, length - s);
   if (draft.startLine && startLine !== undefined) draft.startLine = mirrored(startLine);
@@ -155,7 +158,7 @@ export function reverseTrack(draft: ProjectDraft) {
     draft.pitLane.exit = mirrored(pits[0]);
     draft.pitLane.side = opposite(draft.pitLane.side);
   }
-  [...draft.barriers, ...draft.widthZones].forEach((item, index) => {
+  [...draft.barriers, ...draft.widthZones, ...draft.bankZones].forEach((item, index) => {
     const [from, to] = ranges[index];
     item.from = mirrored(to);
     item.to = mirrored(from);
@@ -163,7 +166,7 @@ export function reverseTrack(draft: ProjectDraft) {
 }
 
 /**
- * Turns the track into a circuit or a road. A barrier or a width zone running
+ * Turns the track into a circuit or a road. A barrier or a zone running
  * through the start of a circuit is split at the start, since a road has no way
  * through it.
  */
@@ -176,6 +179,7 @@ export function setClosed(draft: ProjectDraft, closed: boolean) {
   const split = splitAtStart(draft, before);
   draft.barriers = split(draft.barriers);
   draft.widthZones = split(draft.widthZones);
+  draft.bankZones = split(draft.bankZones);
 }
 
 /**
@@ -187,7 +191,7 @@ function splitAtStart(draft: ProjectDraft, before: { track: Project; samples: Sa
     last = draft.points.at(-1)!.id;
   const distance = (position: TrackPosition) =>
     positionDistance(before.track, before.samples, position) ?? 0;
-  return <T extends Barrier | WidthZone>(items: T[]): T[] =>
+  return <T extends Barrier | WidthZone | BankZone>(items: T[]): T[] =>
     items.flatMap((item) => {
       if (distance(item.from) <= distance(item.to)) return [item];
       const parts: T[] = [];
@@ -316,6 +320,59 @@ export function updateWidthZone(
 
 export function removeWidthZone(draft: ProjectDraft, id: Id) {
   draft.widthZones = draft.widthZones.filter((zone) => zone.id !== id);
+}
+
+/** Why a bank zone cannot be laid over a stretch of track, or null when it can. */
+export function bankZoneRejection(
+  project: Project,
+  samples: readonly Sample[],
+  range: TrackRange,
+): 'bank-zones-limit' | 'too-short' | 'overlap' | null {
+  if (project.bankZones.length >= RULES.bankZones.max) return 'bank-zones-limit';
+  if (range.length < RULES.rangeLength) return 'too-short';
+  const total = trackLength(samples);
+  if (bankZoneRanges(project, samples).some((other) => overlapStart(other, range, total) !== null))
+    return 'overlap';
+  return null;
+}
+
+/**
+ * Lays a bank zone between two track positions, in track direction, and returns
+ * its ID. It starts at the default angle and transition. Check bankZoneRejection() first.
+ */
+export function addBankZone(
+  draft: ProjectDraft,
+  zone: Pick<BankZone, 'from' | 'to' | 'high'> & { angle?: number; transition?: number },
+): Id {
+  const id = createId();
+  draft.bankZones.push({
+    id,
+    from: clampPosition(zone.from),
+    to: clampPosition(zone.to),
+    angle: within(RULES.bankAngle, zone.angle ?? DEFAULTS.bankAngle),
+    high: zone.high,
+    transition: within(RULES.bankTransition, zone.transition ?? DEFAULTS.bankTransition),
+  });
+  return id;
+}
+
+export function updateBankZone(
+  draft: ProjectDraft,
+  id: Id,
+  patch: Partial<Pick<BankZone, 'from' | 'to' | 'angle' | 'high' | 'transition'>>,
+) {
+  const zone = draft.bankZones.find((candidate) => candidate.id === id);
+  if (!zone) return;
+  if (patch.from !== undefined) zone.from = clampPosition(patch.from);
+  if (patch.to !== undefined) zone.to = clampPosition(patch.to);
+  if (patch.angle !== undefined) zone.angle = within(RULES.bankAngle, patch.angle);
+  if (patch.high !== undefined) zone.high = patch.high;
+  if (patch.transition !== undefined)
+    zone.transition = within(RULES.bankTransition, patch.transition);
+}
+
+export function removeBankZone(draft: ProjectDraft, id: Id) {
+  draft.bankZones = draft.bankZones.filter((zone) => zone.id !== id);
 }
 
 export function setStartLine(draft: ProjectDraft, position: TrackPosition) {

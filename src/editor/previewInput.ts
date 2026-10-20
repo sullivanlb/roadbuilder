@@ -29,6 +29,11 @@ export function previewClick(
       if (editor.widthDraft !== null) editor.completeWidthZone(road.s);
       else editor.beginWidthZone(road.s);
       return;
+    case 'bank':
+      if (!road) return;
+      if (editor.bankDraft !== null) editor.completeBankZone(road.s);
+      else editor.beginBankZone(road.s);
+      return;
     case 'pits':
       if (!road) return;
       if (editor.pitDraft) editor.completePitLane(road.s);
@@ -46,7 +51,9 @@ export function previewClick(
         else editor.selectPoint(hit.pointId);
         return;
       }
-      editor.select(pickInLayer(editor.layer, hit, project.project, project.samples));
+      editor.select(
+        pickInLayer(editor.layer, hit, project.project, project.samples, editor.selection),
+      );
       return;
     case 'pan':
       return;
@@ -59,5 +66,6 @@ export function previewHover({ editor }: Pick<PreviewContext, 'editor'>, hit: Tr
   editor.hoverS = road?.s ?? null;
   if (editor.barrierDraft) editor.barrierTarget = road?.s ?? null;
   if (editor.widthDraft !== null) editor.widthTarget = road?.s ?? null;
+  if (editor.bankDraft !== null) editor.bankTarget = road?.s ?? null;
   if (editor.pitDraft) editor.pitTarget = road;
 }

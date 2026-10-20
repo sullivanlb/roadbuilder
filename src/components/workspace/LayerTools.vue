@@ -19,6 +19,7 @@ const TOOL_LOOK: Record<ToolId, { icon: IconName; label: MessageKey }> = {
   select: { icon: 'cursor', label: 'editor.selectTitle' },
   add: { icon: 'plus', label: 'editor.addTitle' },
   width: { icon: 'width', label: 'editor.widthTitle' },
+  bank: { icon: 'banking', label: 'editor.bankTitle' },
   barrier: { icon: 'wall', label: 'editor.barrierTitle' },
   pits: { icon: 'pits', label: 'editor.pitsTitle' },
   pan: { icon: 'move', label: 'editor.panTitle' },

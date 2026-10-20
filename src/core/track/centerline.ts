@@ -2,6 +2,8 @@ import { clamp, distance } from '../math';
 import type { Vec3 } from '../math';
 import { isCircuit } from '../project/schema';
 import type { Project } from '../project/schema';
+import { bankAt, bankZoneRanges } from './bank';
+import { kerbWidth } from './layout';
 import { halfWidthAt, widthZoneRanges } from './width';
 
 /** A point of the centerline with its local frame, laid out at regular spacing. */
@@ -21,10 +23,18 @@ export interface Sample extends Vec3 {
   curvature: number;
   /** Half the roadway width here, kerbs excluded: the base width, or that of a width zone. */
   half: number;
+  /** Cross slope of the roadway, rise per metre towards the right: 0 unless banked. */
+  bank: number;
+  /** Lateral distance to the outer edge of the kerbs: the bank stops there and the ground stays flat beyond. */
+  edge: number;
 }
 
-/** What the centerline is laid out from; without width zones the roadway keeps its base width. */
-export type Track = Pick<Project, 'road' | 'points'> & Partial<Pick<Project, 'widthZones'>>;
+/**
+ * What the centerline is laid out from; without width zones the roadway keeps its
+ * base width, without bank zones it stays flat across.
+ */
+export type Track = Pick<Project, 'road' | 'points'> &
+  Partial<Pick<Project, 'widthZones' | 'bankZones'>>;
 
 // Centripetal Catmull–Rom: stable bends even with unevenly spaced control points.
 function interpolate(p0: Vec3, p1: Vec3, p2: Vec3, p3: Vec3, t: number): Vec3 {
@@ -47,7 +57,7 @@ function interpolate(p0: Vec3, p1: Vec3, p2: Vec3, p3: Vec3, t: number): Vec3 {
   return p;
 }
 
-const frameless = { s: 0, nx: 0, nz: 1, grade: 0, curvature: 0, half: 0 };
+const frameless = { s: 0, nx: 0, nz: 1, grade: 0, curvature: 0, half: 0, bank: 0, edge: 0 };
 
 /** Lays out the centerline as samples roughly `spacing` metres apart. */
 export function sampleTrack(track: Track, spacing = 3): Sample[] {
@@ -61,6 +71,7 @@ export function sampleTrack(track: Track, spacing = 3): Sample[] {
       t: 0,
       ...frameless,
       half: track.road.width / 2,
+      edge: track.road.width / 2 + kerbWidth(track.road),
     }));
   const circuit = isCircuit(track);
   // A road is extended past its ends in a straight line so its first and last bends stay natural.
@@ -115,9 +126,14 @@ export function sampleTrack(track: Track, spacing = 3): Sample[] {
       bz = after.z - p.z;
     p.curvature = (2 * (ax * bz - az * bx)) / (Math.hypot(ax, az) * Math.hypot(bx, bz) * l || 1);
   });
-  // Width zones are track positions: they can only be placed once distances are known.
-  const ranges = widthZoneRanges(track, samples);
-  for (const p of samples) p.half = halfWidthAt(track.road.width / 2, ranges, length, p.s);
+  // Width and bank zones are track positions: they can only be placed once distances are known.
+  const widths = widthZoneRanges(track, samples),
+    banks = bankZoneRanges(track, samples);
+  for (const p of samples) {
+    p.half = halfWidthAt(track.road.width / 2, widths, length, p.s);
+    p.edge = p.half + kerbWidth(track.road);
+    p.bank = bankAt(banks, length, p.s);
+  }
   return samples;
 }
 
@@ -139,7 +155,7 @@ export function sampleAt(samples: readonly Sample[], s: number): Sample | null {
     b = samples[hi],
     t = (s - a.s) / (b.s - a.s || 1);
   const p = { ...a };
-  for (const k of ['x', 'y', 'z', 'nx', 'nz', 'grade', 'half'] as const)
+  for (const k of ['x', 'y', 'z', 'nx', 'nz', 'grade', 'half', 'bank', 'edge'] as const)
     p[k] = a[k] + (b[k] - a[k]) * t;
   const normalLength = Math.hypot(p.nx, p.nz) || 1;
   p.nx /= normalLength;

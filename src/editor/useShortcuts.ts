@@ -37,6 +37,7 @@ export function useShortcuts() {
     { key: 'b', run: tool('barrier') },
     { key: 'p', run: tool('pits') },
     { key: 'l', run: tool('width') },
+    { key: 'd', run: tool('bank') },
     { key: 'h', run: tool('pan') },
     { key: 'f', run: viewport.fit },
     { key: 'c', run: () => editor.setView(editor.view === '3d' ? '2d' : '3d') },
@@ -49,6 +50,7 @@ export function useShortcuts() {
         if (editor.barrierDraft) editor.cancelBarrier();
         else if (editor.pitDraft) editor.cancelPitLane();
         else if (editor.widthDraft !== null) editor.cancelWidthZone();
+        else if (editor.bankDraft !== null) editor.cancelBankZone();
         else if (editor.range) editor.setRange(null);
         else editor.setTool('select');
       },

@@ -1,5 +1,6 @@
 import type { ToolId } from '../../stores/editor';
 import { addTool } from './add';
+import { bankTool } from './bank';
 import { barrierTool } from './barrier';
 import { panTool } from './pan';
 import { pitsTool } from './pits';
@@ -13,6 +14,7 @@ export const TOOLS: Record<ToolId, Tool> = {
   barrier: barrierTool,
   pits: pitsTool,
   width: widthTool,
+  bank: bankTool,
   pan: panTool,
 };
 

@@ -2,6 +2,7 @@ import type { Id } from '../core/ids';
 import type { Project } from '../core/project/schema';
 import type { Sample } from '../core/track/centerline';
 import type { TrackIssue } from '../core/track/issues';
+import { bankZoneAt } from '../core/track/bank';
 import { pitLaneLayout } from '../core/track/pitLane';
 import { widthZoneAt } from '../core/track/width';
 import type { MessageKey } from '../i18n';
@@ -46,7 +47,7 @@ export const LAYERS: readonly Layer[] = [
     tools: ['add'],
     soon: [soon('straight'), soon('arc'), soon('freehand')],
   },
-  { id: 'road', key: '2', tools: ['width'], soon: [soon('banking'), soon('surface')] },
+  { id: 'road', key: '2', tools: ['width', 'bank'], soon: [soon('surface')] },
   { id: 'edges', key: '3', tools: ['barrier'], soon: [soon('runoff')] },
   { id: 'pits', key: '4', tools: ['pits'], soon: [soon('sectors')] },
   { id: 'terrain', key: '5', tools: [], soon: [soon('sculpt')] },
@@ -62,12 +63,14 @@ export type Selection =
   | { kind: 'points'; ids: readonly Id[] }
   | { kind: 'barrier'; id: Id }
   | { kind: 'widthZone'; id: Id }
+  | { kind: 'bankZone'; id: Id }
   | { kind: 'pitLane' }
   | null;
 
 const SELECTION_LAYER: Record<NonNullable<Selection>['kind'], LayerId> = {
   points: 'track',
   widthZone: 'road',
+  bankZone: 'road',
   barrier: 'edges',
   pitLane: 'pits',
 };
@@ -76,19 +79,33 @@ const SELECTION_LAYER: Record<NonNullable<Selection>['kind'], LayerId> = {
 export const layerOfSelection = (selection: Selection): LayerId | null =>
   selection ? SELECTION_LAYER[selection.kind] : null;
 
-/** What a click on `hit` selects in a layer: only that layer's elements answer. */
+/**
+ * What a click on `hit` selects in a layer: only that layer's elements answer.
+ * Where a width zone and a bank zone share the road, the click keeps to the kind
+ * of the `current` selection, and a click on what is already selected takes the
+ * other one.
+ */
 export function pickInLayer(
   layer: LayerId,
   hit: TrackHit,
   project: Project,
   samples: readonly Sample[],
+  current: Selection = null,
 ): Selection {
   switch (layer) {
     case 'track':
       return hit.pointId ? { kind: 'points', ids: [hit.pointId] } : null;
     case 'road': {
-      const zone = hit.road && widthZoneAt(project, samples, hit.road.s);
-      return zone ? { kind: 'widthZone', id: zone.id } : null;
+      if (!hit.road) return null;
+      const width = widthZoneAt(project, samples, hit.road.s),
+        bank = bankZoneAt(project, samples, hit.road.s);
+      const found = [
+        ...(width ? [{ kind: 'widthZone', id: width.id } as const] : []),
+        ...(bank ? [{ kind: 'bankZone', id: bank.id } as const] : []),
+      ];
+      if (current?.kind === 'bankZone') found.reverse();
+      const selected = current && 'id' in current && found[0]?.id === current.id;
+      return (selected ? found[1] : found[0]) ?? found[0] ?? null;
     }
     case 'edges':
       return hit.barrierId ? { kind: 'barrier', id: hit.barrierId } : null;
@@ -107,6 +124,7 @@ const ISSUE_LAYER: Partial<Record<TrackIssue['code'], LayerId>> = {
   'pit-lane-too-short': 'pits',
   'pit-lane-too-tight': 'pits',
   'width-zones-overlap': 'road',
+  'bank-zones-overlap': 'road',
 };
 
 /** The layer where a track issue is fixed. */
