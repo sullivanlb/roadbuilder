@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { nextTick } from 'vue';
 import { setRoad, updatePoint } from '../src/core/project/edits';
 import { parseProjectFile, serializeProject } from '../src/core/project/schema';
+import { positionDistance } from '../src/core/track/positions';
 import { useEditorStore } from '../src/stores/editor';
 import { useExportStore } from '../src/stores/export';
 import { AUTOSAVE_KEY, useFilesStore } from '../src/stores/files';
@@ -95,17 +96,21 @@ describe('editor', () => {
     expect(editor.selectedPointId).toBeNull();
   });
 
-  it('lays a barrier in two clicks, refusing a single point', () => {
+  it('lays a barrier in two clicks anywhere on the track, refusing one too short', () => {
     const { project, editor, ui } = stores();
-    const [a, , , d] = project.project.points.map((point) => point.id);
     editor.setTool('barrier');
-    editor.beginBarrier({ pointId: a, side: 'right' });
-    editor.completeBarrier(a);
+    editor.beginBarrier({ s: 240, side: 'right' });
+    editor.completeBarrier(242);
     expect(ui.notification?.error).toBe(true);
-    editor.completeBarrier(d);
+    editor.completeBarrier(100);
     expect(project.project.barriers).toEqual([
-      expect.objectContaining({ type: 'guardrail', side: 'right', from: a, to: d, offset: 1 }),
+      expect.objectContaining({ type: 'guardrail', side: 'right', offset: 1 }),
     ]);
+    const [laid] = project.project.barriers;
+    const distance = (position: typeof laid.from) =>
+      positionDistance(project.project, project.samples, position);
+    expect(distance(laid.from)).toBeCloseTo(100, 6);
+    expect(distance(laid.to)).toBeCloseTo(240, 6);
     expect(editor.selectedBarrier?.id).toBe(project.project.barriers[0].id);
     expect(editor.barrierDraft).toBeNull();
     editor.setBarrierType('wall');

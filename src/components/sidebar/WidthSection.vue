@@ -11,6 +11,7 @@ import AppIcon from '../ui/AppIcon.vue';
 import RangeField from '../ui/RangeField.vue';
 import SidebarSection from '../ui/SidebarSection.vue';
 import TrackPositionField from './TrackPositionField.vue';
+import { usePlaceLabel } from './usePlaceLabel';
 
 defineProps<{ index: number }>();
 const store = useProjectStore();
@@ -18,14 +19,7 @@ const editor = useEditorStore();
 
 const zones = computed(() => store.project.widthZones);
 const selected = computed(() => editor.selectedWidthZone);
-const pointNumber = (id: string) => String((store.pointIndex.get(id) ?? 0) + 1).padStart(2, '0');
-const place = (position: WidthZone['from']) =>
-  position.distance
-    ? t('widths.place', {
-        point: pointNumber(position.point),
-        distance: formatNumber(position.distance),
-      })
-    : pointNumber(position.point);
+const place = usePlaceLabel();
 
 const status = computed(() => {
   if (editor.widthDraft !== null) return t('widths.statusDraft');

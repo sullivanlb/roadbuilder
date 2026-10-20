@@ -8,11 +8,16 @@ import type { Mesh } from '../../src/core/scene/mesh';
 import { buildScene, findFoldedSurface } from '../../src/core/scene/scene';
 import { sampleTrack } from '../../src/core/track/centerline';
 import { roadEdge } from '../../src/core/track/layout';
-import { template, tightTurnProject } from '../helpers';
+import { onPoint, template, tightTurnProject } from '../helpers';
 
 const barrier = (project: Project, type: BarrierType, side: Side, from: number, to: number) =>
   produce(project, (draft) => {
-    addBarrier(draft, { type, side, from: draft.points[from].id, to: draft.points[to].id });
+    addBarrier(draft, {
+      type,
+      side,
+      from: onPoint(draft.points[from]),
+      to: onPoint(draft.points[to]),
+    });
   });
 
 const allBarrierTypes = (project: Project) =>

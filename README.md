@@ -32,7 +32,7 @@ Pour distribuer l’application, servez le contenu de **`dist/`** sur un héberg
 
 Le vocabulaire du domaine est défini dans [`CONTEXT.md`](CONTEXT.md), les décisions d’architecture dans [`docs/adr/`](docs/adr/) et ce qu’Assetto Corsa attend d’un export — appris en jeu ou documenté — dans [`docs/assetto-corsa.md`](docs/assetto-corsa.md). Complétez ce dernier après chaque test en jeu. Chaque couche n’importe que les couches inférieures ; ESLint le vérifie.
 
-- `src/core/` : le domaine, sans framework. `project/` contient le format v2 (schéma zod, règles et bornes, modèles, opérations d’édition immer), `track/` l’axe du tracé, les tronçons et les diagnostics, `scene/` la construction de la scène (chaussée, terrain, barrières, repères).
+- `src/core/` : le domaine, sans framework. `project/` contient le format v2 (schéma zod, règles et bornes, modèles, opérations d’édition immer), `track/` l’axe du tracé, les plages entre deux repères, les largeurs et les diagnostics, `scene/` la construction de la scène (chaussée, terrain, barrières, repères).
 - `src/export/` : archives Assetto Corsa (KN5, fichiers ini, carte) et OBJ, encodeurs binaires PNG/ZIP. Les textes des documents exportés sont fournis par l’appelant.
 - `src/rendering/` : dessin du plan 2D et du profil (Canvas 2D), aperçu 3D (Three.js, chargé à la demande), palette de couleurs.
 - `src/workers/` : construction des archives dans un Web Worker (Comlink), pour que l’éditeur reste fluide pendant un export ; repli sur le thread principal si les workers ne sont pas disponibles.
@@ -80,7 +80,7 @@ Pour la vérification manuelle : ouvrir les trois modèles et une page blanche, 
 1. Cliquez sur **Nouveau** et choisissez un modèle ou une page blanche.
 2. Déplacez les points en **Plan 2D**. L’outil **+** ajoute un point après celui sélectionné ; un double-clic sur la chaussée insère un point à cet endroit.
 3. Réglez la largeur et les accotements, puis sélectionnez les points pour modifier leur altitude. Dans **Le terrain**, choisissez la marge autour du tracé. Les unités sont en mètres.
-4. Sécurisez les bords dans **Les barrières** : choisissez un type, puis tracez un tronçon en deux clics, du point de départ au point d’arrivée. Réglez son écartement, changez-le de côté ou supprimez-le.
+4. Sécurisez les bords dans **Les barrières** : choisissez un type, puis tracez un tronçon en deux clics sur la piste, du début à la fin. Réglez son écartement, changez-le de côté ou supprimez-le.
 5. Consultez **Aperçu 3D** pour observer le relief ; glissez pour tourner et utilisez la molette pour zoomer.
 6. Cliquez sur **Enregistrer** pour télécharger un fichier projet. Utilisez **Ouvrir** pour le reprendre plus tard.
 
@@ -122,11 +122,11 @@ Une nouvelle portion ne peut pas en chevaucher une autre (maximum **40 portions*
 
 ### Barrières et collisions
 
-Les tronçons se posent avec l’outil **B** ou le bouton **Tracer sur le plan** : un premier clic fixe le point de départ sur la rive cliquée, un second le point d’arrivée. L’aperçu suit la piste entre les deux points. Échap annule le tracé en cours ; les tronçons se règlent ensuite dans **Les barrières** (écartement de 0 à 10 m au-delà du vibreur, changement de côté, suppression). Maximum **120 tronçons**.
+Les tronçons se posent avec l’outil **B** ou le bouton **Tracer sur le plan** : un premier clic fixe le début sur la rive cliquée, n’importe où sur la piste, un second la fin. L’aperçu suit la piste entre les deux clics. Échap annule le tracé en cours ; les tronçons se règlent ensuite dans **Les barrières** (écartement de 0 à 10 m au-delà du vibreur, début et fin en point plus distance, changement de côté, suppression). Maximum **120 tronçons**.
 
 Les quatre types ont des hauteurs réalistes : glissière 0,78 m, pneus 0,85 m, TecPro 0,85 m, mur en béton 1,1 m. Comme les circuits officiels, chaque tronçon produit un **collider invisible** nommé `1WALL_*` que le jeu utilise pour la collision, plus un décor visible (rail, pneus, blocs rouges et blancs ou mur). Les colliders restent à l’extérieur de la chaussée, y compris dans les virages très serrés.
 
-L’inversion du sens du tracé retourne les tronçons, la suppression d’un point déplace ou supprime les tronçons concernés, et le passage en route ouverte scinde les tronçons qui bouclaient.
+L’inversion du sens du tracé retourne les tronçons, la suppression d’un point garde les tronçons en place, et le passage en route ouverte scinde les tronçons qui bouclaient.
 
 | Action                                    | Raccourci                           |
 | ----------------------------------------- | ----------------------------------- |

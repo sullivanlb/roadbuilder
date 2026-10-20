@@ -51,8 +51,9 @@ export const frMessages = {
   'editor.privacy': 'Tout reste sur votre appareil',
 
   'canvas.hint3d': 'Glissez pour tourner · Molette pour zoomer · Retour au plan 2D pour modifier',
-  'canvas.hintBarrierDraft': 'Cliquez le point d’arrivée du tronçon · Échap annule le tracé',
-  'canvas.hintBarrier': 'Cliquez le point de départ du tronçon · Échap quitte l’outil',
+  'canvas.hintBarrierDraft': 'Cliquez la fin de la barrière · Échap annule le tracé',
+  'canvas.hintBarrier':
+    'Cliquez le début de la barrière, sur la rive voulue · Échap quitte l’outil',
   'canvas.hintAdd': 'Cliquez pour ajouter après le point sélectionné · Échap pour terminer',
   'canvas.hintPan': 'Glissez pour déplacer le plan · Molette pour zoomer',
   'canvas.hintPits':
@@ -127,8 +128,9 @@ export const frMessages = {
   'barriers.selectedNote': 'Le tronçon sélectionné : ',
   'barriers.nextNote': 'Prochain tronçon : ',
   'barriers.draw': 'Tracer sur le plan',
-  'barriers.statusDraft': 'Départ au point {point} (côté {side}) — cliquez le point d’arrivée.',
-  'barriers.statusTool': 'Cliquez le point de départ sur la piste. Échap annule.',
+  'barriers.statusDraft': 'Début posé côté {side} : cliquez la fin de la barrière.',
+  'barriers.statusTool':
+    'Cliquez le début de la barrière sur la piste, sur la rive voulue. Échap annule.',
   'barriers.statusSelected':
     'Tronçon sélectionné : réglez son écartement, changez de côté ou supprimez-le.',
   'barriers.statusChoose': 'Cliquez un tronçon sur le plan pour le modifier.',
@@ -138,9 +140,11 @@ export const frMessages = {
   'barriers.sideLeftShort': 'gauche',
   'barriers.sideRight': 'droite',
   'barriers.sideLeft': 'gauche',
-  'barriers.row': '{index} · {type} · {side} · pts {from}→{to}',
+  'barriers.row': '{index} · {type} · {side} · {from} → {to}',
   'barriers.offset': 'Écartement du collider',
   'barriers.offsetMin': '0 m · bord',
+  'barriers.from': 'Début',
+  'barriers.to': 'Fin',
   'barriers.swap': 'Changer de côté',
   'barriers.delete': 'Supprimer',
   'barriers.empty':
@@ -156,7 +160,6 @@ export const frMessages = {
   'widths.statusChoose':
     'Cliquez une portion sur le plan ou dans la liste pour la régler. La largeur change progressivement sur 20 m à chaque bout.',
   'widths.row': '{index} · {width} m · {from} → {to}',
-  'widths.place': '{point} + {distance} m',
   'widths.width': 'Largeur de la portion',
   'widths.from': 'Début',
   'widths.to': 'Fin',
@@ -177,6 +180,7 @@ export const frMessages = {
   'pits.sideLeft': 'Voie à gauche de la piste',
   'pits.delete': 'Supprimer la voie',
   'position.point': 'Point',
+  'position.place': '{point} + {distance} m',
   'position.distance': 'm après',
   'point.title': 'Le relief',
   'point.badge': 'POINT {index}',
@@ -264,7 +268,7 @@ export const frMessages = {
   'help.note2':
     'Roadbuilder est un outil indépendant, non affilié à Kunos Simulazioni. Aucune donnée n’est envoyée à un serveur.',
 
-  'toast.barrierSamePoint': 'Choisissez un point d’arrivée différent du point de départ.',
+  'toast.barrierTooShort': 'Une barrière doit mesurer au moins {min} m.',
   'toast.barriersLimit': 'Maximum {max} tronçons de barrière.',
   'toast.barrierAdded': 'Barrière ajoutée. Échap pour terminer le tracé.',
   'toast.pitLaneAdded':

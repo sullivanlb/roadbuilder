@@ -9,6 +9,7 @@ import type { PlanPoint } from '../src/core/math';
 import { serializeProject } from '../src/core/project/schema';
 import { barrierPath } from '../src/core/scene/barriers';
 import { controlPointSample, sampleAt } from '../src/core/track/centerline';
+import { pointDistance, positionDistance } from '../src/core/track/positions';
 import { i18n, setLocale } from '../src/i18n';
 import { installPlatform } from '../src/platform/platform';
 import { useEditorStore } from '../src/stores/editor';
@@ -391,10 +392,10 @@ describe('editor interface', () => {
   it('lays a barrier with two clicks on the road, then selects it on the plan', async () => {
     await mountApp();
     await click('tool-barrier');
-    expect($('barrier-status').textContent).toContain('point de départ');
+    expect($('barrier-status').textContent).toContain('début de la barrière');
     strokes = [];
     await clickPlan(roadSide(1, 'right'));
-    expect($('barrier-status').textContent).toContain('point d’arrivée');
+    expect($('barrier-status').textContent).toContain('fin de la barrière');
     pointer('pointermove', roadSide(4, 'right'));
     await settle();
     expect(strokes).toContain('#d3f47d');
@@ -403,13 +404,12 @@ describe('editor interface', () => {
     expect(strokes).toContain('#c8d3d7');
     const { project } = stores();
     const [barrier] = (await saved()).barriers;
-    expect(barrier).toMatchObject({
-      type: 'guardrail',
-      side: 'right',
-      from: project.project.points[1].id,
-      to: project.project.points[4].id,
-      offset: 1,
-    });
+    expect(barrier).toMatchObject({ type: 'guardrail', side: 'right', offset: 1 });
+    // The barrier runs from where the first click landed to where the second did.
+    const distance = (position: typeof barrier.from) =>
+      positionDistance(project.project, project.samples, position)!;
+    expect(distance(barrier.from)).toBeCloseTo(pointDistance(project.samples, 1), 0);
+    expect(distance(barrier.to)).toBeCloseTo(pointDistance(project.samples, 4), 0);
     expect($('barrier-count').textContent).toContain('01');
     expect($<HTMLInputElement>('barrier-offset').value).toBe('1');
 
@@ -433,10 +433,10 @@ describe('editor interface', () => {
     await settle();
     expect($('tool-barrier').getAttribute('aria-pressed')).toBe('true');
     await clickPlan(roadSide(1, 'right'));
-    expect($('barrier-status').textContent).toContain('point d’arrivée');
+    expect($('barrier-status').textContent).toContain('fin de la barrière');
     press('Escape');
     await settle();
-    expect($('barrier-status').textContent).toContain('point de départ');
+    expect($('barrier-status').textContent).toContain('début de la barrière');
     press('Escape');
     await settle();
     expect($('tool-select').getAttribute('aria-pressed')).toBe('true');

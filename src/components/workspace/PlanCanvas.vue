@@ -28,7 +28,7 @@ const scene = computed<PlanScene>(() => ({
   hoveredPointId: editor.hoveredPointId,
   selectedBarrierId: editor.selectedBarrierId,
   barrierDraft: editor.barrierDraft,
-  roadTarget: editor.tool === 'barrier' ? editor.roadTarget : null,
+  barrierTarget: editor.barrierDraft ? editor.barrierTarget : null,
   pitDraft: editor.pitDraft && { entry: editor.pitDraft.s, side: editor.pitDraft.side },
   pitTarget: editor.pitDraft ? editor.pitTarget : null,
   selectedWidthZoneId: editor.selectedWidthZoneId,

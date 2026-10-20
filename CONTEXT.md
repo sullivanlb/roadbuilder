@@ -43,9 +43,9 @@ _Avoid_: spline, curve
 The part of the centerline between two consecutive control points, including the closing one of a circuit.
 _Avoid_: leg, section
 
-**Span** (tronçon):
-A stretch of track from one control point to another, following the track direction. It may cover several segments and, on a circuit, run through the start.
-_Avoid_: region, range, section
+**Range** (plage, or tronçon for a barrier):
+A stretch of track between two track positions, following the track direction. It may cover several segments and, on a circuit, run through the start.
+_Avoid_: span, region, section
 
 **Track distance**:
 Distance travelled along the centerline from the first control point.
@@ -86,7 +86,7 @@ How far the terrain extends beyond the outermost part of the track.
 ### Barriers
 
 **Barrier** (barrière):
-A guardrail, tyre wall, TecPro line or concrete wall laid along a span on one side of the track.
+A guardrail, tyre wall, TecPro line or concrete wall laid along a range on one side of the track.
 _Avoid_: wall (except for the concrete type), fence
 
 **Barrier offset** (écartement):

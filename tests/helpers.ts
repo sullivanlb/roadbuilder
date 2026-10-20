@@ -15,6 +15,9 @@ export const template = (name: Template = 'club'): Project => createProject(name
 /** Seven points on an open road, with two bends too tight for its 24 m width. */
 export const tightTurnProject = (): Project => parseProject(tightTurn);
 
+/** The track position sitting exactly on a control point. */
+export const onPoint = (point: { id: string }) => ({ point: point.id, distance: 0 });
+
 /** A project shaped like a JSON file, for importing. */
 export const asJson = (project: unknown) =>
   JSON.parse(JSON.stringify(project)) as Record<string, unknown>;

@@ -18,7 +18,9 @@ import { slugify } from '../../src/core/project/factory';
 import { RULES } from '../../src/core/project/rules';
 import { parseProject, parseProjectFile, serializeProject } from '../../src/core/project/schema';
 import type { Project } from '../../src/core/project/schema';
-import { asJson, template } from '../helpers';
+import { sampleTrack } from '../../src/core/track/centerline';
+import { positionDistance } from '../../src/core/track/positions';
+import { asJson, onPoint, template } from '../helpers';
 
 const failure = (run: () => unknown) => {
   try {
@@ -37,8 +39,8 @@ const withBarrier = (project: Project, from: number, to: number) =>
     addBarrier(draft, {
       type: 'wall',
       side: 'left',
-      from: ids(project)[from],
-      to: ids(project)[to],
+      from: onPoint(project.points[from]),
+      to: onPoint(project.points[to]),
     });
   });
 
@@ -91,9 +93,9 @@ describe('project files', () => {
     const json = asJson(project);
     const barrier = (json.barriers as Record<string, unknown>[])[0];
     expect(parseProject(json).barriers).toHaveLength(1);
+    const missing = { point: 'missing', distance: 0 };
     expect(
-      failure(() => parseProject({ ...json, barriers: [{ ...barrier, to: 'missing' }] })).detail
-        .code,
+      failure(() => parseProject({ ...json, barriers: [{ ...barrier, to: missing }] })).detail.code,
     ).toBe('barrier-endpoint');
     expect(
       failure(() => parseProject({ ...json, barriers: [{ ...barrier, to: barrier.from }] })).detail
@@ -103,6 +105,17 @@ describe('project files', () => {
       failure(() => parseProject({ ...json, barriers: [{ ...barrier, id: project.points[0].id }] }))
         .detail.code,
     ).toBe('duplicate-id');
+  });
+
+  it('reads barriers saved with control point ends, before track positions', () => {
+    const project = withBarrier(template('club'), 1, 4);
+    const json = asJson(project);
+    const [barrier] = json.barriers as Record<string, unknown>[];
+    json.barriers = [{ ...barrier, from: project.points[1].id, to: project.points[4].id }];
+    expect(parseProject(json).barriers[0]).toMatchObject({
+      from: onPoint(project.points[1]),
+      to: onPoint(project.points[4]),
+    });
   });
 
   it('only lets a circuit barrier run through the start', () => {
@@ -145,17 +158,22 @@ describe('editing operations', () => {
     expect(pointRejection(project, { x: 0, z: 0 })).toBeNull();
   });
 
-  it('keeps barriers on their points when points are inserted, and drops them with an endpoint', () => {
+  it('keeps barriers on their points when points are inserted, and in place when an end point goes', () => {
     const project = withBarrier(template(), 2, 4);
-    const [from, to] = [project.points[2].id, project.points[4].id];
+    const [from, to] = [onPoint(project.points[2]), onPoint(project.points[4])];
     const inserted = produce(project, (draft) => {
       insertPoint(draft, 3, { x: 0, y: 0, z: 0 });
     });
     expect(inserted.barriers[0]).toMatchObject({ from, to });
-    expect(
-      produce(project, (draft) => removePoint(draft, project.points[3].id)).barriers,
-    ).toHaveLength(1);
-    expect(produce(project, (draft) => removePoint(draft, to)).barriers).toEqual([]);
+    const end = positionDistance(project, sampleTrack(project), to)!;
+    const removed = produce(project, (draft) => removePoint(draft, to.point));
+    expect(removed.barriers).toHaveLength(1);
+    expect(removed.barriers[0].to.point).toBe(project.points[3].id);
+    // The end stays roughly where it was; the curve changes a little without its point.
+    expect(positionDistance(removed, sampleTrack(removed), removed.barriers[0].to)).toBeCloseTo(
+      end,
+      -1,
+    );
   });
 
   it('reverses the track: the circuit start stays, barriers keep their ground and change side', () => {
@@ -163,10 +181,11 @@ describe('editing operations', () => {
     const reversed = produce(project, reverseTrack);
     expect(ids(reversed)).toEqual([ids(project)[0], ...ids(project).slice(1).reverse()]);
     expect(reversed.barriers[0]).toMatchObject({
-      from: project.barriers[0].to,
-      to: project.barriers[0].from,
+      from: onPoint(project.points[5]),
       side: 'right',
     });
+    expect(reversed.barriers[0].to.point).toBe(project.points[2].id);
+    expect(reversed.barriers[0].to.distance).toBeCloseTo(0, 6);
     const road = template('mountain');
     expect(ids(produce(road, reverseTrack))).toEqual([...ids(road)].reverse());
   });
@@ -175,7 +194,7 @@ describe('editing operations', () => {
     const project = withBarrier(template('club'), 7, 2);
     const points = ids(project);
     const opened = produce(project, (draft) => setClosed(draft, false));
-    expect(opened.barriers.map(({ from, to }) => [from, to])).toEqual([
+    expect(opened.barriers.map(({ from, to }) => [from.point, to.point])).toEqual([
       [points[7], points[8]],
       [points[0], points[2]],
     ]);
@@ -183,25 +202,19 @@ describe('editing operations', () => {
     // A barrier starting on the last point keeps only its part after the start.
     const circuit = template('club');
     const fromLast = produce(withBarrier(circuit, 8, 1), (draft) => setClosed(draft, false));
-    expect(fromLast.barriers.map(({ from, to }) => [from, to])).toEqual([ids(circuit).slice(0, 2)]);
+    expect(fromLast.barriers.map(({ from, to }) => [from.point, to.point])).toEqual([
+      ids(circuit).slice(0, 2),
+    ]);
   });
 
-  it('orders a road barrier along the track and refuses a single-point span', () => {
+  it('refuses a barrier too short or over the limit', () => {
     const project = template('mountain');
-    const backwards = produce(project, (draft) => {
-      addBarrier(draft, {
-        type: 'tires',
-        side: 'right',
-        from: ids(project)[5],
-        to: ids(project)[2],
-      });
+    expect(barrierRejection(project, { start: 100, length: 2 })).toBe('too-short');
+    expect(barrierRejection(project, { start: 100, length: 50 })).toBeNull();
+    const full = produce(withBarrier(project, 1, 3), (draft) => {
+      for (let i = 1; i < 120; i++) draft.barriers.push({ ...draft.barriers[0], id: `b${i}` });
     });
-    expect(backwards.barriers[0]).toMatchObject({
-      from: ids(project)[2],
-      to: ids(project)[5],
-      offset: 1,
-    });
-    expect(barrierRejection(project, ids(project)[1], ids(project)[1])).toBe('same-point');
+    expect(barrierRejection(full, { start: 100, length: 50 })).toBe('barriers-limit');
   });
 
   it('clamps settings and falls back to a default name', () => {

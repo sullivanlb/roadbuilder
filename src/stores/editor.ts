@@ -22,25 +22,13 @@ import type { BarrierType, Side } from '../core/project/schema';
 import { trackLength } from '../core/track/centerline';
 import { LAYOUT } from '../core/track/layout';
 import { positionAt } from '../core/track/positions';
-import { rangeBetween } from '../core/track/width';
+import { rangeBetween } from '../core/track/ranges';
 import { t } from '../i18n';
 import { useProjectStore } from './project';
 import { useUiStore } from './ui';
 
 export type ToolId = 'select' | 'add' | 'barrier' | 'pits' | 'width' | 'pan';
 export type ViewMode = '2d' | '3d';
-
-/** A barrier being laid: its first click is done, the second is awaited. */
-export interface BarrierDraft {
-  from: Id;
-  side: Side;
-}
-
-/** Where the pointer rests on the roadway while laying a barrier. */
-export interface RoadTarget {
-  pointId: Id;
-  side: Side;
-}
 
 /** A place on the road and the side it points at, as a track distance. */
 export interface RoadSpot {
@@ -58,9 +46,11 @@ export const useEditorStore = defineStore('editor', () => {
   const selectedPointId = ref<Id | null>(store.project.points[0]?.id ?? null);
   const selectedBarrierId = ref<Id | null>(null);
   const barrierType = ref<BarrierType>('guardrail');
-  const barrierDraft = ref<BarrierDraft | null>(null);
+  /** First click of the barrier being laid: where it starts, on which side. */
+  const barrierDraft = ref<RoadSpot | null>(null);
   const hoveredPointId = ref<Id | null>(null);
-  const roadTarget = ref<RoadTarget | null>(null);
+  /** Track distance where the next barrier click would land. */
+  const barrierTarget = ref<number | null>(null);
   /** Entry of the pit lane being laid; the exit click is awaited. */
   const pitDraft = ref<RoadSpot | null>(null);
   const pitTarget = ref<RoadSpot | null>(null);
@@ -96,7 +86,6 @@ export const useEditorStore = defineStore('editor', () => {
         selectedPointId.value = null;
       if (!project.barriers.some((barrier) => barrier.id === selectedBarrierId.value))
         selectedBarrierId.value = null;
-      if (barrierDraft.value && !exists(barrierDraft.value.from)) barrierDraft.value = null;
       if (!project.widthZones.some((zone) => zone.id === selectedWidthZoneId.value))
         selectedWidthZoneId.value = null;
       if (!isCircuit(project)) pitDraft.value = null;
@@ -108,7 +97,7 @@ export const useEditorStore = defineStore('editor', () => {
     tool.value = next;
     if (next !== 'barrier') {
       barrierDraft.value = null;
-      roadTarget.value = null;
+      barrierTarget.value = null;
     }
     if (next !== 'pits') {
       pitDraft.value = null;
@@ -178,25 +167,34 @@ export const useEditorStore = defineStore('editor', () => {
     if (!points.length) setTool('add');
   }
 
-  function beginBarrier(target: RoadTarget) {
-    barrierDraft.value = { from: target.pointId, side: target.side };
+  function beginBarrier(spot: RoadSpot) {
+    barrierDraft.value = spot;
   }
 
   function cancelBarrier() {
     barrierDraft.value = null;
   }
 
-  function completeBarrier(to: Id) {
+  /** Second click: the other end. The barrier covers the stretch between the two clicks. */
+  function completeBarrier(s: number) {
     const draft = barrierDraft.value;
     if (!draft) return;
-    const rejection = barrierRejection(store.project, draft.from, to);
-    if (rejection === 'same-point') return ui.notify(t('toast.barrierSamePoint'), true);
+    const range = rangeBetween(store.project, store.samples, draft.s, s);
+    const rejection = barrierRejection(store.project, range);
+    if (rejection === 'too-short')
+      return ui.notify(t('toast.barrierTooShort', { min: RULES.rangeLength }), true);
     if (rejection === 'barriers-limit')
       return ui.notify(t('toast.barriersLimit', { max: RULES.barriers.max }), true);
     selectedBarrierId.value = store.edit((project) =>
-      addBarrier(project, { type: barrierType.value, side: draft.side, from: draft.from, to }),
+      addBarrier(project, {
+        type: barrierType.value,
+        side: draft.side,
+        from: positionAt(store.project, store.samples, range.start),
+        to: positionAt(store.project, store.samples, range.start + range.length),
+      }),
     );
     barrierDraft.value = null;
+    barrierTarget.value = null;
     ui.notify(t('toast.barrierAdded'));
   }
 
@@ -247,7 +245,7 @@ export const useEditorStore = defineStore('editor', () => {
     if (rejection === 'width-zones-limit')
       return ui.notify(t('toast.widthZonesLimit', { max: RULES.widthZones.max }), true);
     if (rejection === 'too-short')
-      return ui.notify(t('toast.widthZoneTooShort', { min: RULES.widthZoneLength }), true);
+      return ui.notify(t('toast.widthZoneTooShort', { min: RULES.rangeLength }), true);
     if (rejection === 'overlap') return ui.notify(t('toast.widthZoneOverlap'), true);
     selectedWidthZoneId.value = store.edit((project) =>
       addWidthZone(project, {
@@ -302,7 +300,7 @@ export const useEditorStore = defineStore('editor', () => {
     barrierType,
     barrierDraft,
     hoveredPointId,
-    roadTarget,
+    barrierTarget,
     pitDraft,
     pitTarget,
     selectedWidthZoneId,

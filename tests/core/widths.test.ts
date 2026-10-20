@@ -19,7 +19,8 @@ import { trackIssues } from '../../src/core/track/issues';
 import { LAYOUT, roadEdge } from '../../src/core/track/layout';
 import { pitLaneLayout } from '../../src/core/track/pitLane';
 import { pointDistance, positionAt, positionDistance } from '../../src/core/track/positions';
-import { rangeBetween, widthZoneRanges } from '../../src/core/track/width';
+import { rangeBetween } from '../../src/core/track/ranges';
+import { widthZoneRanges } from '../../src/core/track/width';
 import { asJson, template, tightTurnProject } from '../helpers';
 
 /** A project with one width zone laid between two track distances. */

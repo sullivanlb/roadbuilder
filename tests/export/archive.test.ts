@@ -7,7 +7,7 @@ import { crc32 } from '../../src/export/binary/crc32';
 import { zipFiles } from '../../src/export/binary/zip';
 import { ExportError } from '../../src/export/errors';
 import { documentTexts } from '../../src/i18n';
-import { template, tightTurnProject } from '../helpers';
+import { onPoint, template, tightTurnProject } from '../helpers';
 
 const texts = documentTexts('fr');
 
@@ -68,8 +68,8 @@ describe('Assetto Corsa archive', () => {
       addBarrier(draft, {
         type: 'tecpro',
         side: 'right',
-        from: draft.points[1].id,
-        to: draft.points[3].id,
+        from: onPoint(draft.points[1]),
+        to: onPoint(draft.points[3]),
       });
     });
     const archive = buildArchive(project, 'assetto', texts);
@@ -88,8 +88,8 @@ describe('OBJ sources', () => {
       addBarrier(draft, {
         type: 'wall',
         side: 'left',
-        from: draft.points[7].id,
-        to: draft.points[2].id,
+        from: onPoint(draft.points[7]),
+        to: onPoint(draft.points[2]),
       });
     });
     const archive = buildArchive(project, 'obj', texts);

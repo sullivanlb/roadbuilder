@@ -13,6 +13,8 @@ import AppIcon from '../ui/AppIcon.vue';
 import RangeField from '../ui/RangeField.vue';
 import SegmentedControl from '../ui/SegmentedControl.vue';
 import SidebarSection from '../ui/SidebarSection.vue';
+import TrackPositionField from './TrackPositionField.vue';
+import { usePlaceLabel } from './usePlaceLabel';
 
 defineProps<{ index: number }>();
 const store = useProjectStore();
@@ -20,7 +22,7 @@ const editor = useEditorStore();
 
 const barriers = computed(() => store.project.barriers);
 const selected = computed(() => editor.selectedBarrier);
-const pointNumber = (id: string) => String((store.pointIndex.get(id) ?? 0) + 1).padStart(2, '0');
+const place = usePlaceLabel();
 
 const type = computed({
   get: () => selected.value?.type ?? editor.barrierType,
@@ -42,7 +44,6 @@ const status = computed(() => {
   const draft = editor.barrierDraft;
   if (draft)
     return t('barriers.statusDraft', {
-      point: pointNumber(draft.from),
       side: draft.side === 'right' ? t('barriers.sideRightShort') : t('barriers.sideLeftShort'),
     });
   if (editor.tool === 'barrier') return t('barriers.statusTool');
@@ -60,14 +61,13 @@ const rowLabel = (barrier: Barrier, index: number) =>
     index: String(index + 1).padStart(2, '0'),
     type: t(`barriers.${barrier.type}`),
     side: barrier.side === 'right' ? t('barriers.sideRight') : t('barriers.sideLeft'),
-    from: pointNumber(barrier.from),
-    to: pointNumber(barrier.to),
+    from: place(barrier.from),
+    to: place(barrier.to),
   });
 
-function previewOffset(offset: number) {
+function preview(patch: Parameters<typeof updateBarrier>[2]) {
   const barrier = selected.value;
-  if (barrier)
-    store.edit((draft) => updateBarrier(draft, barrier.id, { offset }), { commit: false });
+  if (barrier) store.edit((draft) => updateBarrier(draft, barrier.id, patch), { commit: false });
 }
 </script>
 
@@ -113,7 +113,21 @@ function previewOffset(offset: number) {
         :value="selected.offset"
         :rule="RULES.barrierOffset"
         :min-label="t('barriers.offsetMin')"
-        @input="previewOffset"
+        @input="preview({ offset: $event })"
+        @commit="store.commit()"
+      />
+      <TrackPositionField
+        id="barrier-from"
+        :label="t('barriers.from')"
+        :position="selected.from"
+        @input="preview({ from: $event })"
+        @commit="store.commit()"
+      />
+      <TrackPositionField
+        id="barrier-to"
+        :label="t('barriers.to')"
+        :position="selected.to"
+        @input="preview({ to: $event })"
         @commit="store.commit()"
       />
       <div class="actions">

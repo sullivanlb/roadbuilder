@@ -21,19 +21,25 @@ const controlPoint = z.object({
   z: ranged(RULES.coordinate),
 });
 
+/** A place on the track: a control point plus a distance along the track after it (docs/adr/0006). */
+const trackPosition = z.object({ point: id, distance: ranged(RULES.positionDistance) });
+
+/** Barrier ends were control point IDs before docs/adr/0008: such an end sits on its point. */
+const barrierEnd = z.preprocess(
+  (value) => (typeof value === 'string' ? { point: value, distance: 0 } : value),
+  trackPosition,
+);
+
 const barrier = z.object({
   id,
   type: z.enum(BARRIER_TYPES),
   side: z.enum(SIDES),
-  /** Control point where the span starts, in track direction. */
-  from: id,
-  /** Control point where the span ends, in track direction. */
-  to: id,
+  /** Where the barrier starts, in track direction. */
+  from: barrierEnd,
+  /** Where the barrier ends, in track direction. */
+  to: barrierEnd,
   offset: ranged(RULES.barrierOffset),
 });
-
-/** A place on the track: a control point plus a distance along the track after it (docs/adr/0006). */
-const trackPosition = z.object({ point: id, distance: ranged(RULES.positionDistance) });
 
 /** A stretch where the roadway takes another width than the base one, both edges alike. */
 const widthZone = z.object({
@@ -88,13 +94,16 @@ function checkReferences(project: ProjectShape, ctx: z.RefinementCtx<ProjectShap
   }
   const circuit = isCircuit(project);
   project.barriers.forEach((barrier, index) => {
-    const from = order.get(barrier.from),
-      to = order.get(barrier.to);
+    const from = order.get(barrier.from.point),
+      to = order.get(barrier.to.point);
     if (from === undefined || to === undefined)
       return fail('barrier-endpoint', ['barriers', index]);
-    if (from === to) return fail('barrier-span', ['barriers', index]);
-    // Only a circuit lets a span run through the start.
-    if (!circuit && from > to) fail('barrier-direction', ['barriers', index]);
+    // Positions are anchored on the nearest control point before them, so their
+    // order along the track follows their points, then their distances.
+    const compared = from - to || barrier.from.distance - barrier.to.distance;
+    if (compared === 0) return fail('barrier-span', ['barriers', index]);
+    // Only a circuit lets a barrier run through the start.
+    if (!circuit && compared > 0) fail('barrier-direction', ['barriers', index]);
   });
   const positions = [
     ['startLine', project.startLine],

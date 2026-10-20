@@ -8,7 +8,8 @@ import { sampleTrack, trackStats } from './centerline';
 import type { Sample } from './centerline';
 import { LAYOUT } from './layout';
 import { pitBoxCapacity, pitLaneLayout } from './pitLane';
-import { overlapStart, widthZoneRanges } from './width';
+import { overlapStart } from './ranges';
+import { widthZoneRanges } from './width';
 
 /** Thresholds of the track checks. */
 export const CHECKS = {

@@ -46,8 +46,9 @@ export const enMessages: Record<MessageKey, string> = {
   'editor.privacy': 'Everything stays on your device',
 
   'canvas.hint3d': 'Drag to orbit · Scroll to zoom · Back to the 2D plan to edit',
-  'canvas.hintBarrierDraft': 'Click the end point of the span · Escape cancels the span',
-  'canvas.hintBarrier': 'Click the start point of the span · Escape leaves the tool',
+  'canvas.hintBarrierDraft': 'Click where the barrier ends · Escape cancels',
+  'canvas.hintBarrier':
+    'Click where the barrier starts, on the side you want · Escape leaves the tool',
   'canvas.hintAdd': 'Click to add after the selected point · Escape to finish',
   'canvas.hintPan': 'Drag to move the plan · Scroll to zoom',
   'canvas.hintPits': 'Click the pit lane entry, on the side you want · Escape leaves the tool',
@@ -116,8 +117,9 @@ export const enMessages: Record<MessageKey, string> = {
   'barriers.selectedNote': 'Selected span: ',
   'barriers.nextNote': 'Next span: ',
   'barriers.draw': 'Draw on the plan',
-  'barriers.statusDraft': 'Start at point {point} ({side}) — click the end point.',
-  'barriers.statusTool': 'Click the start point on the road. Escape cancels.',
+  'barriers.statusDraft': 'Start set on the {side} side: click where the barrier ends.',
+  'barriers.statusTool':
+    'Click where the barrier starts on the track, on the side you want. Escape cancels.',
   'barriers.statusSelected': 'Selected span: adjust its offset, swap sides or delete it.',
   'barriers.statusChoose': 'Click a span on the plan to edit it.',
   'barriers.statusEmpty':
@@ -126,9 +128,11 @@ export const enMessages: Record<MessageKey, string> = {
   'barriers.sideLeftShort': 'left',
   'barriers.sideRight': 'right',
   'barriers.sideLeft': 'left',
-  'barriers.row': '{index} · {type} · {side} · pts {from}→{to}',
+  'barriers.row': '{index} · {type} · {side} · {from} → {to}',
   'barriers.offset': 'Collider offset',
   'barriers.offsetMin': '0 m · edge',
+  'barriers.from': 'Start',
+  'barriers.to': 'End',
   'barriers.swap': 'Swap side',
   'barriers.delete': 'Delete',
   'barriers.empty': 'No barrier yet. Two clicks make the track safer: start, then finish.',
@@ -143,7 +147,6 @@ export const enMessages: Record<MessageKey, string> = {
   'widths.statusChoose':
     'Click a zone on the plan or in the list to adjust it. The width changes gradually over 20 m at each end.',
   'widths.row': '{index} · {width} m · {from} → {to}',
-  'widths.place': '{point} + {distance} m',
   'widths.width': 'Zone width',
   'widths.from': 'Start',
   'widths.to': 'End',
@@ -163,6 +166,7 @@ export const enMessages: Record<MessageKey, string> = {
   'pits.sideLeft': 'Lane on the left of the track',
   'pits.delete': 'Delete the lane',
   'position.point': 'Point',
+  'position.place': '{point} + {distance} m',
   'position.distance': 'm after',
   'point.title': 'Elevation',
   'point.badge': 'POINT {index}',
@@ -248,7 +252,7 @@ export const enMessages: Record<MessageKey, string> = {
   'help.note2':
     'Roadbuilder is an independent tool, not affiliated with Kunos Simulazioni. No data is sent to any server.',
 
-  'toast.barrierSamePoint': 'Pick an end point different from the start point.',
+  'toast.barrierTooShort': 'A barrier must be at least {min} m long.',
   'toast.barriersLimit': 'Maximum {max} barrier spans.',
   'toast.barrierAdded': 'Barrier added. Escape to finish drawing.',
   'toast.pitLaneAdded': 'Pit lane added. Set the number of cars in “The pits”.',

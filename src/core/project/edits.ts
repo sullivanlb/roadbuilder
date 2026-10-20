@@ -9,12 +9,12 @@ import type { NumericRule } from './rules';
 import { sampleTrack, trackLength } from '../track/centerline';
 import type { Sample } from '../track/centerline';
 import { positionAt, positionDistance, reanchorPosition } from '../track/positions';
-import { overlapStart, widthZoneRanges } from '../track/width';
-import type { TrackRange } from '../track/width';
+import { overlapStart } from '../track/ranges';
+import { widthZoneRanges } from '../track/width';
+import type { TrackRange } from '../track/ranges';
 import { isCircuit } from './schema';
 import type {
   Barrier,
-  BarrierType,
   PitLane,
   Project,
   RoadSettings,
@@ -32,6 +32,11 @@ import type {
 type ProjectDraft = Draft<Project>;
 
 const within = (rule: NumericRule, value: number) => clamp(value, rule.min, rule.max);
+
+const clampPosition = (position: TrackPosition): TrackPosition => ({
+  ...position,
+  distance: within(RULES.positionDistance, position.distance),
+});
 
 /** Why a control point cannot be added, or null when it can. */
 export function pointRejection(
@@ -77,9 +82,9 @@ function mapPositions(draft: ProjectDraft, map: (position: TrackPosition) => Tra
     draft.pitLane.entry = map(draft.pitLane.entry);
     draft.pitLane.exit = map(draft.pitLane.exit);
   }
-  for (const zone of draft.widthZones) {
-    zone.from = map(zone.from);
-    zone.to = map(zone.to);
+  for (const item of [...draft.barriers, ...draft.widthZones]) {
+    item.from = map(item.from);
+    item.to = map(item.to);
   }
 }
 
@@ -91,8 +96,8 @@ function dropPitsUnlessCircuit(draft: ProjectDraft) {
 }
 
 /**
- * Removes a control point. The barriers that end on it go with it; the track
- * positions anchored on it move to the previous point and keep their place.
+ * Removes a control point. The track positions anchored on it, barrier and width
+ * zone ends included, move to the previous point and keep their place.
  */
 export function removePoint(draft: ProjectDraft, id: Id) {
   const { track, samples } = measured(draft);
@@ -100,16 +105,15 @@ export function removePoint(draft: ProjectDraft, id: Id) {
   if (removed < 0) return;
   mapPositions(draft, (position) => reanchorPosition(track, samples, position, removed));
   draft.points.splice(removed, 1);
-  draft.barriers = draft.barriers.filter((barrier) => barrier.from !== id && barrier.to !== id);
   if (!draft.points.length) delete draft.startLine;
   dropPitsUnlessCircuit(draft);
 }
 
 /**
  * Drives the track the other way. A circuit keeps its first control point so the
- * start stays in place. Barriers keep covering the same ground: their span is
- * swapped and they change side, since left and right follow the direction.
- * Width zones keep their ground too: their start becomes their end.
+ * start stays in place. Barriers and width zones keep covering the same ground:
+ * their start becomes their end, and barriers change side, since left and right
+ * follow the direction.
  */
 export function reverseTrack(draft: ProjectDraft) {
   const before = measured(draft);
@@ -119,13 +123,13 @@ export function reverseTrack(draft: ProjectDraft) {
     positionDistance(before.track, before.samples, position) ?? 0;
   const startLine = draft.startLine && distance(draft.startLine);
   const pits = draft.pitLane && [distance(draft.pitLane.entry), distance(draft.pitLane.exit)];
-  const zones = draft.widthZones.map((zone) => [distance(zone.from), distance(zone.to)]);
+  const ranges = [...draft.barriers, ...draft.widthZones].map((item) => [
+    distance(item.from),
+    distance(item.to),
+  ]);
   if (isCircuit(draft)) draft.points = [draft.points[0], ...draft.points.slice(1).reverse()];
   else draft.points.reverse();
-  for (const barrier of draft.barriers) {
-    [barrier.from, barrier.to] = [barrier.to, barrier.from];
-    barrier.side = opposite(barrier.side);
-  }
+  for (const barrier of draft.barriers) barrier.side = opposite(barrier.side);
   const after = measured(draft);
   const mirrored = (s: number) => positionAt(after.track, after.samples, length - s);
   if (draft.startLine && startLine !== undefined) draft.startLine = mirrored(startLine);
@@ -135,10 +139,10 @@ export function reverseTrack(draft: ProjectDraft) {
     draft.pitLane.exit = mirrored(pits[0]);
     draft.pitLane.side = opposite(draft.pitLane.side);
   }
-  draft.widthZones.forEach((zone, index) => {
-    const [from, to] = zones[index];
-    zone.from = mirrored(to);
-    zone.to = mirrored(from);
+  [...draft.barriers, ...draft.widthZones].forEach((item, index) => {
+    const [from, to] = ranges[index];
+    item.from = mirrored(to);
+    item.to = mirrored(from);
   });
 }
 
@@ -153,40 +157,30 @@ export function setClosed(draft: ProjectDraft, closed: boolean) {
   draft.road.closed = closed;
   dropPitsUnlessCircuit(draft);
   if (!before || isCircuit(draft)) return;
-  splitWidthZonesAtStart(draft, before);
-  const order = new Map(draft.points.map((point, index) => [point.id, index]));
-  const first = draft.points[0].id,
-    last = draft.points.at(-1)!.id;
-  draft.barriers = draft.barriers.flatMap((barrier) => {
-    if (order.get(barrier.from)! < order.get(barrier.to)!) return [barrier];
-    const parts: Barrier[] = [];
-    if (barrier.from !== last) parts.push({ ...barrier, to: last });
-    if (barrier.to !== first) parts.push({ ...barrier, id: createId(), from: first });
-    return parts;
-  });
+  const split = splitAtStart(draft, before);
+  draft.barriers = split(draft.barriers);
+  draft.widthZones = split(draft.widthZones);
 }
 
 /**
- * Splits the width zones that run through the start of a circuit about to become
- * a road: one part up to the last control point, one from the first.
+ * Splits what runs through the start of a circuit about to become a road: one
+ * part up to the last control point, one from the first.
  */
-function splitWidthZonesAtStart(
-  draft: ProjectDraft,
-  before: { track: Project; samples: Sample[] },
-) {
+function splitAtStart(draft: ProjectDraft, before: { track: Project; samples: Sample[] }) {
   const first = draft.points[0].id,
     last = draft.points.at(-1)!.id;
   const distance = (position: TrackPosition) =>
     positionDistance(before.track, before.samples, position) ?? 0;
-  draft.widthZones = draft.widthZones.flatMap((zone) => {
-    if (distance(zone.from) <= distance(zone.to)) return [zone];
-    const parts: WidthZone[] = [];
-    // A start on the last point lies on the closing segment, which the road loses.
-    if (zone.from.point !== last) parts.push({ ...zone, to: { point: last, distance: 0 } });
-    if (zone.to.point !== first || zone.to.distance > 0)
-      parts.push({ ...zone, id: createId(), from: { point: first, distance: 0 } });
-    return parts;
-  });
+  return <T extends Barrier | WidthZone>(items: T[]): T[] =>
+    items.flatMap((item) => {
+      if (distance(item.from) <= distance(item.to)) return [item];
+      const parts: T[] = [];
+      // A start on the last point lies on the closing segment, which the road loses.
+      if (item.from.point !== last) parts.push({ ...item, to: { point: last, distance: 0 } });
+      if (item.to.point !== first || item.to.distance > 0)
+        parts.push({ ...item, id: createId(), from: { point: first, distance: 0 } });
+      return parts;
+    });
 }
 
 export function setRoad(
@@ -211,45 +205,47 @@ export function setAuthor(draft: ProjectDraft, author: string) {
   draft.author = author.trim().slice(0, RULES.author.max);
 }
 
-/** Why a barrier cannot be laid between two control points, or null when it can. */
+/** Why a barrier cannot be laid over a stretch of track, or null when it can. */
 export function barrierRejection(
   project: Project,
-  from: Id,
-  to: Id,
-): 'same-point' | 'barriers-limit' | null {
-  if (from === to) return 'same-point';
+  range: TrackRange,
+): 'too-short' | 'barriers-limit' | null {
+  if (range.length < RULES.rangeLength) return 'too-short';
   if (project.barriers.length >= RULES.barriers.max) return 'barriers-limit';
   return null;
 }
 
 /**
- * Lays a barrier from one control point to another and returns its ID. On a road
- * the span is reordered to follow the track direction. Check barrierRejection() first.
+ * Lays a barrier between two track positions, in track direction, and returns
+ * its ID. Check barrierRejection() first.
  */
 export function addBarrier(
   draft: ProjectDraft,
-  barrier: { type: BarrierType; side: Side; from: Id; to: Id },
+  barrier: Pick<Barrier, 'type' | 'side' | 'from' | 'to'>,
 ): Id {
-  let { from, to } = barrier;
-  if (!isCircuit(draft)) {
-    const index = (id: Id) => draft.points.findIndex((point) => point.id === id);
-    if (index(from) > index(to)) [from, to] = [to, from];
-  }
   const id = createId();
-  draft.barriers.push({ ...barrier, id, from, to, offset: DEFAULTS.barrierOffset });
+  draft.barriers.push({
+    ...barrier,
+    id,
+    from: clampPosition(barrier.from),
+    to: clampPosition(barrier.to),
+    offset: DEFAULTS.barrierOffset,
+  });
   return id;
 }
 
 export function updateBarrier(
   draft: ProjectDraft,
   id: Id,
-  patch: Partial<Pick<Barrier, 'type' | 'side' | 'offset'>>,
+  patch: Partial<Pick<Barrier, 'type' | 'side' | 'offset' | 'from' | 'to'>>,
 ) {
   const barrier = draft.barriers.find((candidate) => candidate.id === id);
   if (!barrier) return;
   if (patch.type !== undefined) barrier.type = patch.type;
   if (patch.side !== undefined) barrier.side = patch.side;
   if (patch.offset !== undefined) barrier.offset = within(RULES.barrierOffset, patch.offset);
+  if (patch.from !== undefined) barrier.from = clampPosition(patch.from);
+  if (patch.to !== undefined) barrier.to = clampPosition(patch.to);
 }
 
 export function removeBarrier(draft: ProjectDraft, id: Id) {
@@ -265,17 +261,12 @@ export function widthZoneRejection(
   range: TrackRange,
 ): 'width-zones-limit' | 'too-short' | 'overlap' | null {
   if (project.widthZones.length >= RULES.widthZones.max) return 'width-zones-limit';
-  if (range.length < RULES.widthZoneLength) return 'too-short';
+  if (range.length < RULES.rangeLength) return 'too-short';
   const total = trackLength(samples);
   if (widthZoneRanges(project, samples).some((other) => overlapStart(other, range, total) !== null))
     return 'overlap';
   return null;
 }
-
-const clampPosition = (position: TrackPosition): TrackPosition => ({
-  ...position,
-  distance: within(RULES.positionDistance, position.distance),
-});
 
 /**
  * Lays a width zone between two track positions, in track direction, and returns

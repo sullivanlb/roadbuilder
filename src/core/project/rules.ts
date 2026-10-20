@@ -15,8 +15,8 @@ export const RULES = {
   points: { max: 160 },
   barriers: { max: 120 },
   widthZones: { max: 40 },
-  /** Shortest width zone accepted, along the track. */
-  widthZoneLength: 5,
+  /** Shortest width zone or barrier accepted, along the track. */
+  rangeLength: 5,
   /** Two control points closer than this on the ground plane are rejected. */
   pointSpacing: 2,
   coordinate: { min: -10000, max: 10000, step: 1 },

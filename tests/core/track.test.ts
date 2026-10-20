@@ -4,8 +4,9 @@ import { bounds } from '../../src/core/math';
 import { addBarrier, setRoad } from '../../src/core/project/edits';
 import { sampleAt, sampleTrack, trackStats } from '../../src/core/track/centerline';
 import { trackIssues } from '../../src/core/track/issues';
-import { spanSamples, spanSegments } from '../../src/core/track/spans';
-import { template, tightTurnProject } from '../helpers';
+import { positionRange, rangeSamples } from '../../src/core/track/ranges';
+import { barrierSamples } from '../../src/core/scene/barriers';
+import { onPoint, template, tightTurnProject } from '../helpers';
 
 describe('centerline', () => {
   it.each(['club', 'kart', 'mountain'] as const)('keeps the %s template stable', (name) => {
@@ -89,15 +90,20 @@ describe('track issues', () => {
   });
 });
 
-describe('spans', () => {
+describe('ranges', () => {
   it('follow the track direction and run through the start of a circuit', () => {
     const project = template('club');
-    const id = (index: number) => project.points[index].id;
-    expect(spanSegments(project, { from: id(2), to: id(5) })).toEqual([2, 3, 4]);
-    expect(spanSegments(project, { from: id(7), to: id(2) })).toEqual([7, 8, 0, 1]);
-    const path = spanSamples(project, sampleTrack(project), { from: id(7), to: id(2) });
+    const samples = sampleTrack(project);
+    const at = (index: number) => onPoint(project.points[index]);
+    const range = positionRange(project, samples, at(7), at(2))!;
+    const path = rangeSamples(samples, range);
     expect([path[0].x, path[0].z]).toEqual([project.points[7].x, project.points[7].z]);
     expect([path.at(-1)!.x, path.at(-1)!.z]).toEqual([project.points[2].x, project.points[2].z]);
+    expect(new Set(path.map((sample) => sample.segment))).toEqual(new Set([7, 8, 0, 1, 2]));
+    // Ends between samples are interpolated exactly where they are.
+    const between = rangeSamples(samples, { start: 100.5, length: 30 });
+    expect(between[0].s).toBeCloseTo(100.5, 6);
+    expect(between.at(-1)!.s).toBeCloseTo(130.5, 6);
   });
 
   it('end on the last point of a road', () => {
@@ -105,16 +111,20 @@ describe('spans', () => {
       addBarrier(draft, {
         type: 'wall',
         side: 'left',
-        from: draft.points[7].id,
-        to: draft.points[9].id,
+        from: onPoint(draft.points[7]),
+        to: onPoint(draft.points[9]),
       });
     });
-    const path = spanSamples(project, sampleTrack(project), project.barriers[0]);
+    const path = barrierSamples(project, sampleTrack(project), project.barriers[0]);
     const last = project.points[9];
     expect([path.at(-1)!.x, path.at(-1)!.z]).toEqual([last.x, last.z]);
   });
 
-  it('are empty when an endpoint is unknown', () => {
-    expect(spanSegments(template(), { from: 'nope', to: template().points[1].id })).toEqual([]);
+  it('are unknown when an end point is gone', () => {
+    const project = template();
+    const missing = { point: 'nope', distance: 0 };
+    expect(positionRange(project, sampleTrack(project), missing, onPoint(project.points[1]))).toBe(
+      null,
+    );
   });
 });

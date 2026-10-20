@@ -5,7 +5,8 @@ import type { Project, Side } from '../../core/project/schema';
 import { barrierPath } from '../../core/scene/barriers';
 import type { Sample } from '../../core/track/centerline';
 import { widestHalf } from '../../core/track/layout';
-import { rangeContains, widthZoneRanges } from '../../core/track/width';
+import { rangeContains } from '../../core/track/ranges';
+import { widthZoneRanges } from '../../core/track/width';
 import type { PlanProjection, ScreenPoint } from './projection';
 
 /** Pick distances, in pixels. */
@@ -75,26 +76,6 @@ export function findRoad(
     };
   }
   return best;
-}
-
-/** The control point nearest the cursor along the road, with the side of the road it points at. */
-export function findRoadSide(
-  view: PlanProjection,
-  project: Project,
-  samples: readonly Sample[],
-  at: ScreenPoint,
-): { pointId: Id; side: Side } | null {
-  const road = findRoad(view, project, samples, at);
-  const points = project.points;
-  if (!road || !points.length) return null;
-  const a = points[road.segment],
-    b = points[(road.segment + 1) % points.length];
-  const distanceTo = (point: Vec3) => {
-    const p = view.toScreen(point);
-    return Math.hypot(p.x - at.x, p.y - at.y);
-  };
-  const side = sideOf(view, road, at);
-  return { pointId: distanceTo(a) <= distanceTo(b) ? a.id : b.id, side };
 }
 
 /** The track distance under the cursor, with the side of the road it points at. */

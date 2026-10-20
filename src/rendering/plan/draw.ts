@@ -1,9 +1,8 @@
 import type { Id } from '../../core/ids';
 import type { Vec3 } from '../../core/math';
 import { DEFAULTS } from '../../core/project/rules';
-import { isCircuit } from '../../core/project/schema';
 import type { Project, Side } from '../../core/project/schema';
-import { barrierPath } from '../../core/scene/barriers';
+import { barrierLine, barrierPath } from '../../core/scene/barriers';
 import { gridPlaces, pitBoxPlaces } from '../../core/scene/markers';
 import type { Place } from '../../core/scene/markers';
 import { startLine } from '../../core/scene/road';
@@ -12,8 +11,9 @@ import type { Sample } from '../../core/track/centerline';
 import type { TightTurn } from '../../core/track/issues';
 import { kerbWidth, LAYOUT, roadEdge, terrainBounds } from '../../core/track/layout';
 import { pitLaneLayout } from '../../core/track/pitLane';
-import { rangeBetween, widthZoneRanges } from '../../core/track/width';
-import type { TrackRange } from '../../core/track/width';
+import { rangeBetween, rangeSamples } from '../../core/track/ranges';
+import { widthZoneRanges } from '../../core/track/width';
+import type { TrackRange } from '../../core/track/ranges';
 import { BARRIER_STYLE, COLORS } from '../theme';
 import type { PlanProjection } from './projection';
 
@@ -25,10 +25,10 @@ export interface PlanScene {
   selectedPointId: Id | null;
   hoveredPointId: Id | null;
   selectedBarrierId: Id | null;
-  /** First click of the barrier being laid. */
-  barrierDraft: { from: Id; side: Side } | null;
+  /** First click of the barrier being laid, as a track distance. */
+  barrierDraft: { s: number; side: Side } | null;
   /** Where the next barrier click would land. */
-  roadTarget: { pointId: Id; side: Side } | null;
+  barrierTarget: number | null;
   /** Entry of the pit lane being laid, as a track distance. */
   pitDraft: { entry: number; side: Side } | null;
   /** Where the next pit lane click would land. */
@@ -139,15 +139,6 @@ function strokeAlong(
   flush();
   ctx.setLineDash([]);
   ctx.lineDashOffset = 0;
-}
-
-/** Samples along a stretch of track, about every 2 m. */
-function alongRange(samples: readonly Sample[], range: TrackRange): Sample[] {
-  const total = trackLength(samples),
-    steps = Math.max(1, Math.ceil(range.length / 2));
-  return Array.from({ length: steps + 1 }, (_, i) =>
-    sampleAt(samples, (range.start + (range.length * i) / steps) % total)!,
-  );
 }
 
 /** Terrain outline, then the road drawn as stacked strokes from the widest to the narrowest. */
@@ -308,7 +299,7 @@ function drawPits(ctx: Context, view: PlanProjection, scene: PlanScene) {
 function drawWidthZones(ctx: Context, view: PlanProjection, scene: PlanScene) {
   const { project, samples } = scene;
   const edges = (range: TrackRange) => {
-    const path = alongRange(samples, range);
+    const path = rangeSamples(samples, range);
     ctx.beginPath();
     for (const side of [-1, 1])
       path.forEach((sample, i) => {
@@ -393,18 +384,12 @@ function drawBarriers(ctx: Context, view: PlanProjection, scene: PlanScene) {
     ctx.lineWidth = style.width;
     dashed(ctx, style.dash, () => ctx.stroke());
   }
-  const draft = scene.barrierDraft,
-    target = scene.roadTarget;
-  if (draft && target && target.pointId !== draft.from) {
-    const index = (id: Id) => project.points.findIndex((point) => point.id === id);
-    const forward = isCircuit(project) || index(draft.from) < index(target.pointId);
-    const [from, to] = forward ? [draft.from, target.pointId] : [target.pointId, draft.from];
-    const path = barrierPath(project, samples, {
-      from,
-      to,
-      side: draft.side,
-      offset: DEFAULTS.barrierOffset,
-    });
+  const draft = scene.barrierDraft;
+  if (!draft) return;
+  const line = { side: draft.side, offset: DEFAULTS.barrierOffset };
+  if (scene.barrierTarget !== null) {
+    const range = rangeBetween(project, samples, draft.s, scene.barrierTarget);
+    const path = barrierLine(project, samples, rangeSamples(samples, range), line);
     if (path.length > 1) {
       trace(ctx, view, path);
       ctx.strokeStyle = COLORS.accent;
@@ -412,18 +397,14 @@ function drawBarriers(ctx: Context, view: PlanProjection, scene: PlanScene) {
       dashed(ctx, [6, 5], () => ctx.stroke());
     }
   }
-  const ring = (id: Id, color: string) => {
-    const point = project.points.find((candidate) => candidate.id === id);
-    if (!point) return;
-    const p = view.toScreen(point);
-    ctx.beginPath();
-    ctx.arc(p.x, p.y, 10, 0, Math.PI * 2);
-    ctx.strokeStyle = color;
-    ctx.lineWidth = 1.5;
-    ctx.stroke();
-  };
-  if (target) ring(target.pointId, COLORS.point.haloOutline);
-  if (draft) ring(draft.from, COLORS.accent);
+  // The first click, on its side of the road.
+  const [start] = barrierLine(project, samples, [sampleAt(samples, draft.s)!], line);
+  const p = view.toScreen(start);
+  ctx.beginPath();
+  ctx.arc(p.x, p.y, 6, 0, Math.PI * 2);
+  ctx.strokeStyle = COLORS.accent;
+  ctx.lineWidth = 1.5;
+  ctx.stroke();
 }
 
 /** Control points, numbered, with the selected and the problematic ones highlighted. */
