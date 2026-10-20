@@ -55,6 +55,8 @@ export const enMessages: Record<MessageKey, string> = {
   'canvas.hintPitsDraft': 'Click the pit lane exit · Escape cancels',
   'canvas.hintWidth': 'Click where the zone starts on the track · Escape leaves the tool',
   'canvas.hintWidthDraft': 'Click where the zone ends · Escape cancels',
+  'canvas.hintSelectLayer':
+    'Click an item of the layer to adjust it · Scroll to zoom · Space + drag to pan',
   'canvas.hintSelect': 'Drag a point · Scroll to zoom · Space + drag to pan',
   'canvas.start': 'START',
   'canvas.finish': 'FINISH',

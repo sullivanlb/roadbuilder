@@ -23,6 +23,8 @@ import { trackLength } from '../core/track/centerline';
 import { LAYOUT } from '../core/track/layout';
 import { positionAt } from '../core/track/positions';
 import { rangeBetween } from '../core/track/ranges';
+import { LAYERS, layerOfSelection, layerOfTool } from '../editor/layers';
+import type { LayerId, Selection } from '../editor/layers';
 import { t } from '../i18n';
 import { useProjectStore } from './project';
 import { useUiStore } from './ui';
@@ -36,15 +38,21 @@ export interface RoadSpot {
   side: Side;
 }
 
-/** What the user is doing: active tool and view, selection, barrier being laid, hover. */
+/** What the user is doing: active layer, tool and view, selection, what is being laid, hover. */
 export const useEditorStore = defineStore('editor', () => {
   const store = useProjectStore();
   const ui = useUiStore();
 
+  const layer = ref<LayerId>('track');
+  /** Layers hidden on the plan and in the preview. */
+  const hiddenLayers = ref<LayerId[]>([]);
   const tool = ref<ToolId>(store.project.points.length ? 'select' : 'add');
   const view = ref<ViewMode>('2d');
-  const selectedPointId = ref<Id | null>(store.project.points[0]?.id ?? null);
-  const selectedBarrierId = ref<Id | null>(null);
+  const firstPoint = (): Selection => {
+    const first = store.project.points[0];
+    return first ? { kind: 'points', ids: [first.id] } : null;
+  };
+  const selection = ref<Selection>(firstPoint());
   const barrierType = ref<BarrierType>('guardrail');
   /** First click of the barrier being laid: where it starts, on which side. */
   const barrierDraft = ref<RoadSpot | null>(null);
@@ -54,11 +62,20 @@ export const useEditorStore = defineStore('editor', () => {
   /** Entry of the pit lane being laid; the exit click is awaited. */
   const pitDraft = ref<RoadSpot | null>(null);
   const pitTarget = ref<RoadSpot | null>(null);
-  const selectedWidthZoneId = ref<Id | null>(null);
   /** Track distance of the first click of the width zone being laid; the second is awaited. */
   const widthDraft = ref<number | null>(null);
   const widthTarget = ref<number | null>(null);
 
+  const selected = <K extends NonNullable<Selection>['kind']>(kind: K) =>
+    computed(() => {
+      const current = selection.value;
+      return current?.kind === kind ? (current as Extract<Selection, { kind: K }>) : null;
+    });
+  const selectedPoints = selected('points');
+  /** The selected control point, when the selection holds points. */
+  const selectedPointId = computed(() => selectedPoints.value?.ids[0] ?? null);
+  const selectedBarrierId = computed(() => selected('barrier').value?.id ?? null);
+  const selectedWidthZoneId = computed(() => selected('widthZone').value?.id ?? null);
   const selectedIndex = computed(() =>
     selectedPointId.value === null ? -1 : (store.pointIndex.get(selectedPointId.value) ?? -1),
   );
@@ -81,19 +98,51 @@ export const useEditorStore = defineStore('editor', () => {
   watch(
     () => store.project,
     (project) => {
-      const exists = (id: Id | null) => id !== null && store.pointIndex.has(id);
-      if (selectedPointId.value !== null && !exists(selectedPointId.value))
-        selectedPointId.value = null;
-      if (!project.barriers.some((barrier) => barrier.id === selectedBarrierId.value))
-        selectedBarrierId.value = null;
-      if (!project.widthZones.some((zone) => zone.id === selectedWidthZoneId.value))
-        selectedWidthZoneId.value = null;
+      const current = selection.value;
+      if (current?.kind === 'points') {
+        const ids = current.ids.filter((id) => store.pointIndex.has(id));
+        if (ids.length !== current.ids.length)
+          selection.value = ids.length ? { kind: 'points', ids } : null;
+      }
+      const gone =
+        (current?.kind === 'barrier' && !project.barriers.some((b) => b.id === current.id)) ||
+        (current?.kind === 'widthZone' && !project.widthZones.some((z) => z.id === current.id)) ||
+        (current?.kind === 'pitLane' && !project.pitLane);
+      if (gone) selection.value = null;
       if (!isCircuit(project)) pitDraft.value = null;
     },
   );
 
+  function clearDrafts() {
+    barrierDraft.value = null;
+    barrierTarget.value = null;
+    pitDraft.value = null;
+    pitTarget.value = null;
+    widthDraft.value = null;
+    widthTarget.value = null;
+  }
+
+  /** Works on another layer: its tools and its elements only, nothing selected yet. */
+  function setLayer(next: LayerId) {
+    if (layer.value === next) return;
+    store.commit();
+    layer.value = next;
+    selection.value = null;
+    clearDrafts();
+    if (layerOfTool(tool.value) !== null) tool.value = 'select';
+  }
+
+  function toggleLayer(id: LayerId) {
+    hiddenLayers.value = hiddenLayers.value.includes(id)
+      ? hiddenLayers.value.filter((hidden) => hidden !== id)
+      : [...hiddenLayers.value, id];
+  }
+
+  /** Picks a tool; one that belongs to another layer moves to that layer first. */
   function setTool(next: ToolId) {
     if (view.value === '3d' && next !== 'pan') view.value = '2d';
+    const home = layerOfTool(next);
+    if (home) setLayer(home);
     tool.value = next;
     if (next !== 'barrier') {
       barrierDraft.value = null;
@@ -114,21 +163,23 @@ export const useEditorStore = defineStore('editor', () => {
     view.value = next;
   }
 
-  /** Starts a new document: first point selected, the right tool for an empty track. */
+  /** Starts a new document: on the track layer, first point selected, the right tool for an empty track. */
   function reset() {
-    selectedPointId.value = store.project.points[0]?.id ?? null;
-    selectedBarrierId.value = null;
-    selectedWidthZoneId.value = null;
-    barrierDraft.value = null;
-    pitDraft.value = null;
-    widthDraft.value = null;
+    layer.value = 'track';
+    clearDrafts();
     setTool(store.project.points.length ? 'select' : 'add');
+    selection.value = firstPoint();
   }
 
-  function selectPoint(id: Id | null) {
+  /** Selects something, moving to its layer if need be; null clears the selection. */
+  function select(next: Selection) {
     store.commit();
-    selectedPointId.value = id;
+    const home = layerOfSelection(next);
+    if (home) setLayer(home);
+    selection.value = next;
   }
+
+  const selectPoint = (id: Id | null) => select(id ? { kind: 'points', ids: [id] } : null);
 
   /** Selects the control point at a position in the track (clamped). */
   function selectPointAt(index: number) {
@@ -136,15 +187,8 @@ export const useEditorStore = defineStore('editor', () => {
     if (points.length) selectPoint(points[Math.max(0, Math.min(points.length - 1, index))].id);
   }
 
-  function selectBarrier(id: Id | null) {
-    store.commit();
-    selectedBarrierId.value = id;
-  }
-
-  function selectWidthZone(id: Id | null) {
-    store.commit();
-    selectedWidthZoneId.value = id;
-  }
+  const selectBarrier = (id: Id | null) => select(id ? { kind: 'barrier', id } : null);
+  const selectWidthZone = (id: Id | null) => select(id ? { kind: 'widthZone', id } : null);
 
   /** Adds a control point after `index` (by default after the selection) and selects it. */
   function addPoint(at: Pick<Vec3, 'x' | 'z'> & { y?: number }, after = selectedIndex.value) {
@@ -154,7 +198,8 @@ export const useEditorStore = defineStore('editor', () => {
     if (rejection === 'too-close')
       return ui.notify(t('toast.pointTooClose', { min: RULES.pointSpacing }), true);
     const y = at.y ?? selectedPoint.value?.y ?? 0;
-    selectedPointId.value = store.edit((draft) => insertPoint(draft, after + 1, { ...at, y }));
+    const id = store.edit((draft) => insertPoint(draft, after + 1, { ...at, y }));
+    selection.value = { kind: 'points', ids: [id] };
   }
 
   function deleteSelectedPoint() {
@@ -163,7 +208,8 @@ export const useEditorStore = defineStore('editor', () => {
     const index = selectedIndex.value;
     store.edit((draft) => removePoint(draft, id));
     const points = store.project.points;
-    selectedPointId.value = points[Math.min(index, points.length - 1)]?.id ?? null;
+    const next = points[Math.min(index, points.length - 1)];
+    selection.value = next ? { kind: 'points', ids: [next.id] } : null;
     if (!points.length) setTool('add');
   }
 
@@ -185,7 +231,7 @@ export const useEditorStore = defineStore('editor', () => {
       return ui.notify(t('toast.barrierTooShort', { min: RULES.rangeLength }), true);
     if (rejection === 'barriers-limit')
       return ui.notify(t('toast.barriersLimit', { max: RULES.barriers.max }), true);
-    selectedBarrierId.value = store.edit((project) =>
+    const id = store.edit((project) =>
       addBarrier(project, {
         type: barrierType.value,
         side: draft.side,
@@ -193,6 +239,7 @@ export const useEditorStore = defineStore('editor', () => {
         to: positionAt(store.project, store.samples, range.start + range.length),
       }),
     );
+    selection.value = { kind: 'barrier', id };
     barrierDraft.value = null;
     barrierTarget.value = null;
     ui.notify(t('toast.barrierAdded'));
@@ -247,12 +294,13 @@ export const useEditorStore = defineStore('editor', () => {
     if (rejection === 'too-short')
       return ui.notify(t('toast.widthZoneTooShort', { min: RULES.rangeLength }), true);
     if (rejection === 'overlap') return ui.notify(t('toast.widthZoneOverlap'), true);
-    selectedWidthZoneId.value = store.edit((project) =>
+    const id = store.edit((project) =>
       addWidthZone(project, {
         from: positionAt(store.project, store.samples, range.start),
         to: positionAt(store.project, store.samples, range.start + range.length),
       }),
     );
+    selection.value = { kind: 'widthZone', id };
     widthDraft.value = null;
     widthTarget.value = null;
     ui.notify(t('toast.widthZoneAdded'));
@@ -264,8 +312,7 @@ export const useEditorStore = defineStore('editor', () => {
     const zones = store.project.widthZones;
     const index = zones.indexOf(zone);
     store.edit((draft) => removeWidthZone(draft, zone.id));
-    selectedWidthZoneId.value =
-      store.project.widthZones[Math.min(index, zones.length - 2)]?.id ?? null;
+    selectWidthZone(store.project.widthZones[Math.min(index, zones.length - 2)]?.id ?? null);
   }
 
   /** Chooses the type of the next barrier, and of the selected one if any. */
@@ -288,13 +335,17 @@ export const useEditorStore = defineStore('editor', () => {
     const barriers = store.project.barriers;
     const index = barriers.indexOf(barrier);
     store.edit((draft) => removeBarrier(draft, barrier.id));
-    selectedBarrierId.value =
-      store.project.barriers[Math.min(index, barriers.length - 2)]?.id ?? null;
+    selectBarrier(store.project.barriers[Math.min(index, barriers.length - 2)]?.id ?? null);
   }
 
   return {
+    layer,
+    hiddenLayers,
+    layers: LAYERS,
     tool,
     view,
+    selection,
+    selectedPoints,
     selectedPointId,
     selectedBarrierId,
     barrierType,
@@ -311,9 +362,12 @@ export const useEditorStore = defineStore('editor', () => {
     selectedBarrier,
     selectedWidthZone,
     selectedIssues,
+    setLayer,
+    toggleLayer,
     setTool,
     setView,
     reset,
+    select,
     selectPoint,
     selectPointAt,
     selectBarrier,

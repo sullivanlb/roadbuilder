@@ -1,8 +1,9 @@
 import { clamp } from '../math';
 import type { WidthZone } from '../project/schema';
+import { trackLength } from './centerline';
 import type { Sample, Track } from './centerline';
 import { LAYOUT } from './layout';
-import { offsetIn, positionRange } from './ranges';
+import { offsetIn, positionRange, rangeContains } from './ranges';
 import type { TrackRange } from './ranges';
 
 /** A width zone resolved on the current track. */
@@ -22,6 +23,13 @@ export function widthZoneRanges(track: Track, samples: readonly Sample[]): Width
     const range = positionRange(track, samples, zone.from, zone.to);
     return range && range.length >= 1 ? [{ zone, ...range }] : [];
   });
+}
+
+/** The width zone at track distance `s`, the later one where zones overlap, or null. */
+export function widthZoneAt(track: Track, samples: readonly Sample[], s: number): WidthZone | null {
+  const total = trackLength(samples);
+  const ranges = widthZoneRanges(track, samples).filter((range) => rangeContains(range, total, s));
+  return ranges.at(-1)?.zone ?? null;
 }
 
 /**

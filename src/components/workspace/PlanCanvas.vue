@@ -23,6 +23,9 @@ const { cursor, hint, listeners, end } = usePlanInteraction(canvas);
 const scene = computed<PlanScene>(() => ({
   project: store.project,
   samples: store.samples,
+  layer: editor.layer,
+  hiddenLayers: editor.hiddenLayers,
+  pitLaneSelected: editor.selection?.kind === 'pitLane',
   tightTurns: store.issues.tightTurns,
   selectedPointId: editor.selectedPointId,
   hoveredPointId: editor.hoveredPointId,

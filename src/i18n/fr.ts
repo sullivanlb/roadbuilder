@@ -61,6 +61,8 @@ export const frMessages = {
   'canvas.hintPitsDraft': 'Cliquez la sortie de la voie des stands · Échap annule',
   'canvas.hintWidth': 'Cliquez le début de la portion sur la piste · Échap quitte l’outil',
   'canvas.hintWidthDraft': 'Cliquez la fin de la portion · Échap annule',
+  'canvas.hintSelectLayer':
+    'Cliquez un élément de la couche pour le régler · Molette pour zoomer · Espace + glisser pour naviguer',
   'canvas.hintSelect': 'Glissez un point · Molette pour zoomer · Espace + glisser pour naviguer',
   'canvas.start': 'DÉPART',
   'canvas.finish': 'ARRIVÉE',

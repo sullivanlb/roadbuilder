@@ -4,6 +4,7 @@ import { computed, ref } from 'vue';
 import { bounds } from '../core/math';
 import type { PlanPoint } from '../core/math';
 import type { IssueLocation } from '../core/track/issues';
+import { issueLayer } from '../editor/layers';
 import { terrainBounds } from '../core/track/layout';
 import { frameCamera, PlanProjection, zoomCamera } from '../rendering/plan/projection';
 import type { PlanCamera, ScreenPoint, ViewportSize } from '../rendering/plan/projection';
@@ -75,7 +76,8 @@ export const useViewportStore = defineStore('viewport', () => {
     ui.closeDialog();
     editor.setView('2d');
     editor.setTool('select');
-    if (location.pointIds[0]) editor.selectPoint(location.pointIds[0]);
+    editor.setLayer(issueLayer(location.issue));
+    if (location.pointIds[0] && editor.layer === 'track') editor.selectPoint(location.pointIds[0]);
     const points = store.project.points.filter((point) => location.pointIds.includes(point.id));
     focus([store.samples[location.sampleIndex], ...points]);
     focusRequest.value++;

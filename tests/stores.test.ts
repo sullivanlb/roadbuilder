@@ -2,7 +2,10 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { nextTick } from 'vue';
 import { setRoad, updatePoint } from '../src/core/project/edits';
 import { parseProjectFile, serializeProject } from '../src/core/project/schema';
+import { pitLaneLayout } from '../src/core/track/pitLane';
 import { positionDistance } from '../src/core/track/positions';
+import { pickInLayer } from '../src/editor/layers';
+import type { LayerId, TrackHit } from '../src/editor/layers';
 import { useEditorStore } from '../src/stores/editor';
 import { useExportStore } from '../src/stores/export';
 import { AUTOSAVE_KEY, useFilesStore } from '../src/stores/files';
@@ -160,6 +163,55 @@ describe('editor', () => {
     expect(project.project.widthZones).toEqual([]);
     project.undo();
     expect(project.project.widthZones).toHaveLength(1);
+  });
+
+  it('picks only what belongs to the active layer', () => {
+    const { project, editor } = stores();
+    project.replace(template('club'));
+    editor.beginWidthZone(100);
+    editor.completeWidthZone(300);
+    editor.beginBarrier({ s: 100, side: 'left' });
+    editor.completeBarrier(300);
+    const [zone] = project.project.widthZones;
+    const [barrier] = project.project.barriers;
+    const lane = pitLaneLayout(project.project, project.samples)!;
+    // One click that lands on a point, a barrier and a width zone at once.
+    const hit: TrackHit = {
+      road: { s: 200, side: 'left' },
+      pointId: project.project.points[1].id,
+      barrierId: barrier.id,
+    };
+    const pick = (layer: LayerId, at = hit) =>
+      pickInLayer(layer, at, project.project, project.samples);
+    expect(pick('track')).toEqual({ kind: 'points', ids: [project.project.points[1].id] });
+    expect(pick('road')).toEqual({ kind: 'widthZone', id: zone.id });
+    expect(pick('edges')).toEqual({ kind: 'barrier', id: barrier.id });
+    expect(pick('pits')).toBeNull();
+    const onLane = { ...hit, road: { s: lane.entry + lane.length / 2, side: lane.side } };
+    expect(pick('pits', onLane)).toEqual({ kind: 'pitLane' });
+    expect(pick('terrain')).toBeNull();
+  });
+
+  it('moves to the layer of a tool or a selection, and starts each layer with nothing selected', () => {
+    const { project, editor } = stores();
+    project.replace(template('club'));
+    editor.reset();
+    expect(editor.layer).toBe('track');
+    expect(editor.selectedPointId).toBe(project.project.points[0].id);
+    editor.setTool('barrier');
+    expect(editor.layer).toBe('edges');
+    expect(editor.selection).toBeNull();
+    editor.setTool('select');
+    expect(editor.layer).toBe('edges');
+    editor.selectPoint(project.project.points[2].id);
+    expect(editor.layer).toBe('track');
+    editor.setLayer('road');
+    expect(editor.tool).toBe('select');
+    expect(editor.selection).toBeNull();
+    editor.toggleLayer('edges');
+    expect(editor.hiddenLayers).toEqual(['edges']);
+    editor.toggleLayer('edges');
+    expect(editor.hiddenLayers).toEqual([]);
   });
 
   it('leaves the 3D view for every tool but panning', () => {

@@ -5,8 +5,6 @@ import type { Project, Side } from '../../core/project/schema';
 import { barrierPath } from '../../core/scene/barriers';
 import type { Sample } from '../../core/track/centerline';
 import { widestHalf } from '../../core/track/layout';
-import { rangeContains } from '../../core/track/ranges';
-import { widthZoneRanges } from '../../core/track/width';
 import type { PlanProjection, ScreenPoint } from './projection';
 
 /** Pick distances, in pixels. */
@@ -90,22 +88,6 @@ export function findRoadPosition(
   return { s: road.s, side: sideOf(view, road, at) };
 }
 
-/** The width zone under the cursor, the later one where zones overlap, or null. */
-export function findWidthZone(
-  view: PlanProjection,
-  project: Project,
-  samples: readonly Sample[],
-  at: ScreenPoint,
-): Id | null {
-  const road = findRoad(view, project, samples, at);
-  if (!road) return null;
-  const total = samples.at(-1)!.s;
-  const ranges = widthZoneRanges(project, samples).filter((range) =>
-    rangeContains(range, total, road.s),
-  );
-  return ranges.at(-1)?.zone.id ?? null;
-}
-
 /** The barrier under the cursor, or null. */
 export function findBarrier(
   view: PlanProjection,
@@ -126,4 +108,26 @@ export function findBarrier(
     }
   }
   return best;
+}
+
+/** What lies under a click, whatever the view it was made in, for the layers to pick from. */
+export interface TrackHit {
+  /** Where the click lands on the road, when it is on or near it. */
+  road: { s: number; side: Side } | null;
+  pointId: Id | null;
+  barrierId: Id | null;
+}
+
+/** Everything under the cursor that a click could pick. */
+export function trackHitAt(
+  view: PlanProjection,
+  project: Project,
+  samples: readonly Sample[],
+  at: ScreenPoint,
+): TrackHit {
+  return {
+    road: findRoadPosition(view, project, samples, at),
+    pointId: findPoint(view, project, at),
+    barrierId: findBarrier(view, project, samples, at),
+  };
 }

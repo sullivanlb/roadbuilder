@@ -414,7 +414,8 @@ describe('editor interface', () => {
     expect($<HTMLInputElement>('barrier-offset').value).toBe('1');
 
     await click('tool-select');
-    await clickPlan(roadSide(1, 'right'));
+    // The selection tool stays on the barrier layer: a click away from barriers selects nothing.
+    await clickPlan(roadSide(6, 'left'));
     expect($('barrier-editor')).toBeNull();
     const path = barrierPath(project.project, project.samples, project.project.barriers[0]);
     await clickPlan(screen(path[Math.floor(path.length / 2)]));

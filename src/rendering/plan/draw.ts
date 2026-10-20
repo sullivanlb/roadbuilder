@@ -14,6 +14,8 @@ import { pitLaneLayout } from '../../core/track/pitLane';
 import { rangeBetween, rangeSamples } from '../../core/track/ranges';
 import { widthZoneRanges } from '../../core/track/width';
 import type { TrackRange } from '../../core/track/ranges';
+import { INACTIVE_LAYER_ALPHA } from '../layers';
+import type { LayerId } from '../layers';
 import { BARRIER_STYLE, COLORS } from '../theme';
 import type { PlanProjection } from './projection';
 
@@ -21,6 +23,10 @@ import type { PlanProjection } from './projection';
 export interface PlanScene {
   project: Project;
   samples: readonly Sample[];
+  /** The layer being edited; the others are dimmed, the hidden ones left out. */
+  layer: LayerId;
+  hiddenLayers: readonly LayerId[];
+  pitLaneSelected: boolean;
   tightTurns: readonly TightTurn[];
   selectedPointId: Id | null;
   hoveredPointId: Id | null;
@@ -150,11 +156,13 @@ function drawTrack(ctx: Context, view: PlanProjection, scene: PlanScene) {
   const corner = view.toScreen({ x: terrain.minX, z: terrain.minZ });
   const width = (terrain.maxX - terrain.minX) * scale,
     height = (terrain.maxZ - terrain.minZ) * scale;
-  ctx.fillStyle = COLORS.terrain.fill;
-  ctx.fillRect(corner.x, corner.y, width, height);
-  ctx.strokeStyle = COLORS.terrain.outline;
-  ctx.lineWidth = 1;
-  dashed(ctx, [6, 5], () => ctx.strokeRect(corner.x, corner.y, width, height));
+  inLayer(ctx, scene, 'terrain', () => {
+    ctx.fillStyle = COLORS.terrain.fill;
+    ctx.fillRect(corner.x, corner.y, width, height);
+    ctx.strokeStyle = COLORS.terrain.outline;
+    ctx.lineWidth = 1;
+    dashed(ctx, [6, 5], () => ctx.strokeRect(corner.x, corner.y, width, height));
+  });
 
   const kerbs = 2 * kerbWidth(road);
   ctx.lineJoin = 'round';
@@ -225,6 +233,21 @@ function drawPits(ctx: Context, view: PlanProjection, scene: PlanScene) {
   const edge = (sample: Sample) => roadEdge(project.road, sample);
   const beside = (sample: Sample, lateral: number) =>
     view.toScreen({ x: sample.x + sample.nx * lateral, z: sample.z + sample.nz * lateral });
+  if (lane && scene.pitLaneSelected) {
+    // A halo along the middle of the lane.
+    const middle = samples.filter((sample) => lane.profile(sample.s));
+    trace(
+      ctx,
+      view,
+      middle.map((sample) => {
+        const lateral = lane.sign * lane.profile(sample.s)!.center;
+        return { x: sample.x + sample.nx * lateral, y: 0, z: sample.z + sample.nz * lateral };
+      }),
+    );
+    ctx.strokeStyle = COLORS.selection;
+    ctx.lineWidth = Math.max(8, lane.width * view.camera.scale);
+    ctx.stroke();
+  }
   if (lane) {
     ctx.fillStyle = COLORS.pits.lane;
     ctx.strokeStyle = COLORS.pits.lane;
@@ -411,6 +434,20 @@ function drawBarriers(ctx: Context, view: PlanProjection, scene: PlanScene) {
 function drawPoints(ctx: Context, view: PlanProjection, scene: PlanScene) {
   const affected = new Set(scene.tightTurns.flatMap((turn) => turn.pointIds));
   ctx.font = '9px Consolas, monospace';
+  // Off the track layer, points are only landmarks for track positions.
+  if (scene.layer !== 'track') {
+    ctx.save();
+    ctx.globalAlpha = INACTIVE_LAYER_ALPHA;
+    ctx.fillStyle = COLORS.point.outline;
+    ctx.textBaseline = 'middle';
+    scene.project.points.forEach((point, i) => {
+      const p = view.toScreen(point);
+      ctx.fillRect(p.x - 1.5, p.y - 1.5, 3, 3);
+      ctx.fillText(String(i + 1).padStart(2, '0'), p.x + 6, p.y - 6);
+    });
+    ctx.restore();
+    return;
+  }
   scene.project.points.forEach((point, i) => {
     const p = view.toScreen(point),
       selected = point.id === scene.selectedPointId,
@@ -454,17 +491,26 @@ function drawPoints(ctx: Context, view: PlanProjection, scene: PlanScene) {
   });
 }
 
+/** Draws what belongs to a layer: in full on the active layer, dimmed otherwise, not at all when hidden. */
+function inLayer(ctx: Context, scene: PlanScene, layer: LayerId, draw: () => void) {
+  if (scene.hiddenLayers.includes(layer)) return;
+  ctx.save();
+  if (layer !== scene.layer) ctx.globalAlpha = INACTIVE_LAYER_ALPHA;
+  draw();
+  ctx.restore();
+}
+
 /** Draws the whole plan. `dpr` is the canvas pixel ratio. */
 export function drawPlan(ctx: Context, view: PlanProjection, scene: PlanScene, dpr: number) {
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
   drawBackground(ctx, view);
   if (scene.samples.length > 1) {
     drawTrack(ctx, view, scene);
-    drawPits(ctx, view, scene);
-    drawWidthZones(ctx, view, scene);
+    inLayer(ctx, scene, 'pits', () => drawPits(ctx, view, scene));
+    inLayer(ctx, scene, 'road', () => drawWidthZones(ctx, view, scene));
     drawStart(ctx, view, scene);
     drawTightTurns(ctx, view, scene);
-    drawBarriers(ctx, view, scene);
+    inLayer(ctx, scene, 'edges', () => drawBarriers(ctx, view, scene));
   }
   drawPoints(ctx, view, scene);
 }
