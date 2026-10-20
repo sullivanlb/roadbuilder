@@ -8,7 +8,9 @@ import App from '../src/App.vue';
 import type { PlanPoint } from '../src/core/math';
 import { serializeProject } from '../src/core/project/schema';
 import { barrierPath } from '../src/core/scene/barriers';
-import { controlPointSample, sampleAt } from '../src/core/track/centerline';
+import { controlPointSample, sampleAt, trackLength } from '../src/core/track/centerline';
+import { widthZoneRanges } from '../src/core/track/width';
+import { bandX } from '../src/rendering/band';
 import { pointDistance, positionDistance } from '../src/core/track/positions';
 import { i18n, setLocale } from '../src/i18n';
 import { installPlatform } from '../src/platform/platform';
@@ -19,7 +21,7 @@ import { useViewportStore } from '../src/stores/viewport';
 import { memoryStorage, template, testPlatform, tightTurnProject } from './helpers';
 import type { MemoryStorage, TestPlatform } from './helpers';
 
-const SIZE = { width: 900, height: 550, profile: 69 };
+const SIZE = { width: 900, height: 550, band: 140 };
 
 let wrapper: VueWrapper | null;
 let pinia: Pinia;
@@ -114,7 +116,7 @@ beforeEach(() => {
     class {
       constructor(private readonly callback: ResizeObserverCallback) {}
       observe(target: Element) {
-        const height = target.id === 'elevation-canvas' ? SIZE.profile : SIZE.height;
+        const height = target.id === 'band-canvas' ? SIZE.band : SIZE.height;
         const size = [{ inlineSize: SIZE.width, blockSize: height }];
         this.callback(
           [
@@ -162,6 +164,7 @@ beforeEach(() => {
           if (key in target) return target[key];
           if (key === 'createLinearGradient' || key === 'createRadialGradient')
             return () => ({ addColorStop() {} });
+          if (key === 'measureText') return (text: string) => ({ width: text.length * 6 });
           return (...args: unknown[]) => {
             for (const arg of args)
               if (typeof arg === 'number' && !Number.isFinite(arg))
@@ -282,7 +285,11 @@ describe('editor interface', () => {
     );
     await settle();
     expect((await saved()).points).toHaveLength(10);
-    $('elevation-canvas').dispatchEvent(new MouseEvent('click', { clientX: 0, bubbles: true }));
+    // A click at the very start of the band picks the first point.
+    for (const type of ['pointerdown', 'pointerup'])
+      $('band-canvas').dispatchEvent(
+        new MouseEvent(type, { clientX: 90, clientY: 60, button: 0, bubbles: true }),
+      );
     await settle();
     expect($('point-badge').textContent).toBe('POINT 01');
   });
@@ -540,6 +547,44 @@ describe('editor interface', () => {
     await settle();
     expect($('layer-road').getAttribute('aria-pressed')).toBe('true');
     expect($('tool-width').getAttribute('aria-pressed')).toBe('true');
+  });
+
+  it('picks a stretch in the band, lays a zone on it and stretches the zone by its end', async () => {
+    await mountApp();
+    await click('layer-road');
+    const band = $('band-canvas');
+    const at = (type: string, x: number, y: number) =>
+      band.dispatchEvent(
+        new MouseEvent(type, { clientX: x, clientY: y, button: 0, bubbles: true }),
+      );
+    // Rows: width on top, zones below; drag across the zones row.
+    at('pointerdown', 300, 100);
+    at('pointermove', 420, 100);
+    at('pointerup', 420, 100);
+    await settle();
+    expect($('range-inspector')).not.toBeNull();
+    await click('range-width-zone');
+    expect($('range-inspector')).toBeNull();
+    const { project, viewport } = stores();
+    expect(project.project.widthZones).toHaveLength(1);
+    expect($('width-row-0').classList.contains('active')).toBe(true);
+
+    // Stretch the zone by its end, in one undo step.
+    const total = trackLength(project.samples);
+    const view = { start: 0, end: total };
+    const size = { width: SIZE.width, height: SIZE.band };
+    const zone = widthZoneRanges(project.project, project.samples)[0];
+    const endX = bandX(size, view, zone.start + zone.length);
+    at('pointerdown', endX, 100);
+    at('pointermove', endX + 60, 100);
+    at('pointermove', endX + 80, 100);
+    at('pointerup', endX + 80, 100);
+    await settle();
+    const longer = widthZoneRanges(project.project, project.samples)[0];
+    expect(longer.length).toBeGreaterThan(zone.length + 20);
+    await click('undo');
+    expect(widthZoneRanges(project.project, project.samples)[0].length).toBeCloseTo(zone.length, 3);
+    expect(viewport.bandView).toBeNull();
   });
 
   it('switches the whole interface to English and remembers it', async () => {

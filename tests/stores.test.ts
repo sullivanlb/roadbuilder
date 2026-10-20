@@ -216,6 +216,39 @@ describe('editor', () => {
     expect(editor.hiddenLayers).toEqual([]);
   });
 
+  it('lays a width zone, barriers or the pit lane on a stretch picked in the band', () => {
+    const { project, editor } = stores();
+    project.replace(template('club'));
+    editor.reset();
+    editor.setRange({ start: 50, length: 600 });
+    editor.selectPointsInRange();
+    expect(editor.selectedPoints?.ids.length).toBeGreaterThan(0);
+    expect(editor.range).toBeNull();
+
+    editor.setLayer('road');
+    editor.setRange({ start: 100, length: 150 });
+    editor.widthZoneOnRange();
+    expect(project.project.widthZones).toHaveLength(1);
+    expect(editor.selection).toEqual({ kind: 'widthZone', id: project.project.widthZones[0].id });
+    expect(editor.range).toBeNull();
+    // The same stretch again overlaps: refused, and the stretch stays.
+    editor.setRange({ start: 120, length: 50 });
+    editor.widthZoneOnRange();
+    expect(project.project.widthZones).toHaveLength(1);
+    expect(editor.range).not.toBeNull();
+
+    editor.setLayer('edges');
+    editor.barriersOnRange(['left', 'right']);
+    expect(project.project.barriers.map((barrier) => barrier.side)).toEqual(['left', 'right']);
+
+    editor.setLayer('pits');
+    editor.setRange({ start: 300, length: 200 });
+    editor.pitLaneOnRange();
+    const lane = pitLaneLayout(project.project, project.samples)!;
+    expect(lane.entry).toBeCloseTo(300, 6);
+    expect(lane.length).toBeCloseTo(200, 6);
+  });
+
   it('leaves the 3D view for every tool but panning', () => {
     const { editor } = stores();
     editor.setView('3d');

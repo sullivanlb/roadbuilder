@@ -22,7 +22,9 @@ import type { BarrierType, Side } from '../core/project/schema';
 import { trackLength } from '../core/track/centerline';
 import { LAYOUT } from '../core/track/layout';
 import { positionAt } from '../core/track/positions';
-import { rangeBetween } from '../core/track/ranges';
+import { pointDistance } from '../core/track/positions';
+import { rangeBetween, rangeContains } from '../core/track/ranges';
+import type { TrackRange } from '../core/track/ranges';
 import { LAYERS, layerOfSelection, layerOfTool } from '../editor/layers';
 import type { LayerId, Selection } from '../editor/layers';
 import { t } from '../i18n';
@@ -62,6 +64,10 @@ export const useEditorStore = defineStore('editor', () => {
   /** Entry of the pit lane being laid; the exit click is awaited. */
   const pitDraft = ref<RoadSpot | null>(null);
   const pitTarget = ref<RoadSpot | null>(null);
+  /** Track distance under the pointer, on the plan, the band or the preview. */
+  const hoverS = ref<number | null>(null);
+  /** A stretch picked in the band, waiting for something to be laid on it. */
+  const range = ref<TrackRange | null>(null);
   /** Track distance of the first click of the width zone being laid; the second is awaited. */
   const widthDraft = ref<number | null>(null);
   const widthTarget = ref<number | null>(null);
@@ -196,6 +202,94 @@ export const useEditorStore = defineStore('editor', () => {
     const home = layerOfSelection(next);
     if (home) setLayer(home);
     selection.value = next;
+    if (next) range.value = null;
+  }
+
+  function setRange(next: TrackRange | null) {
+    store.commit();
+    range.value = next;
+  }
+
+  /** Tells why something cannot be laid; returns false for the caller to stop. */
+  const refuse = (message: string) => {
+    ui.notify(message, true);
+    return false;
+  };
+
+  /** The two track positions bounding a range. */
+  const rangeEnds = (stretch: TrackRange) => ({
+    from: positionAt(store.project, store.samples, stretch.start),
+    to: positionAt(store.project, store.samples, stretch.start + stretch.length),
+  });
+
+  /** Lays a barrier over a stretch and selects it; false when it is refused. */
+  function layBarrier(stretch: TrackRange, side: Side): boolean {
+    const rejection = barrierRejection(store.project, stretch);
+    if (rejection === 'too-short')
+      return refuse(t('toast.barrierTooShort', { min: RULES.rangeLength }));
+    if (rejection === 'barriers-limit')
+      return refuse(t('toast.barriersLimit', { max: RULES.barriers.max }));
+    const id = store.edit((project) =>
+      addBarrier(project, { type: barrierType.value, side, ...rangeEnds(stretch) }),
+    );
+    selection.value = { kind: 'barrier', id };
+    return true;
+  }
+
+  /** Lays a width zone over a stretch and selects it; false when it is refused. */
+  function layWidthZone(stretch: TrackRange): boolean {
+    const rejection = widthZoneRejection(store.project, store.samples, stretch);
+    if (rejection === 'width-zones-limit')
+      return refuse(t('toast.widthZonesLimit', { max: RULES.widthZones.max }));
+    if (rejection === 'too-short')
+      return refuse(t('toast.widthZoneTooShort', { min: RULES.rangeLength }));
+    if (rejection === 'overlap') return refuse(t('toast.widthZoneOverlap'));
+    const id = store.edit((project) => addWidthZone(project, rangeEnds(stretch)));
+    selection.value = { kind: 'widthZone', id };
+    return true;
+  }
+
+  /** Lays the pit lane over a stretch, entry first; false when it is refused. */
+  function layPitLane(stretch: TrackRange, side: Side): boolean {
+    if (!isCircuit(store.project)) return refuse(t('pits.roadOnly'));
+    if (stretch.length < 2 * LAYOUT.pitLane.taper) return refuse(t('toast.pitLaneSamePlace'));
+    const ends = rangeEnds(stretch);
+    store.edit((project) => setPitLane(project, { side, entry: ends.from, exit: ends.to }));
+    selection.value = { kind: 'pitLane' };
+    return true;
+  }
+
+  /** Selects the control points inside the picked stretch. */
+  function selectPointsInRange() {
+    const stretch = range.value;
+    if (!stretch) return;
+    const total = trackLength(store.samples);
+    const ids = store.project.points
+      .filter((_, i) => rangeContains(stretch, total, pointDistance(store.samples, i)))
+      .map((point) => point.id);
+    select(ids.length ? { kind: 'points', ids } : null);
+  }
+
+  function widthZoneOnRange() {
+    if (range.value && layWidthZone(range.value)) {
+      range.value = null;
+      ui.notify(t('toast.widthZoneAdded'));
+    }
+  }
+
+  function barriersOnRange(sides: Side[]) {
+    const stretch = range.value;
+    if (stretch && sides.every((side) => layBarrier(stretch, side))) {
+      range.value = null;
+      ui.notify(t('toast.barrierAdded'));
+    }
+  }
+
+  function pitLaneOnRange() {
+    if (range.value && layPitLane(range.value, store.project.pitLane?.side ?? 'right')) {
+      range.value = null;
+      ui.notify(t('toast.pitLaneAdded'));
+    }
   }
 
   const selectPoint = (id: Id | null) => select(id ? { kind: 'points', ids: [id] } : null);
@@ -244,21 +338,7 @@ export const useEditorStore = defineStore('editor', () => {
   function completeBarrier(s: number) {
     const draft = barrierDraft.value;
     if (!draft) return;
-    const range = rangeBetween(store.project, store.samples, draft.s, s);
-    const rejection = barrierRejection(store.project, range);
-    if (rejection === 'too-short')
-      return ui.notify(t('toast.barrierTooShort', { min: RULES.rangeLength }), true);
-    if (rejection === 'barriers-limit')
-      return ui.notify(t('toast.barriersLimit', { max: RULES.barriers.max }), true);
-    const id = store.edit((project) =>
-      addBarrier(project, {
-        type: barrierType.value,
-        side: draft.side,
-        from: positionAt(store.project, store.samples, range.start),
-        to: positionAt(store.project, store.samples, range.start + range.length),
-      }),
-    );
-    selection.value = { kind: 'barrier', id };
+    if (!layBarrier(rangeBetween(store.project, store.samples, draft.s, s), draft.side)) return;
     barrierDraft.value = null;
     barrierTarget.value = null;
     ui.notify(t('toast.barrierAdded'));
@@ -280,14 +360,7 @@ export const useEditorStore = defineStore('editor', () => {
     if (!draft) return;
     const total = trackLength(store.samples);
     const length = (((exit - draft.s) % total) + total) % total;
-    if (length < 2 * LAYOUT.pitLane.taper) return ui.notify(t('toast.pitLaneSamePlace'), true);
-    store.edit((project) =>
-      setPitLane(project, {
-        side: draft.side,
-        entry: positionAt(store.project, store.samples, draft.s),
-        exit: positionAt(store.project, store.samples, exit),
-      }),
-    );
+    if (!layPitLane({ start: draft.s, length }, draft.side)) return;
     pitDraft.value = null;
     setTool('select');
     ui.notify(t('toast.pitLaneAdded'));
@@ -306,20 +379,7 @@ export const useEditorStore = defineStore('editor', () => {
   function completeWidthZone(s: number) {
     const first = widthDraft.value;
     if (first === null) return;
-    const range = rangeBetween(store.project, store.samples, first, s);
-    const rejection = widthZoneRejection(store.project, store.samples, range);
-    if (rejection === 'width-zones-limit')
-      return ui.notify(t('toast.widthZonesLimit', { max: RULES.widthZones.max }), true);
-    if (rejection === 'too-short')
-      return ui.notify(t('toast.widthZoneTooShort', { min: RULES.rangeLength }), true);
-    if (rejection === 'overlap') return ui.notify(t('toast.widthZoneOverlap'), true);
-    const id = store.edit((project) =>
-      addWidthZone(project, {
-        from: positionAt(store.project, store.samples, range.start),
-        to: positionAt(store.project, store.samples, range.start + range.length),
-      }),
-    );
-    selection.value = { kind: 'widthZone', id };
+    if (!layWidthZone(rangeBetween(store.project, store.samples, first, s))) return;
     widthDraft.value = null;
     widthTarget.value = null;
     ui.notify(t('toast.widthZoneAdded'));
@@ -361,6 +421,8 @@ export const useEditorStore = defineStore('editor', () => {
     layer,
     hiddenLayers,
     layers: LAYERS,
+    hoverS,
+    range,
     tool,
     view,
     selection,
@@ -387,6 +449,11 @@ export const useEditorStore = defineStore('editor', () => {
     setView,
     reset,
     select,
+    setRange,
+    selectPointsInRange,
+    widthZoneOnRange,
+    barriersOnRange,
+    pitLaneOnRange,
     selectPoint,
     selectPointAt,
     selectBarrier,

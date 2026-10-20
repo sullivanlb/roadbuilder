@@ -44,7 +44,11 @@ export interface PlanScene {
   widthDraft: number | null;
   /** Where the next width zone click would land. */
   widthTarget: number | null;
-  labels: { start: string; finish: string };
+  /** The stretch picked in the band. */
+  range: TrackRange | null;
+  /** Track distance under the pointer, here or in the band. */
+  hoverS: number | null;
+  labels: { start: string; finish: string; distance: (metres: number) => string };
 }
 
 type Context = CanvasRenderingContext2D;
@@ -491,6 +495,46 @@ function drawPoints(ctx: Context, view: PlanProjection, scene: PlanScene) {
   });
 }
 
+/** The stretch picked in the band, its roadway edges dashed. */
+function drawRange(ctx: Context, view: PlanProjection, scene: PlanScene) {
+  if (!scene.range) return;
+  const path = rangeSamples(scene.samples, scene.range);
+  ctx.beginPath();
+  for (const side of [-1, 1])
+    path.forEach((sample, i) => {
+      const lateral = side * (sample.half + 1);
+      const p = view.toScreen({
+        x: sample.x + sample.nx * lateral,
+        z: sample.z + sample.nz * lateral,
+      });
+      if (i === 0) ctx.moveTo(p.x, p.y);
+      else ctx.lineTo(p.x, p.y);
+    });
+  ctx.strokeStyle = COLORS.accent;
+  ctx.lineWidth = 2.5;
+  dashed(ctx, [7, 5], () => ctx.stroke());
+}
+
+/** A line across the road where the pointer is, here or in the band, with its track distance. */
+function drawCursor(ctx: Context, view: PlanProjection, scene: PlanScene) {
+  if (scene.hoverS === null) return;
+  const sample = sampleAt(scene.samples, scene.hoverS)!;
+  const reach = sample.half + 6;
+  const a = view.toScreen({ x: sample.x - sample.nx * reach, z: sample.z - sample.nz * reach });
+  const b = view.toScreen({ x: sample.x + sample.nx * reach, z: sample.z + sample.nz * reach });
+  ctx.strokeStyle = COLORS.accent;
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.moveTo(a.x, a.y);
+  ctx.lineTo(b.x, b.y);
+  ctx.stroke();
+  ctx.font = '10px "Segoe UI", sans-serif';
+  ctx.textAlign = 'left';
+  ctx.textBaseline = 'middle';
+  ctx.fillStyle = COLORS.accent;
+  ctx.fillText(scene.labels.distance(scene.hoverS), b.x + 6, b.y);
+}
+
 /** Draws what belongs to a layer: in full on the active layer, dimmed otherwise, not at all when hidden. */
 function inLayer(ctx: Context, scene: PlanScene, layer: LayerId, draw: () => void) {
   if (scene.hiddenLayers.includes(layer)) return;
@@ -511,6 +555,8 @@ export function drawPlan(ctx: Context, view: PlanProjection, scene: PlanScene, d
     drawStart(ctx, view, scene);
     drawTightTurns(ctx, view, scene);
     inLayer(ctx, scene, 'edges', () => drawBarriers(ctx, view, scene));
+    drawRange(ctx, view, scene);
   }
   drawPoints(ctx, view, scene);
+  if (scene.samples.length > 1) drawCursor(ctx, view, scene);
 }

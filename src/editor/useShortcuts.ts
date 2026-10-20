@@ -48,6 +48,7 @@ export function useShortcuts() {
         if (editor.barrierDraft) editor.cancelBarrier();
         else if (editor.pitDraft) editor.cancelPitLane();
         else if (editor.widthDraft !== null) editor.cancelWidthZone();
+        else if (editor.range) editor.setRange(null);
         else editor.setTool('select');
       },
     },

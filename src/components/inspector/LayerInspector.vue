@@ -9,6 +9,7 @@ import StartSection from '../sidebar/StartSection.vue';
 import TerrainSection from '../sidebar/TerrainSection.vue';
 import TrackSection from '../sidebar/TrackSection.vue';
 import WidthSection from '../sidebar/WidthSection.vue';
+import RangeInspector from './RangeInspector.vue';
 
 /** The settings of the active layer and of what is selected in it. */
 const editor = useEditorStore();
@@ -17,6 +18,7 @@ const editor = useEditorStore();
 <template>
   <aside id="inspector" class="inspector" :aria-label="t('inspector.aria')">
     <h1>{{ t(`layers.${editor.layer}`) }}</h1>
+    <RangeInspector v-if="editor.range" />
     <template v-if="editor.layer === 'track'">
       <TrackSection />
       <PointSection />

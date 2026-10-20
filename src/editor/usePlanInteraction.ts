@@ -5,6 +5,7 @@ import { t } from '../i18n';
 import { useEditorStore } from '../stores/editor';
 import { useProjectStore } from '../stores/project';
 import { useViewportStore } from '../stores/viewport';
+import { findRoadPosition } from '../rendering/plan/hitTest';
 import { isTyping } from './focus';
 import { panGesture, TOOLS } from './tools';
 import type { Gesture, PointerInput, ToolContext } from './tools';
@@ -53,8 +54,13 @@ export function usePlanInteraction(canvas: Ref<HTMLCanvasElement | null>) {
   }
 
   function onPointerMove(event: PointerEvent) {
-    if (gesture.value) gesture.value.move(input(event));
-    else tool.value.hover?.(context, input(event));
+    const at = input(event);
+    if (gesture.value) gesture.value.move(at);
+    else tool.value.hover?.(context, at);
+    // The band follows the pointer along the road.
+    const { project, viewport } = context;
+    editor.hoverS =
+      findRoadPosition(viewport.projection, project.project, project.samples, at.at)?.s ?? null;
   }
 
   function end() {

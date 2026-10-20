@@ -37,7 +37,13 @@ const scene = computed<PlanScene>(() => ({
   selectedWidthZoneId: editor.selectedWidthZoneId,
   widthDraft: editor.widthDraft,
   widthTarget: editor.widthDraft !== null ? editor.widthTarget : null,
-  labels: { start: t('canvas.start'), finish: t('canvas.finish') },
+  range: editor.range,
+  hoverS: editor.hoverS,
+  labels: {
+    start: t('canvas.start'),
+    finish: t('canvas.finish'),
+    distance: (metres: number) => `${formatNumber(metres)} m`,
+  },
 }));
 
 let frame: number | null = null;

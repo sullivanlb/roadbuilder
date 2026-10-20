@@ -64,6 +64,7 @@ const hidden = (id: LayerId) => editor.hiddenLayers.includes(id);
       </button>
     </div>
     <p class="note">{{ t('layers.note') }}</p>
+    <p class="note privacy">{{ t('editor.privacy') }}</p>
   </nav>
 </template>
 
@@ -151,11 +152,16 @@ h2 {
   color: var(--text);
   background: var(--hover);
 }
+.note:first-of-type {
+  margin-top: auto;
+}
+.privacy {
+  padding-top: 6px;
+}
 .eye.off {
   opacity: 0.4;
 }
 .note {
-  margin-top: auto;
   padding: 12px 8px 0;
   font-size: 10px;
   line-height: 1.6;

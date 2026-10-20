@@ -83,6 +83,17 @@ export const useViewportStore = defineStore('viewport', () => {
     focusRequest.value++;
   }
 
+  /** Track distances shown in the band; null shows the whole track. */
+  const bandView = ref<{ start: number; end: number } | null>(null);
+
+  /** Zooms or scrolls the band, kept on the track and at least 100 m wide. */
+  function setBandView(next: { start: number; end: number } | null, total: number) {
+    if (!next || next.end - next.start >= total) return void (bandView.value = null);
+    const width = Math.max(100, next.end - next.start);
+    const start = Math.min(Math.max(0, next.start), total - width);
+    bandView.value = { start, end: start + width };
+  }
+
   function resize(next: ViewportSize) {
     size.value = next;
     if (!fitted.value) fit();
@@ -98,6 +109,8 @@ export const useViewportStore = defineStore('viewport', () => {
     fit,
     focus,
     focusIssue,
+    bandView,
+    setBandView,
     zoom,
     pan,
     resize,
