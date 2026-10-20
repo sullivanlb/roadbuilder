@@ -3,6 +3,7 @@ import type { Bounds, PlanPoint, Vec3 } from '../math';
 import type { Project } from '../project/schema';
 import type { Sample } from '../track/centerline';
 import { terrainBounds } from '../track/layout';
+import { groundHeight } from './ground';
 import { addVertex, createMesh, MAX_MESH_VERTICES, vertexCount, vertexPosition } from './mesh';
 import type { Mesh } from './mesh';
 
@@ -199,8 +200,7 @@ export function buildTerrain(
     }
     return result;
   });
-  const anchors = samples.filter((_, i) => i % Math.max(1, Math.ceil(samples.length / 400)) === 0);
-  if (anchors.at(-1) !== samples.at(-1)) anchors.push(samples.at(-1)!);
+  const ground = groundHeight(project, samples);
   const heightAt = (p: PlanPoint) => {
     let border = -Infinity;
     for (let row = cellZ(p.z - 2e-6); row <= cellZ(p.z + 2e-6); row++) {
@@ -215,16 +215,7 @@ export function buildTerrain(
         }
       }
     }
-    if (Number.isFinite(border)) return border;
-    let weighted = 0,
-      total = 0;
-    for (const a of anchors) {
-      const d2 = (p.x - a.x) ** 2 + (p.z - a.z) ** 2 + 36,
-        weight = 1 / (d2 * Math.sqrt(d2));
-      weighted += weight * (a.y - 0.04);
-      total += weight;
-    }
-    return weighted / total;
+    return Number.isFinite(border) ? border : ground(p);
   };
   for (const id of new Set(aligned.flat())) points[id].y = heightAt(points[id]);
   const faces = [];

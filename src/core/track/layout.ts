@@ -29,6 +29,8 @@ export const LAYOUT = {
   curveClearance: 0.8,
   /** Length over which the roadway changes width at each end of a width zone. */
   widthTaper: 20,
+  /** Ground beyond the shoulders: kept flat over `flat`, then eased into the far terrain over `blend`. */
+  terrain: { flat: 8, blend: 40 },
 } as const;
 
 export const kerbWidth = (road: RoadSettings) => (road.kerbs ? LAYOUT.kerbWidth : 0);

@@ -106,7 +106,7 @@ Utilisez **Voir le virage**, dans l’en-tête de la bande, le menu **Aller à**
 
 Le sol est généré automatiquement dès que le tracé comporte au moins deux points. Il remplit l’intérieur des circuits et les espaces entre les portions d’une route ouverte, puis s’étend autour du tracé dans un rectangle. La marge se règle dans **Le terrain → Marge autour du tracé** : **150 m par défaut**, de **50 à 500 m**.
 
-Le terrain suit les altitudes du tracé et se raccorde aux accotements. Son maillage est découpé autour de la chaussée, des vibreurs et du stand afin de ne pas les recouvrir. Les petites différences de hauteur existantes aux extrémités des vibreurs ou du stand sont raccordées progressivement. Le relief éloigné est interpolé automatiquement ; la sculpture manuelle du terrain reste une tâche à réaliser.
+Le terrain suit les altitudes du tracé et se raccorde aux accotements. Son maillage est découpé autour de la chaussée, des vibreurs et du stand afin de ne pas les recouvrir. Les petites différences de hauteur existantes aux extrémités des vibreurs ou du stand sont raccordées progressivement. Au-delà des accotements, le terrain reste d’abord à plat, à la hauteur de leur bord, sur 8 m, puis rejoint en pente douce, sur 40 m, le relief éloigné, interpolé automatiquement à partir des altitudes du tracé. Entre deux passages proches du tracé, il descend de l’un à l’autre sans marche ; la sculpture manuelle du terrain reste une tâche à réaliser.
 
 Le contour en pointillés du plan 2D montre la limite extérieure. L’aperçu 3D affiche le terrain réel. Les exports **Assetto Corsa et OBJ** incluent cette même géométrie ; dans le jeu, elle utilise la surface physique **GRASS**. Au-delà du contour extérieur, il n’y a plus de sol : augmentez la marge pour disposer de plus d’espace.
 
@@ -183,7 +183,7 @@ Prochaines priorités : **trajectoires IA → dévers**.
 - [x] **Barrières et murs** : glissières, pneus, TecPro et murs en béton tracés en deux clics, avec colliders invisibles dans Assetto Corsa.
 - [x] **Vrais stands** : voie des stands avec entrée, sortie et muret, plusieurs emplacements et une grille de départ (à valider en jeu).
 - [x] **Largeur variable** : régler la largeur par portion pour élargir une ligne droite ou resserrer un passage (à valider en jeu).
-- [ ] **Dévers et virages relevés** : incliner la chaussée dans les courbes.
+- [x] **Dévers et virages relevés** : incliner la chaussée dans les courbes.
 - [ ] **Outils de dessin précis** : ajouter des lignes droites, arcs de cercle et virages à rayon réglable.
 - [ ] **Décors à placer** : ajouter arbres, bâtiments, tribunes, panneaux et éclairages.
 - [ ] **Revêtements personnalisés** : choisir asphalte, terre, gravier, marquages et vibreurs par portion.
