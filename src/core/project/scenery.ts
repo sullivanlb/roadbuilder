@@ -51,7 +51,7 @@ export const SCENERY_SIZES: Record<SceneryKind, Record<keyof Size, NumericRule>>
 
 /** What a new scenery item of each kind looks like. Buildings and grandstands stop cars, the rest does not. */
 export const SCENERY_DEFAULTS: Record<SceneryKind, Size & Pick<SceneryItem, 'solid'>> = {
-  tree: { width: 6, depth: 6, height: 12, solid: false },
+  tree: { width: 9, depth: 9, height: 10, solid: false },
   building: { width: 16, depth: 10, height: 7, solid: true },
   grandstand: { width: 40, depth: 10, height: 8, solid: true },
   sign: { width: 8, depth: 0.3, height: 4, solid: false },
