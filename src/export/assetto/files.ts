@@ -61,24 +61,30 @@ export const lightingIni = () => ini({ LIGHTING: { SUN_PITCH_ANGLE: 45, SUN_HEAD
 
 const vector = (values: readonly number[]) => values.map((v) => +v.toFixed(3)).join(', ');
 
+/** The CSP condition lighting the lamps: its default one for track lights. */
+const NIGHT = 'NightLights';
+
 /**
  * extension/ext_config.ini, read by Custom Shaders Patch: one light per lamp and
- * the lamp material glowing brighter, both lit when the sun sets. `SUN` is the
- * sun angle from the zenith, 90 at the horizon (docs/assetto-corsa.md).
+ * the lamp material glowing brighter, both lit at night (docs/assetto-corsa.md).
+ * A custom condition on the sun angle lit nothing in game; lights now use the
+ * condition CSP gives them by default.
  */
 export function extConfigIni(lights: readonly SceneLight[]) {
   const sections: IniSections = {
-    CONDITION_0: { NAME: 'ROADBUILDER_NIGHT', INPUT: 'SUN', LUT: '(|0=0|86=0|96=1|180=1|)' },
+    LIGHTING: { LIT_MULT: 1, CAR_LIGHTS_LIT_MULT: 1 },
     MATERIAL_ADJUSTMENT_0: {
+      ACTIVE: 1,
       MATERIALS: 'lamp',
       KEY_0: 'ksEmissive',
       VALUE_0: '30, 28, 24',
       VALUE_0_OFF: '0.6, 0.6, 0.6',
-      CONDITION: 'ROADBUILDER_NIGHT',
+      CONDITION: NIGHT,
     },
   };
   lights.forEach((light, i) => {
     sections[`LIGHT_${i}`] = {
+      ACTIVE: 1,
       POSITION: vector(light.position),
       DIRECTION: vector(light.direction),
       COLOR: '1, 0.92, 0.8, 30',
@@ -88,7 +94,7 @@ export function extConfigIni(lights: readonly SceneLight[]) {
       RANGE_GRADIENT_OFFSET: 0.2,
       FADE_AT: 500,
       FADE_SMOOTH: 50,
-      CONDITION: 'ROADBUILDER_NIGHT',
+      CONDITION: NIGHT,
     };
   });
   return ini(sections);

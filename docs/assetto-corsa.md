@@ -28,7 +28,7 @@ Add to this file every time a test in game teaches something, and update the sta
 
 **Solid walls (concrete barrier, pit wall) use two vertical faces about a metre apart and no top.** Both block cars. _Confirmed in game._ Why this shape is needed is _assumed_: a thin closed slab with a top at body height was suspected of letting cars through, but the pit wall's real problem turned out to be its name. Forum reports describe double-sided barriers making cars stick to walls ([assettocorsamods.net](https://assettocorsamods.net/threads/assetto-mods-and-track-creation.3349)), so faces close together are best avoided.
 
-**Scenery colliders** are invisible `1WALL_scenery` meshes: vertical faces around the footprint of each solid scenery item, at least a metre apart, open on top, from 0.4 m below the ground to 3 m. Built like the barrier colliders, so they should stop cars; _assumed_ until tried in game.
+**Scenery colliders stop cars**: invisible `1WALL_scenery` meshes, vertical faces around the footprint of each solid scenery item, at least a metre apart, open on top, from 0.4 m below the ground to 3 m. _Confirmed in game_ on buildings and grandstands.
 
 ## KN5 model
 
@@ -42,13 +42,13 @@ Add to this file every time a test in game teaches something, and update the sta
 
 ## Custom Shaders Patch
 
-**CSP reads `extension/ext_config.ini` in the track folder.** _Documented_ ([CSP config wiki](https://github.com/ac-custom-shaders-patch/acc-extension-config/wiki)). The game without CSP ignores it.
+**CSP reads `extension/ext_config.ini` in the track folder.** _Assumed_: tracks ship it there, but the CSP pages read do not say so; forum examples put a track config in `assettocorsa/extension/config/tracks/<track>.ini` instead ([assettocorsamods.net](https://assettocorsamods.net/threads/how-to-model-track-lights-for-custom-shaders-patch.1559/)). The game without CSP ignores it.
 
-**A `[LIGHT_n]` section with `POSITION` and `DIRECTION` places one light**, with `SPOT`, `SPOT_SHARPNESS`, `RANGE`, `RANGE_GRADIENT_OFFSET`, `COLOR` (r, g, b, intensity), `FADE_AT`, `FADE_SMOOTH` and the `CONDITION` controlling its brightness. _Documented_ ([Tracks – Lights](https://github.com/ac-custom-shaders-patch/acc-extension-config/wiki/Tracks-%E2%80%93-Lights)). Whether our values light the track well is _assumed_.
+**A `[LIGHT_n]` section with `POSITION` and `DIRECTION` places one light**, with `SPOT`, `SPOT_SHARPNESS`, `RANGE`, `RANGE_GRADIENT_OFFSET`, `COLOR` (r, g, b, intensity), `FADE_AT`, `FADE_SMOOTH` and the `CONDITION` controlling its brightness, `NightLights` by default. _Documented_ ([Tracks – Lights](https://cup.acstuff.club/docs/csp/tracks/lights)). Whether our values light the track well is _assumed_.
 
-**A `[CONDITION_n]` with `INPUT = SUN` follows the sun angle**, 0 at the zenith and 90 at the horizon, through a `LUT`. _Documented_ ([Tracks – Conditions](https://github.com/ac-custom-shaders-patch/acc-extension-config/wiki/Tracks-%E2%80%93-Conditions)). Ours, `ROADBUILDER_NIGHT`, goes from 0 at 86° to 1 at 96°: lights on at dusk is _assumed_.
+**Lights on a custom `[CONDITION_0]` (`INPUT = SUN`, `LUT = (|0=0|86=0|96=1|180=1|)`) showed nothing at night**, with Sol. _Observed in game_; whether the condition, the missing `[LIGHTING]` section or the file's place was at fault is unknown. The export now uses the default `NightLights` condition and writes `[LIGHTING]` with `LIT_MULT = 1` and `CAR_LIGHTS_LIT_MULT = 1`, as in configs reported working ([assettocorsamods.net](https://assettocorsamods.net/threads/working-track-lamps.1782/)); _assumed_ until tried.
 
-**`[MATERIAL_ADJUSTMENT_0]` raises `ksEmissive` of the `lamp` material at night** (`KEY_0`, `VALUE_0`, `VALUE_0_OFF`, `CONDITION`). _Assumed_ from published track configs; not found in the wiki pages read.
+**`[MATERIAL_ADJUSTMENT_0]` raises `ksEmissive` of the `lamp` material at night** (`ACTIVE`, `MATERIALS`, `KEY_0`, `VALUE_0`, `VALUE_0_OFF`, `CONDITION`). _Assumed_ from a config reported working ([assettocorsamods.net](https://assettocorsamods.net/threads/how-to-model-track-lights-for-custom-shaders-patch.1559/)). It only brightens the lamps; the light on the track comes from the `[LIGHT_n]` sections.
 
 ## Markers
 
@@ -73,4 +73,4 @@ Empty nodes read by the game, each a 4×4 transform with local Y up and local -Z
 
 - Whether timing works on open roads (point-to-point sessions).
 - How the game reads `ai/fast_lane.ai` and `ai/pit_lane.ai` (needed for AI lines).
-- Whether scenery colliders stop cars, and whether the night lights and glowing lamps work with CSP.
+- Whether the night lights and glowing lamps work with CSP, and where CSP looks for the track's config.
