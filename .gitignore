@@ -4,3 +4,5 @@ coverage/
 *.tsbuildinfo
 .idea/
 .env.local
+.cache/
+__pycache__/
