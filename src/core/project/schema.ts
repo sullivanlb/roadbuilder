@@ -10,6 +10,16 @@ export const PROJECT_VERSION = 2;
 
 export const BARRIER_TYPES = ['guardrail', 'tires', 'tecpro', 'wall'] as const;
 export const SIDES = ['left', 'right'] as const;
+export const SCENERY_KINDS = ['tree', 'building', 'grandstand', 'sign', 'light'] as const;
+/** The looks a scenery item may take; each kind accepts its own (SCENERY_VARIANTS in scenery.ts). */
+export const SCENERY_LOOKS = [
+  'leafy',
+  'conifer',
+  'billboard',
+  'board',
+  'single',
+  'double',
+] as const;
 
 const id = z.string().min(1).max(64);
 const ranged = ({ min, max }: NumericRule) => z.number().min(min).max(max);
@@ -73,6 +83,25 @@ const bankZone = z.object({
   transition: ranged(RULES.bankTransition).default(DEFAULTS.bankTransition),
 });
 
+/** A free-standing object on the ground: a tree or grove, a building, a grandstand, a sign or a light. */
+const sceneryItem = z.object({
+  id,
+  kind: z.enum(SCENERY_KINDS),
+  x: ranged(RULES.coordinate),
+  z: ranged(RULES.coordinate),
+  /** Where its front faces, in degrees clockwise from -Z on the plan. */
+  heading: ranged(RULES.heading),
+  /** Stops cars in game, through an invisible collider. */
+  solid: z.boolean(),
+  /** Across its front, front to back, and from the ground up; a grove spreads over its width. */
+  width: ranged(RULES.scenerySize),
+  depth: ranged(RULES.scenerySize),
+  height: ranged(RULES.scenerySize),
+  variant: z.enum(SCENERY_LOOKS).optional(),
+  /** Trees in a grove, scattered from the item's ID so they stay in place. */
+  count: z.number().int().min(RULES.groveCount.min).max(RULES.groveCount.max).optional(),
+});
+
 const pitLane = z.object({
   side: z.enum(SIDES),
   entry: trackPosition,
@@ -97,6 +126,7 @@ const projectShape = z.object({
   barriers: z.array(barrier).max(RULES.barriers.max),
   widthZones: z.array(widthZone).max(RULES.widthZones.max).default([]),
   bankZones: z.array(bankZone).max(RULES.bankZones.max).default([]),
+  scenery: z.array(sceneryItem).max(RULES.scenery.max).default([]),
   /** Absent until set: the start line then sits a little after the first control point. */
   startLine: trackPosition.optional(),
   pitLane: pitLane.nullable().default(null),
@@ -116,6 +146,7 @@ function checkReferences(project: ProjectShape, ctx: z.RefinementCtx<ProjectShap
     ...project.barriers,
     ...project.widthZones,
     ...project.bankZones,
+    ...project.scenery,
   ]) {
     if (ids.has(item.id)) return fail('duplicate-id', []);
     ids.add(item.id);
@@ -148,6 +179,10 @@ function checkReferences(project: ProjectShape, ctx: z.RefinementCtx<ProjectShap
   ] as const;
   for (const [field, position] of positions)
     if (position && !order.has(position.point)) return fail('position-point', [field]);
+  project.scenery.forEach((item, index) => {
+    if (item.variant && !SCENERY_VARIANTS[item.kind].includes(item.variant))
+      fail('invalid-value', ['scenery', index, 'variant']);
+  });
   if (project.pitLane && !circuit) return fail('pit-lane-on-road', ['pitLane']);
   if (project.cars > 1 && !project.pitLane) fail('cars-without-pit-lane', ['cars']);
 }
@@ -165,6 +200,18 @@ export type BankZone = Project['bankZones'][number];
 export type RoadSettings = Project['road'];
 export type TrackPosition = NonNullable<Project['startLine']>;
 export type PitLane = NonNullable<Project['pitLane']>;
+export type SceneryItem = Project['scenery'][number];
+export type SceneryKind = SceneryItem['kind'];
+export type SceneryLook = NonNullable<SceneryItem['variant']>;
+
+/** The looks each kind of scenery accepts, the first one by default; none for buildings and grandstands. */
+export const SCENERY_VARIANTS: Record<SceneryKind, readonly SceneryLook[]> = {
+  tree: ['leafy', 'conifer'],
+  building: [],
+  grandstand: [],
+  sign: ['billboard', 'board'],
+  light: ['single', 'double'],
+};
 
 /** A circuit needs three control points to close; with fewer it is driven as a road. */
 export const isCircuit = (project: Pick<Project, 'road' | 'points'>) =>
@@ -173,6 +220,8 @@ export const isCircuit = (project: Pick<Project, 'road' | 'points'>) =>
 function toDetail(error: z.ZodError): ProjectErrorDetail {
   const issue = error.issues[0];
   const [head] = issue.path;
+  if (issue.code === 'custom' && issue.params?.reason === 'invalid-value')
+    return { code: 'invalid-value', path: issue.path.join('.') };
   if (issue.code === 'custom' && typeof issue.params?.reason === 'string')
     return { code: issue.params.reason } as ProjectErrorDetail;
   if (head === 'format' || head === 'version' || issue.path.length === 0)
@@ -182,6 +231,7 @@ function toDetail(error: z.ZodError): ProjectErrorDetail {
     if (head === 'barriers') return { code: 'barriers-limit', max: RULES.barriers.max };
     if (head === 'widthZones') return { code: 'width-zones-limit', max: RULES.widthZones.max };
     if (head === 'bankZones') return { code: 'bank-zones-limit', max: RULES.bankZones.max };
+    if (head === 'scenery') return { code: 'scenery-limit', max: RULES.scenery.max };
   }
   return { code: 'invalid-value', path: issue.path.join('.') };
 }

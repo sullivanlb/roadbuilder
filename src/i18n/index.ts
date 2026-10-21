@@ -101,6 +101,8 @@ export function formatProjectError(detail: ProjectErrorDetail, target?: Locale):
       return tr('projectError.widthZonesLimit', { max: detail.max });
     case 'bank-zones-limit':
       return tr('projectError.bankZonesLimit', { max: detail.max });
+    case 'scenery-limit':
+      return tr('projectError.sceneryLimit', { max: detail.max });
     case 'duplicate-id':
       return tr('projectError.duplicateId');
     case 'barrier-endpoint':

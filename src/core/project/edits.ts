@@ -15,7 +15,8 @@ import { overlapStart } from '../track/ranges';
 import { bankZoneRanges } from '../track/bank';
 import { widthZoneRanges } from '../track/width';
 import type { TrackRange } from '../track/ranges';
-import { isCircuit } from './schema';
+import { SCENERY_DEFAULTS, SCENERY_SIZES } from './scenery';
+import { isCircuit, SCENERY_VARIANTS } from './schema';
 import type {
   BankZone,
   Barrier,
@@ -23,6 +24,8 @@ import type {
   PitLane,
   Project,
   RoadSettings,
+  SceneryItem,
+  SceneryKind,
   Side,
   TrackPosition,
   WidthZone,
@@ -528,4 +531,71 @@ export function removePitLane(draft: ProjectDraft) {
 /** Sets the car count; more than one car needs a pit lane. */
 export function setCars(draft: ProjectDraft, cars: number) {
   draft.cars = draft.pitLane ? Math.round(within(RULES.cars, cars)) : 1;
+}
+
+/** Why a scenery item cannot be added, or null when it can. */
+export function sceneryRejection(project: Project, count = 1): 'scenery-limit' | null {
+  return project.scenery.length + count > RULES.scenery.max ? 'scenery-limit' : null;
+}
+
+/** A heading brought back within a turn, in whole degrees. */
+const turn = (heading: number) => Math.round(((heading % 360) + 360) % 360) % 360;
+
+/** Places a scenery item of a kind, with the defaults of its kind, facing `heading`. */
+export function addScenery(draft: ProjectDraft, kind: SceneryKind, at: PlanPoint, heading = 0): Id {
+  const id = createId();
+  const variant = SCENERY_VARIANTS[kind][0];
+  draft.scenery.push({
+    id,
+    kind,
+    x: within(RULES.coordinate, at.x),
+    z: within(RULES.coordinate, at.z),
+    heading: turn(heading),
+    ...SCENERY_DEFAULTS[kind],
+    ...(variant ? { variant } : {}),
+    ...(kind === 'tree' ? { count: 1 } : {}),
+  });
+  return id;
+}
+
+export type SceneryPatch = Partial<
+  Pick<SceneryItem, 'x' | 'z' | 'heading' | 'solid' | 'width' | 'depth' | 'height' | 'variant'>
+> & { count?: number };
+
+/** Changes a scenery item, within the sizes and looks its kind accepts. */
+export function updateScenery(draft: ProjectDraft, id: Id, patch: SceneryPatch) {
+  const item = draft.scenery.find((candidate) => candidate.id === id);
+  if (!item) return;
+  const sizes = SCENERY_SIZES[item.kind];
+  if (patch.x !== undefined) item.x = within(RULES.coordinate, patch.x);
+  if (patch.z !== undefined) item.z = within(RULES.coordinate, patch.z);
+  if (patch.heading !== undefined) item.heading = turn(patch.heading);
+  if (patch.solid !== undefined) item.solid = patch.solid;
+  if (patch.width !== undefined) item.width = within(sizes.width, patch.width);
+  // A grove is round: its depth follows its width.
+  if (item.kind === 'tree') item.depth = item.width;
+  else if (patch.depth !== undefined) item.depth = within(sizes.depth, patch.depth);
+  if (patch.height !== undefined) item.height = within(sizes.height, patch.height);
+  if (patch.variant !== undefined && SCENERY_VARIANTS[item.kind].includes(patch.variant))
+    item.variant = patch.variant;
+  if (patch.count !== undefined && item.kind === 'tree')
+    item.count = Math.round(within(RULES.groveCount, patch.count));
+}
+
+export function removeScenery(draft: ProjectDraft, ids: readonly Id[]) {
+  draft.scenery = draft.scenery.filter((item) => !ids.includes(item.id));
+}
+
+/** Copies scenery items a little aside of the originals and returns the IDs of the copies. */
+export function duplicateScenery(draft: ProjectDraft, ids: readonly Id[], offset: PlanPoint): Id[] {
+  const copies = draft.scenery
+    .filter((item) => ids.includes(item.id))
+    .map((item) => ({
+      ...item,
+      id: createId(),
+      x: within(RULES.coordinate, item.x + offset.x),
+      z: within(RULES.coordinate, item.z + offset.z),
+    }));
+  draft.scenery.push(...copies);
+  return copies.map((item) => item.id);
 }

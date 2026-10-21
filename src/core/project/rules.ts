@@ -16,6 +16,7 @@ export const RULES = {
   barriers: { max: 120 },
   widthZones: { max: 40 },
   bankZones: { max: 40 },
+  scenery: { max: 400 },
   /** Shortest width zone, bank zone or barrier accepted, along the track. */
   rangeLength: 5,
   /** Two control points closer than this on the ground plane are rejected. */
@@ -38,6 +39,12 @@ export const RULES = {
   radius: { min: 5, max: 2000, step: 1 },
   /** Length of a straight segment, from point to point. */
   segmentLength: { min: 2, max: 5000, step: 1 },
+  /** Direction a scenery item faces, in degrees clockwise from north (-Z) on the plan. */
+  heading: { min: 0, max: 359, step: 5 },
+  /** Footprint and height of a scenery item, in metres; each kind narrows them in SCENERY_SIZES. */
+  scenerySize: { min: 0.2, max: 200, step: 0.5 },
+  /** Number of trees in a grove. */
+  groveCount: { min: 1, max: 40, step: 1 },
 } as const satisfies Record<string, NumericRule | { max: number } | number>;
 
 /** Values given to the settings a new project does not choose itself. */

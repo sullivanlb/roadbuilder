@@ -26,6 +26,7 @@ export function createProject(template: Template, name: string): Project {
     barriers: [],
     widthZones: [],
     bankZones: [],
+    scenery: [],
     ...(points.length ? { startLine: { point: points[0].id, distance: DEFAULTS.startLine } } : {}),
     pitLane: pits
       ? {

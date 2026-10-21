@@ -131,7 +131,29 @@ _Avoid_: hitbox, collision mesh
 
 **Decor** (décor):
 The visible geometry of a barrier, drawn in game but not used for collisions.
-_Avoid_: scenery (reserved for future free-standing objects), visual
+_Avoid_: scenery (reserved for free-standing objects), visual
+
+### Scenery
+
+**Scenery item** (objet de décor):
+A free-standing object placed on the plan: a tree or grove, a building, a grandstand, a sign or a light. It stands where it was put, on the ground, and does not follow the track when the track is edited.
+_Avoid_: prop, asset, decor (reserved for the visible geometry of barriers)
+
+**Heading** (orientation):
+The direction the front of a scenery item faces on the plan. A new item faces the nearest part of the track.
+_Avoid_: rotation, yaw, angle
+
+**Grove** (bosquet):
+A tree item holding several trees scattered over its width; the same item always scatters them in the same places.
+_Avoid_: forest, cluster
+
+**Solid** (bloquant):
+A scenery item that stops cars in game, through an invisible collider around it. Buildings and grandstands are solid by default, the other kinds are not.
+_Avoid_: collidable, physical
+
+**Light** (éclairage):
+A lamp post whose lamps glow, and light the track at night with Custom Shaders Patch.
+_Avoid_: lamp, floodlight
 
 ### Checks
 
@@ -164,7 +186,7 @@ _Avoid_: capacity, pitboxes
 ### Output
 
 **Scene** (scène):
-Everything generated from a project to be seen or driven: surfaces, terrain, barriers and markers. The 3D preview and every export show the same scene.
+Everything generated from a project to be seen or driven: surfaces, terrain, barriers, scenery and markers. The 3D preview and every export show the same scene.
 _Avoid_: model, mesh
 
 **Marker**:

@@ -7,6 +7,7 @@ export type ProjectErrorDetail =
   | { code: 'barriers-limit'; max: number }
   | { code: 'width-zones-limit'; max: number }
   | { code: 'bank-zones-limit'; max: number }
+  | { code: 'scenery-limit'; max: number }
   | { code: 'duplicate-id' }
   | { code: 'barrier-endpoint' }
   | { code: 'barrier-span' }

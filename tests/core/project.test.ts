@@ -2,11 +2,14 @@ import { produce } from 'immer';
 import { describe, expect, it } from 'vitest';
 import {
   addBarrier,
+  addScenery,
   barrierRejection,
+  duplicateScenery,
   insertPoint,
   pointRejection,
   removePoint,
   removePoints,
+  removeScenery,
   rename,
   reverseTrack,
   setAltitude,
@@ -15,10 +18,12 @@ import {
   shiftAltitude,
   updateBarrier,
   updatePoint,
+  updateScenery,
 } from '../../src/core/project/edits';
 import type { ProjectError } from '../../src/core/project/errors';
 import { slugify } from '../../src/core/project/factory';
 import { RULES } from '../../src/core/project/rules';
+import { SCENERY_SIZES } from '../../src/core/project/scenery';
 import { parseProject, parseProjectFile, serializeProject } from '../../src/core/project/schema';
 import type { Project } from '../../src/core/project/schema';
 import { sampleTrack } from '../../src/core/track/centerline';
@@ -89,6 +94,29 @@ describe('project files', () => {
       z: 0,
     }));
     expect(failure(() => parseProject(json)).detail.code).toBe('points-limit');
+  });
+
+  it('reads projects saved before scenery, and checks scenery items', () => {
+    const json = asJson(template());
+    delete json.scenery;
+    expect(parseProject(json).scenery).toEqual([]);
+    const tree = { id: 't', kind: 'tree', x: 0, z: 0, heading: 0, solid: false };
+    const sized = { width: 6, depth: 6, height: 10 };
+    json.scenery = [{ ...tree, ...sized, variant: 'conifer', count: 3 }];
+    expect(parseProject(json).scenery[0]).toMatchObject({ variant: 'conifer', count: 3 });
+    json.scenery = [{ ...tree, ...sized, variant: 'billboard' }];
+    expect(failure(() => parseProject(json)).detail).toEqual({
+      code: 'invalid-value',
+      path: 'scenery.0.variant',
+    });
+    json.scenery = [{ ...tree, ...sized, id: (json.points as { id: string }[])[0].id }];
+    expect(failure(() => parseProject(json)).detail.code).toBe('duplicate-id');
+    json.scenery = Array.from({ length: RULES.scenery.max + 1 }, (_, i) => ({
+      ...tree,
+      ...sized,
+      id: `s${i}`,
+    }));
+    expect(failure(() => parseProject(json)).detail.code).toBe('scenery-limit');
   });
 
   it('checks the references of barriers', () => {
@@ -244,5 +272,28 @@ describe('editing operations', () => {
     expect(edited.road).toMatchObject({ width: RULES.width.min, shoulder: RULES.shoulder.max });
     expect(edited.barriers[0].offset).toBe(RULES.barrierOffset.max);
     expect(edited.name).toBe('Sans nom');
+  });
+
+  it('places, changes, copies and removes scenery within the rules of its kind', () => {
+    let tree = '',
+      stand = '',
+      copies: string[] = [];
+    const edited = produce(template(), (draft) => {
+      tree = addScenery(draft, 'tree', { x: 10, z: 20 }, -90);
+      stand = addScenery(draft, 'grandstand', { x: 0, z: 0 });
+      updateScenery(draft, tree, { width: 100, depth: 3, count: 0.4, variant: 'board' });
+      updateScenery(draft, stand, { heading: 725, depth: 1, variant: 'conifer' });
+      copies = duplicateScenery(draft, [tree], { x: 5, z: 0 });
+    });
+    const [grove, grandstand, copy] = edited.scenery;
+    expect(grove).toMatchObject({ heading: 270, solid: false, variant: 'leafy', count: 1 });
+    expect(grove.width).toBe(SCENERY_SIZES.tree.width.max);
+    expect(grove.depth).toBe(grove.width);
+    expect(grandstand).toMatchObject({ heading: 5, solid: true, depth: 4 });
+    expect(grandstand.variant).toBeUndefined();
+    expect(copy).toMatchObject({ ...grove, id: copies[0], x: 15 });
+    const removed = produce(edited, (draft) => removeScenery(draft, [tree, stand]));
+    expect(removed.scenery.map((item) => item.id)).toEqual(copies);
+    expect(parseProject(asJson(edited))).toEqual(edited);
   });
 });
