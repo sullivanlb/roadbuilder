@@ -42,7 +42,7 @@ Add to this file every time a test in game teaches something, and update the sta
 
 ## Custom Shaders Patch
 
-**CSP reads `extension/ext_config.ini` in the track folder**, under that name: every installed track with a CSP config ships it there, and a copy renamed after the track is ignored. _Observed_ on the user's installation. The game without CSP ignores it.
+**CSP reads `extension/ext_config.ini` in the track folder**, under that name: every installed track with a CSP config ships it there, and a copy renamed after the track is ignored. _Confirmed in game_: CSP's log (`Documents/Assetto Corsa/logs/custom_shaders_patch.log`) reports « Config for <track> found: …\extension\ext_config.ini », and its `[INCLUDE]` of `common/conditions.ini` is followed. The game without CSP ignores it.
 
 **A `[LIGHT_n]` section with `POSITION` and `DIRECTION` places one light**, with `SPOT`, `SPOT_SHARPNESS`, `RANGE`, `RANGE_GRADIENT_OFFSET`, `COLOR` (r, g, b, intensity), `FADE_AT`, `FADE_SMOOTH` and the `CONDITION` controlling its brightness. _Documented_ ([Tracks – Lights](https://cup.acstuff.club/docs/csp/tracks/lights)). Whether our values light the track well is _assumed_.
 
