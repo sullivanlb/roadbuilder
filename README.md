@@ -58,12 +58,12 @@ Les fichiers `.roadbuilder.json` sont au **format version 2** : les points de co
 
 La CI (GitHub Actions) vérifie le formatage, le lint, les types, les tests et la compilation à chaque push. Les tests couvrent le format de projet et ses références, les opérations d’édition, la géométrie et les diagnostics, la scène (valeurs finies, indices valides, colliders orientés vers la piste, bridage dans les virages), la structure des archives, l’historique, la sauvegarde automatique et sa récupération, ainsi que les parcours de l’interface. Les tailles de maillage et les statistiques des modèles sont figées dans des snapshots : après une modification volontaire de la géométrie, mettez-les à jour avec `npx vitest -u` et vérifiez l’export **dans Assetto Corsa**.
 
-Pour la vérification manuelle : ouvrir les trois modèles et une page blanche, parcourir les six couches, déplacer/ajouter/supprimer des points (seuls et en groupe), tracer droites et arcs (avec et sans Maj), arrondir un point et régler son rayon, régler largeur et relief, tracer une portion plus large et une plus étroite, poser un dévers dans un virage et le vérifier en 3D, poser portions, barrières et voie des stands depuis le plan, la bande et la 3D, tirer leurs bords dans la bande, utiliser « Aller à » et la mini-carte, tester zoom et raccourcis, enregistrer/recharger/importer un projet, puis télécharger les ZIP Assetto Corsa et OBJ. Comparer également le rendu aux dimensions bureau et mobile.
+Pour la vérification manuelle : ouvrir les trois modèles et une page blanche, parcourir les six couches, déplacer/ajouter/supprimer des points (seuls et en groupe), tracer droites et arcs (avec et sans Maj), arrondir un point et régler son rayon, régler largeur et relief, tracer une portion plus large et une plus étroite, poser un dévers dans un virage et le vérifier en 3D, poser portions, barrières et voie des stands depuis le plan, la bande et la 3D, poser chaque type de décor puis le déplacer, le tourner, le dupliquer et basculer « Bloque les voitures », tirer leurs bords dans la bande, utiliser « Aller à » et la mini-carte, tester zoom et raccourcis, enregistrer/recharger/importer un projet, puis télécharger les ZIP Assetto Corsa et OBJ. Comparer également le rendu aux dimensions bureau et mobile.
 
 ## Fonctionnalités disponibles
 
 - Circuits fermés et routes ouvertes, avec modèles club, karting, montagne et page blanche.
-- Édition par couches (tracé, chaussée, bords, stands et départ, terrain, décor à venir) : la couche active décide de ce que le clic attrape ; les autres restent visibles, atténuées, ou masquées.
+- Édition par couches (tracé, chaussée, bords, stands et départ, terrain, décor) : la couche active décide de ce que le clic attrape ; les autres restent visibles, atténuées, ou masquées.
 - Dessin en 2D : ajout, déplacement et suppression de points, seuls ou en groupe (rectangle de sélection, Maj + clic), zoom et navigation.
 - Dessin précis : lignes droites de longueur exacte, arcs de cercle tangents au tracé et points arrondis à rayon réglable.
 - Bande de piste : la piste déroulée sous le plan, avec l’altitude, les largeurs, les barrières ou les stands selon la couche ; on y choisit une plage pour y poser un élément et on y étire les éléments par leurs bords.
@@ -72,6 +72,7 @@ Pour la vérification manuelle : ouvrir les trois modèles et une page blanche, 
 - Largeur variable : portions plus larges ou plus étroites, tracées en deux clics n’importe où sur la piste.
 - Dévers : la chaussée s’incline par portions dans les virages, jusqu’au virage relevé d’un ovale (35°).
 - Barrières avec collision : glissières, pneus, blocs TecPro et murs en béton, tracés en deux clics le long de la piste.
+- Décor : arbres et bosquets, bâtiments, tribunes, panneaux et éclairages posés librement sur le plan ou en 3D, face à la piste ; bâtiments et tribunes arrêtent les voitures (réglable par objet), les éclairages s’allument la nuit avec Custom Shaders Patch.
 - Terrain complet en herbe, raccordé au relief, à l’intérieur et autour du tracé, avec une marge réglable de 50 à 500 m et des collisions dans Assetto Corsa.
 - Aperçu 3D orientable, où l’on sélectionne et pose comme sur le plan.
 - Annulation et rétablissement des modifications.
@@ -155,6 +156,12 @@ Les quatre types ont des hauteurs réalistes : glissière 0,78 m, pneus 0,85 m, 
 
 L’inversion du sens du tracé retourne les tronçons, la suppression d’un point garde les tronçons en place, et le passage en route ouverte scinde les tronçons qui bouclaient.
 
+### Décor
+
+Sur la couche **Décor** (6), choisissez un arbre, un bâtiment, une tribune, un panneau ou un éclairage, puis cliquez sur le plan ou dans l’aperçu 3D : l’objet se pose sur le terrain, face à la partie de la piste la plus proche (Maj : grille de 5 m). Il se sélectionne, se glisse et se règle ensuite dans **Objets de décor** : aspect (feuillu ou conifère, panneau sur pieds ou au sol, éclairage à un ou deux bras), dimensions, orientation, nombre d’arbres d’un bosquet. Les objets restent en place quand le tracé change ; un avertissement signale ceux qui empiètent sur la piste. Maximum **400 objets**.
+
+Bâtiments et tribunes arrêtent les voitures par défaut, grâce à un collider invisible `1WALL_scenery` ; l’interrupteur **Bloque les voitures** l’ajoute ou le retire pour chaque objet. Les éclairages ont des lampes lumineuses et, avec Custom Shaders Patch, de vraies lumières de nuit déclarées dans `extension/ext_config.ini` (à vérifier en jeu).
+
 | Action                                      | Raccourci                           |
 | ------------------------------------------- | ----------------------------------- |
 | Changer de couche                           | 1 à 6                               |
@@ -170,7 +177,9 @@ L’inversion du sens du tracé retourne les tronçons, la suppression d’un po
 | Annuler / rétablir                          | Ctrl+Z / Ctrl+Maj+Z ou Ctrl+Y       |
 | Enregistrer le projet                       | Ctrl+S                              |
 | Ajouter ou retirer un point de la sélection | Maj + clic                          |
-| Supprimer les points sélectionnés           | Suppr                               |
+| Supprimer les points ou objets sélectionnés | Suppr                               |
+| Tourner les objets de décor de 15°          | E / Maj+E                           |
+| Dupliquer les objets de décor               | Ctrl+D                              |
 | Annuler un tracé, puis vider la plage       | Échap                               |
 
 Sur macOS, les raccourcis Ctrl acceptent aussi Cmd.
@@ -197,7 +206,7 @@ Prochaines priorités : **trajectoires IA → dévers**.
 - [x] **Largeur variable** : régler la largeur par portion pour élargir une ligne droite ou resserrer un passage (à valider en jeu).
 - [x] **Dévers et virages relevés** : incliner la chaussée dans les courbes.
 - [x] **Outils de dessin précis** : ajouter des lignes droites, arcs de cercle et virages à rayon réglable.
-- [ ] **Décors à placer** : ajouter arbres, bâtiments, tribunes, panneaux et éclairages.
+- [x] **Décors à placer** : ajouter arbres, bâtiments, tribunes, panneaux et éclairages (collisions et lumières CSP à valider en jeu).
 - [ ] **Revêtements personnalisés** : choisir asphalte, terre, gravier, marquages et vibreurs par portion.
 - [ ] **Sculpture du terrain** : créer collines, talus, fossés et dégagements.
 - [ ] **Image de fond** : importer un plan ou une vue aérienne et dessiner dessus à l’échelle.
@@ -218,7 +227,7 @@ L’import dans Assetto Corsa a été confirmé par l’utilisateur pour la vers
 - Chronométrage à vérifier, particulièrement sur les routes ouvertes, prévues pour le roulage libre.
 - Le terrain reste limité au rectangle visible dans l’éditeur ; posez des barrières aux endroits risqués, sinon une chute reste possible au-delà.
 - Les barrières utilisent des colliders simplifiés ; leur blocage de la voiture a été confirmé en jeu.
-- Pas de ponts, de dévers ni de décors. Les matériaux sont simples.
+- Pas de ponts. Les matériaux sont simples ; le décor est en géométrie simplifiée, ses collisions et ses lumières de nuit restent à vérifier en jeu.
 - Les intersections et certains virages trop serrés bloquent l’export ; tous les chevauchements de bords ou d’accotements ne sont pas détectés.
 
 ## Références

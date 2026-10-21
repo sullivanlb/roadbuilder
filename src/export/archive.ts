@@ -51,7 +51,8 @@ export function buildArchive(input: Project, format: ExportFormat, texts: Docume
     files['markers.json'] = JSON.stringify(scene.markers, null, 2);
     for (const material of usedMaterials(scene))
       files[`texture/${textureFile(material)}`] = texture(material);
-    files['README.txt'] = texts.objReadme(project.barriers.length);
+    const colliders = project.barriers.length + project.scenery.filter((item) => item.solid).length;
+    files['README.txt'] = texts.objReadme(colliders);
   } else {
     const root = `content/tracks/${slug}/`;
     const map = makeMap(project, samples),
@@ -73,6 +74,8 @@ export function buildArchive(input: Project, format: ExportFormat, texts: Docume
       projectFile,
       terrainMargin: project.terrain.margin,
       barrierCount: project.barriers.length,
+      sceneryCount: project.scenery.length,
+      lights: scene.lights.length > 0,
       pitBoxes: project.pitLane ? project.cars : null,
       warnings: issues.warnings,
     });

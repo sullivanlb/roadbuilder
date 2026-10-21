@@ -543,7 +543,8 @@ describe('editor interface', () => {
     expect(stores().editor.hiddenLayers).toEqual(['edges']);
     expect($('layer-eye-edges').getAttribute('aria-pressed')).toBe('false');
     await click('layer-decor');
-    expect($('inspector-planned')).not.toBeNull();
+    expect($('tool-tree')).not.toBeNull();
+    expect($('scenery-empty')).not.toBeNull();
     // A tool key of another layer moves to that layer.
     press('l');
     await settle();

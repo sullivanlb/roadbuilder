@@ -51,7 +51,12 @@ export const LAYERS: readonly Layer[] = [
   { id: 'edges', key: '3', tools: ['barrier'], soon: [soon('runoff')] },
   { id: 'pits', key: '4', tools: ['pits'], soon: [soon('sectors')] },
   { id: 'terrain', key: '5', tools: [], soon: [soon('sculpt')] },
-  { id: 'decor', key: '6', tools: [], soon: [soon('trees'), soon('grandstands')], planned: true },
+  {
+    id: 'decor',
+    key: '6',
+    tools: ['tree', 'building', 'grandstand', 'sign', 'light'],
+    soon: [],
+  },
 ];
 
 /** The layer a tool belongs to, or null for the tools offered on every layer. */
@@ -65,6 +70,7 @@ export type Selection =
   | { kind: 'widthZone'; id: Id }
   | { kind: 'bankZone'; id: Id }
   | { kind: 'pitLane' }
+  | { kind: 'scenery'; ids: readonly Id[] }
   | null;
 
 const SELECTION_LAYER: Record<NonNullable<Selection>['kind'], LayerId> = {
@@ -73,6 +79,7 @@ const SELECTION_LAYER: Record<NonNullable<Selection>['kind'], LayerId> = {
   bankZone: 'road',
   barrier: 'edges',
   pitLane: 'pits',
+  scenery: 'decor',
 };
 
 /** The layer whose elements a selection holds. */
@@ -114,8 +121,9 @@ export function pickInLayer(
       const onLane = lane && hit.road?.side === lane.side && lane.along(hit.road.s) !== null;
       return onLane ? { kind: 'pitLane' } : null;
     }
-    case 'terrain':
     case 'decor':
+      return hit.sceneryId ? { kind: 'scenery', ids: [hit.sceneryId] } : null;
+    case 'terrain':
       return null;
   }
 }

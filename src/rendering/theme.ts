@@ -43,6 +43,17 @@ export const COLORS = {
   pits: { lane: '#596264', wall: '#ddd9c9', box: '#d3f47d99', grid: '#e4e9d6aa' },
   profile: { grid: '#39504355', line: '#bddb86', fillTop: '#a7cb5e40', fillBottom: '#a7cb5e03' },
   preview: { sky: '#17251f' },
+  scenery: {
+    leafy: '#5d8a46cc',
+    conifer: '#3e6b4ecc',
+    building: '#c6bea9b3',
+    grandstand: '#5c86b8b3',
+    sign: '#e2ac2e',
+    light: '#fff1ce',
+    glow: '#fff1ce30',
+    outline: '#101814aa',
+    front: '#e4e9d6',
+  },
 } as const;
 
 /** How each barrier type is drawn on the plan and in the sidebar. */

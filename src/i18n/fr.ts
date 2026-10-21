@@ -32,6 +32,11 @@ export const frMessages = {
   'editor.pitsTitle': 'Tracer la voie des stands (P)',
   'editor.widthTitle': 'Tracer une portion de largeur (L)',
   'editor.bankTitle': 'Tracer une portion de dévers (D)',
+  'editor.treeTitle': 'Planter un arbre ou un bosquet',
+  'editor.buildingTitle': 'Poser un bâtiment',
+  'editor.grandstandTitle': 'Poser une tribune',
+  'editor.signTitle': 'Poser un panneau',
+  'editor.lightTitle': 'Poser un éclairage',
   'editor.panTitle': 'Déplacer la vue (H)',
   'editor.undoTitle': 'Annuler (Ctrl+Z)',
   'editor.redoTitle': 'Rétablir (Ctrl+Maj+Z)',
@@ -70,6 +75,10 @@ export const frMessages = {
   'canvas.hintBankDraft': 'Cliquez la fin du dévers · Échap annule',
   'canvas.hintSelectLayer':
     'Cliquez un élément de la couche pour le régler · Molette pour zoomer · Espace + glisser pour naviguer',
+  'canvas.hintScenery':
+    'Cliquez pour poser l’objet, face à la piste · Maj : grille de 5 m · Échap quitte l’outil',
+  'canvas.hintSelectScenery':
+    'Glissez un objet · Maj + clic ou glisser dans le vide pour en prendre plusieurs · E tourne · Ctrl+D duplique',
   'canvas.hintSelect':
     'Glissez un point · Maj + clic ou glisser dans le vide pour en prendre plusieurs · Espace + glisser pour naviguer',
   'canvas.start': 'DÉPART',
@@ -139,15 +148,13 @@ export const frMessages = {
   'layers.terrain': 'Terrain',
   'layers.terrainSub': 'Marge autour du tracé',
   'layers.decor': 'Décor',
-  'layers.decorSub': 'Arbres, tribunes, panneaux',
+  'layers.decorSub': 'Arbres, bâtiments, tribunes, panneaux, éclairages',
   'layers.planned': 'Bientôt',
   'layers.hide': 'Masquer {layer} sur le plan',
   'layers.show': 'Afficher {layer} sur le plan',
   'layers.note':
     'La couche active décide de ce que le clic attrape. L’œil masque une couche sur le plan.',
   'inspector.aria': 'Réglages de la couche',
-  'inspector.decor':
-    'Arbres, tribunes, panneaux et éclairages auront leur couche. Ils ne gêneront pas la sélection des points ou des barrières.',
   'start.title': 'Départ',
   'soon.title': 'À venir : {tool}',
   'soon.freehand': 'Main levée',
@@ -160,10 +167,39 @@ export const frMessages = {
   'soon.sectorsNote': 'Les lignes de secteur du chronométrage se placeront ici.',
   'soon.sculpt': 'Sculpter',
   'soon.sculptNote': 'Collines, talus et fossés se sculpteront ici.',
-  'soon.trees': 'Arbres',
-  'soon.treesNote': 'Les arbres se peindront par zones.',
-  'soon.grandstands': 'Tribunes',
-  'soon.grandstandsNote': 'Les tribunes se placeront le long de la piste.',
+  'scenery.title': 'Objets de décor',
+  'scenery.count': '{count} OBJET | {count} OBJETS',
+  'scenery.placeAria': 'Poser un objet',
+  'scenery.tree': 'Arbre',
+  'scenery.building': 'Bâtiment',
+  'scenery.grandstand': 'Tribune',
+  'scenery.sign': 'Panneau',
+  'scenery.light': 'Éclairage',
+  'scenery.variantAria': 'Aspect',
+  'scenery.leafy': 'Feuillu',
+  'scenery.conifer': 'Conifère',
+  'scenery.billboard': 'Sur pieds',
+  'scenery.board': 'Au sol',
+  'scenery.single': 'Un bras',
+  'scenery.double': 'Deux bras',
+  'scenery.width': 'Largeur',
+  'scenery.spread': 'Diamètre',
+  'scenery.reach': 'Longueur du bras',
+  'scenery.depth': 'Profondeur',
+  'scenery.height': 'Hauteur',
+  'scenery.heading': 'Orientation',
+  'scenery.trees': 'Arbres du bosquet',
+  'scenery.solid': 'Bloque les voitures',
+  'scenery.solidNote': 'Collision invisible en jeu',
+  'scenery.selected': '{count} objet sélectionné | {count} objets sélectionnés',
+  'scenery.duplicate': 'Dupliquer',
+  'scenery.delete': 'Supprimer',
+  'scenery.empty':
+    'Aucun objet. Choisissez-en un ci-dessus et cliquez sur le plan : il se pose face à la piste.',
+  'scenery.note':
+    'Les objets restent en place quand le tracé change. E tourne de 15°, Ctrl+D duplique, Suppr efface.',
+  'scenery.lightsNote':
+    'Les éclairages s’allument la nuit avec Custom Shaders Patch ; sans lui, seules les lampes sont visibles.',
   'sidebar.name': 'Nom du tracé',
   'save.saved': 'Sauvegardé sur cet appareil',
   'save.pending': 'Enregistrement…',
@@ -372,7 +408,11 @@ export const frMessages = {
   'help.shortcutFit': 'Tout cadrer',
   'help.shortcutUndo': 'Annuler',
   'help.shortcutRedo': 'Rétablir',
-  'help.shortcutDelete': 'Supprimer un point',
+  'help.shortcutDelete': 'Supprimer un point ou un objet',
+  'help.shortcutRotate': 'Tourner un objet de décor',
+  'help.shortcutDuplicate': 'Dupliquer un objet de décor',
+  'help.keyRotate': 'E / Maj E',
+  'help.keyCtrlD': 'Ctrl D',
   'help.keyCtrlZ': 'Ctrl Z',
   'help.keyCtrlShiftZ': 'Ctrl Maj Z',
   'help.keyCtrlS': 'Ctrl S',
@@ -468,7 +508,7 @@ export const frMessages = {
   'documents.objReadme':
     'Roadbuilder — sources 3D\n\nImportez track.obj dans Blender (axe vertical Y, avant -Z, échelle 1 m).\nLes textures se trouvent dans texture/. Les transformations des repères Assetto Corsa sont dans markers.json (matrices 4×4, translation sur la dernière ligne).\nOBJ ne conserve pas les repères AC : recréez-les si vous passez par Blender/ksEditor.\nPour un export KN5 direct, utilisez Exporter > Assetto Corsa dans Roadbuilder.\n',
   'documents.objReadmeBarriers':
-    'Les maillages 1WALL_* sont les colliders du jeu (invisibles sur la piste) ; les décors des barrières n’ont pas de préfixe.\n',
+    'Les maillages 1WALL_* sont les colliders du jeu (invisibles sur la piste) ; les décors des barrières et les objets de décor n’ont pas de préfixe.\n',
   'documents.installationHead':
     'ROADBUILDER — {name}\n\nEXPORT KN5 EXPÉRIMENTAL, À VÉRIFIER EN JEU\n\n1. Décompressez cette archive dans un dossier temporaire.\n2. Copiez content/tracks/{slug} dans assettocorsa/content/tracks/.\n   Si ce nom existe déjà, conservez une copie de votre ancienne version avant de la remplacer.\n3. Dans Content Manager ou Assetto Corsa, sélectionnez {name}.\n4. Lancez des ESSAIS LIBRES, avec une seule voiture et sans adversaires.\n\nINCLUS\n',
   'documents.installationBarriers':
@@ -477,12 +517,16 @@ export const frMessages = {
     'Voie des stands avec muret, {count} emplacements et grille de départ de {count} places.\n',
   'documents.installationSpawnPit':
     'Un seul emplacement de stand, à côté du départ, sans voie des stands.\n',
+  'documents.installationScenery':
+    'Décor : {count} objet (arbres, bâtiments, tribunes, panneaux, éclairages).|Décor : {count} objets (arbres, bâtiments, tribunes, panneaux, éclairages).',
+  'documents.installationLights':
+    'Les éclairages s’allument la nuit avec Custom Shaders Patch (extension/ext_config.ini).\n',
   'documents.installationBody':
     'Chaussée avec collisions, accotements, vibreurs optionnels, textures intégrées au KN5,\nrepères de départ/stands et chronométrage, surfaces, plan et aperçu.\nTerrain en herbe avec collisions, à l’intérieur et autour du tracé, raccordé à son relief.\nMarge extérieure du terrain : {terrainMargin} m au-delà des limites des accotements.\nLe point 1 définit le début du tracé ; la ligne de départ est placée après le stand.\n\nLIMITES DE CETTE VERSION\nLa compatibilité en jeu n’a pas été vérifiée automatiquement.\nPas de trajectoires IA : les courses contre l’IA ne sont pas prises en charge.\nRoutes ouvertes : essais libres uniquement ; chronométrage point-à-point non validé.\nLe terrain s’arrête au rectangle en pointillés visible dans l’éditeur.\nAu-delà de ce bord extérieur, une chute reste possible. Augmentez la marge si nécessaire.\n',
   'documents.installationBarrierLimits':
     'Les barrières sont des colliders simples : vérifiez les impacts en jeu.\nLe relief du terrain est interpolé automatiquement.\n',
   'documents.installationNoBarrierLimits':
-    'Pas de barrières, de ponts ou de décor ; le relief du terrain est interpolé automatiquement.\n',
+    'Pas de barrières ni de ponts ; le relief du terrain est interpolé automatiquement.\n',
   'documents.installationTail':
     'Les chevauchements de bords de route/accotements ne sont pas tous détectés.\nPour un circuit destiné à la compétition, vérifiez et complétez le modèle dans un outil 3D.\n\nLe fichier {projectFile} permet de reprendre le travail dans l’éditeur.\n',
   'documents.installationWarnings': 'AVERTISSEMENTS',

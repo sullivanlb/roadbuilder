@@ -44,8 +44,11 @@ export function useShortcuts() {
     { key: 'f', run: viewport.fit },
     { key: 'c', run: () => editor.setView(editor.view === '3d' ? '2d' : '3d') },
     ...editor.layers.map((layer) => ({ key: layer.key, run: () => editor.setLayer(layer.id) })),
-    { key: 'delete', run: editor.deleteSelectedPoint },
-    { key: 'backspace', run: editor.deleteSelectedPoint },
+    { key: 'delete', run: editor.deleteSelection },
+    { key: 'backspace', run: editor.deleteSelection },
+    { key: 'e', run: () => editor.rotateSelectedScenery(15) },
+    { key: 'e', shift: true, run: () => editor.rotateSelectedScenery(-15) },
+    { key: 'd', mod: true, run: editor.duplicateSelectedScenery },
     {
       key: 'escape',
       run: () => {

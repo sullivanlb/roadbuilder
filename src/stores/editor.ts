@@ -6,10 +6,12 @@ import {
   addArc,
   addBankZone,
   addBarrier,
+  addScenery,
   arcRejection,
   addWidthZone,
   bankZoneRejection,
   barrierRejection,
+  duplicateScenery,
   insertPoint,
   opposite,
   pointRejection,
@@ -17,17 +19,23 @@ import {
   removeBarrier,
   removePoint,
   removePoints,
+  removeScenery,
+  sceneryRejection,
   setAltitude,
   shiftAltitude,
   removeWidthZone,
   setPitLane,
   setStraight,
   updateBarrier,
+  updateScenery,
   widthZoneRejection,
 } from '../core/project/edits';
+import { planDistance } from '../core/math';
 import { RULES } from '../core/project/rules';
-import { isCircuit } from '../core/project/schema';
-import type { BarrierType, Side } from '../core/project/schema';
+import { SCENERY_DEFAULTS } from '../core/project/scenery';
+import { isCircuit, SCENERY_KINDS, SCENERY_VARIANTS } from '../core/project/schema';
+import type { BarrierType, SceneryItem, SceneryKind, Side } from '../core/project/schema';
+import { headingTowards } from '../core/scene/scenery';
 import { outsideOf } from '../core/track/bank';
 import { trackLength } from '../core/track/centerline';
 import { LAYOUT } from '../core/track/layout';
@@ -44,7 +52,20 @@ import { useProjectStore } from './project';
 import { useUiStore } from './ui';
 
 export type ToolId =
-  'select' | 'add' | 'straight' | 'arc' | 'barrier' | 'pits' | 'width' | 'bank' | 'pan';
+  | 'select'
+  | 'add'
+  | 'straight'
+  | 'arc'
+  | 'barrier'
+  | 'pits'
+  | 'width'
+  | 'bank'
+  | SceneryKind
+  | 'pan';
+
+/** The tool placing a kind of scenery, or null for the other tools. */
+export const sceneryKindOf = (tool: ToolId): SceneryKind | null =>
+  (SCENERY_KINDS as readonly string[]).includes(tool) ? (tool as SceneryKind) : null;
 export type ViewMode = '2d' | '3d';
 
 /** A place on the road and the side it points at, as a track distance. */
@@ -89,6 +110,9 @@ export const useEditorStore = defineStore('editor', () => {
   const bankTarget = ref<number | null>(null);
   /** Where the pointer aims the straight or the arc being drawn, and whether Shift snaps it. */
   const drawPointer = ref<{ at: PlanPoint; snap: boolean } | null>(null);
+  /** Where the next scenery item would be placed, under the pointer. */
+  const sceneryPointer = ref<PlanPoint | null>(null);
+  const hoveredSceneryId = ref<Id | null>(null);
 
   const selected = <K extends NonNullable<Selection>['kind']>(kind: K) =>
     computed(() => {
@@ -104,6 +128,10 @@ export const useEditorStore = defineStore('editor', () => {
   const selectedBarrierId = computed(() => selected('barrier').value?.id ?? null);
   const selectedWidthZoneId = computed(() => selected('widthZone').value?.id ?? null);
   const selectedBankZoneId = computed(() => selected('bankZone').value?.id ?? null);
+  const selectedSceneryIds = computed(() => selected('scenery').value?.ids ?? []);
+  const selectedScenery = computed(() =>
+    store.project.scenery.filter((item) => selectedSceneryIds.value.includes(item.id)),
+  );
   const selectedIndex = computed(() =>
     selectedPointId.value === null ? -1 : (store.pointIndex.get(selectedPointId.value) ?? -1),
   );
@@ -135,6 +163,34 @@ export const useEditorStore = defineStore('editor', () => {
       return arcDraft(start, pointer.at, pointer.snap);
     return null;
   });
+  /** The heading of an item placed at `at`: facing the nearest part of the track. */
+  function facingTrack(at: PlanPoint) {
+    let nearest = store.samples[0],
+      best = Infinity;
+    for (const sample of store.samples) {
+      const d = planDistance(sample, at);
+      if (d < best) {
+        best = d;
+        nearest = sample;
+      }
+    }
+    return nearest ? headingTowards(at, nearest) : 0;
+  }
+  /** The item the active scenery tool would place under the pointer, to show it beforehand. */
+  const sceneryGhost = computed<SceneryItem | null>(() => {
+    const kind = sceneryKindOf(tool.value),
+      at = sceneryPointer.value;
+    if (!kind || !at) return null;
+    const variant = SCENERY_VARIANTS[kind][0];
+    return {
+      id: 'ghost',
+      kind,
+      ...at,
+      heading: facingTrack(at),
+      ...SCENERY_DEFAULTS[kind],
+      ...(variant ? { variant } : {}),
+    };
+  });
   /** Located issues around the selected control point. */
   const selectedIssues = computed(() =>
     store.issues.locations.filter(
@@ -163,6 +219,14 @@ export const useEditorStore = defineStore('editor', () => {
         return project.bankZones.some((z) => z.id === current.id) ? current : null;
       case 'pitLane':
         return project.pitLane ? current : null;
+      case 'scenery': {
+        const ids = current.ids.filter((id) => project.scenery.some((item) => item.id === id));
+        return ids.length === current.ids.length
+          ? current
+          : ids.length
+            ? { kind: 'scenery', ids }
+            : null;
+      }
       case undefined:
         return null;
     }
@@ -191,6 +255,7 @@ export const useEditorStore = defineStore('editor', () => {
     bankDraft.value = null;
     bankTarget.value = null;
     drawPointer.value = null;
+    sceneryPointer.value = null;
   }
 
   /** Works on another layer: its tools, its elements, and what was selected in it before. */
@@ -232,6 +297,7 @@ export const useEditorStore = defineStore('editor', () => {
       bankTarget.value = null;
     }
     drawPointer.value = null;
+    sceneryPointer.value = null;
   }
 
   function setView(next: ViewMode) {
@@ -570,6 +636,57 @@ export const useEditorStore = defineStore('editor', () => {
     selectBankZone(store.project.bankZones[Math.min(index, zones.length - 2)]?.id ?? null);
   }
 
+  /** Places a scenery item at `at`, facing the track, and selects it. */
+  function placeScenery(kind: SceneryKind, at: PlanPoint) {
+    if (sceneryRejection(store.project))
+      return void refuse(t('toast.sceneryLimit', { max: RULES.scenery.max }));
+    const heading = facingTrack(at);
+    const id = store.edit((draft) => addScenery(draft, kind, at, heading));
+    selection.value = { kind: 'scenery', ids: [id] };
+  }
+
+  const selectScenery = (id: Id | null) => select(id ? { kind: 'scenery', ids: [id] } : null);
+
+  /** Adds a scenery item to the selection, or takes it out. */
+  function toggleScenery(id: Id) {
+    const ids = selectedSceneryIds.value;
+    const next = ids.includes(id) ? ids.filter((other) => other !== id) : [...ids, id];
+    select(next.length ? { kind: 'scenery', ids: next } : null);
+  }
+
+  function deleteSelectedScenery() {
+    const ids = selectedSceneryIds.value;
+    if (!ids.length) return;
+    store.edit((draft) => removeScenery(draft, ids));
+    selection.value = null;
+  }
+
+  /** Turns every selected scenery item about itself by `degrees`, clockwise on the plan. */
+  function rotateSelectedScenery(degrees: number) {
+    const items = selectedScenery.value;
+    if (items.length)
+      store.edit((draft) => {
+        for (const item of items)
+          updateScenery(draft, item.id, { heading: item.heading + degrees });
+      });
+  }
+
+  /** Copies the selected scenery items a few metres aside and selects the copies. */
+  function duplicateSelectedScenery() {
+    const ids = selectedSceneryIds.value;
+    if (!ids.length) return;
+    if (sceneryRejection(store.project, ids.length))
+      return void refuse(t('toast.sceneryLimit', { max: RULES.scenery.max }));
+    const copies = store.edit((draft) => duplicateScenery(draft, ids, { x: 5, z: 5 }));
+    selection.value = { kind: 'scenery', ids: copies };
+  }
+
+  /** Deletes what is selected, when it can be deleted from the keyboard: points or scenery. */
+  function deleteSelection() {
+    if (selection.value?.kind === 'scenery') deleteSelectedScenery();
+    else deleteSelectedPoint();
+  }
+
   /** Chooses the type of the next barrier, and of the selected one if any. */
   function setBarrierType(type: BarrierType) {
     barrierType.value = type;
@@ -620,6 +737,11 @@ export const useEditorStore = defineStore('editor', () => {
     bankDraft,
     bankTarget,
     drawPointer,
+    sceneryPointer,
+    hoveredSceneryId,
+    sceneryGhost,
+    selectedSceneryIds,
+    selectedScenery,
     drawFrom,
     drawDraft,
     selectedIndex,
@@ -669,5 +791,12 @@ export const useEditorStore = defineStore('editor', () => {
     setBarrierType,
     swapSelectedBarrierSide,
     deleteSelectedBarrier,
+    placeScenery,
+    selectScenery,
+    toggleScenery,
+    deleteSelectedScenery,
+    rotateSelectedScenery,
+    duplicateSelectedScenery,
+    deleteSelection,
   };
 });

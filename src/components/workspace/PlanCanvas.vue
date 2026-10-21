@@ -42,6 +42,9 @@ const scene = computed<PlanScene>(() => ({
   bankDraft: editor.bankDraft,
   bankTarget: editor.bankDraft !== null ? editor.bankTarget : null,
   drawDraft: editor.drawDraft,
+  selectedSceneryIds: editor.selectedSceneryIds,
+  hoveredSceneryId: editor.hoveredSceneryId,
+  sceneryGhost: editor.sceneryGhost,
   range: editor.range,
   hoverS: editor.hoverS,
   labels: {

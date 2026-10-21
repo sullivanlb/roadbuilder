@@ -5,6 +5,7 @@ import { bankTool } from './bank';
 import { barrierTool } from './barrier';
 import { panTool } from './pan';
 import { pitsTool } from './pits';
+import { placeTool } from './scenery';
 import { selectTool } from './select';
 import { straightTool } from './straight';
 import { widthTool } from './width';
@@ -19,6 +20,11 @@ export const TOOLS: Record<ToolId, Tool> = {
   pits: pitsTool,
   width: widthTool,
   bank: bankTool,
+  tree: placeTool('tree'),
+  building: placeTool('building'),
+  grandstand: placeTool('grandstand'),
+  sign: placeTool('sign'),
+  light: placeTool('light'),
   pan: panTool,
 };
 

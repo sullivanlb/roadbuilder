@@ -70,7 +70,7 @@ function onPointerUp(event: PointerEvent) {
 function onPointerMove(event: PointerEvent) {
   if (!renderer || press) return;
   const hit = hitAt(event);
-  previewHover({ editor }, hit ?? { road: null, pointId: null, barrierId: null });
+  previewHover({ editor }, hit ?? { road: null });
 }
 
 onMounted(() => {

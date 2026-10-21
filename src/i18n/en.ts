@@ -27,6 +27,11 @@ export const enMessages: Record<MessageKey, string> = {
   'editor.pitsTitle': 'Draw the pit lane (P)',
   'editor.widthTitle': 'Draw a width zone (L)',
   'editor.bankTitle': 'Draw a bank zone (D)',
+  'editor.treeTitle': 'Plant a tree or a grove',
+  'editor.buildingTitle': 'Place a building',
+  'editor.grandstandTitle': 'Place a grandstand',
+  'editor.signTitle': 'Place a sign',
+  'editor.lightTitle': 'Place a light',
   'editor.panTitle': 'Pan the view (H)',
   'editor.undoTitle': 'Undo (Ctrl+Z)',
   'editor.redoTitle': 'Redo (Ctrl+Shift+Z)',
@@ -63,6 +68,10 @@ export const enMessages: Record<MessageKey, string> = {
   'canvas.hintBankDraft': 'Click where the banking ends · Escape cancels',
   'canvas.hintSelectLayer':
     'Click an item of the layer to adjust it · Scroll to zoom · Space + drag to pan',
+  'canvas.hintScenery':
+    'Click to place the item, facing the track · Shift: 5 m grid · Esc leaves the tool',
+  'canvas.hintSelectScenery':
+    'Drag an item · Shift + click or drag on empty space to take several · E turns · Ctrl+D duplicates',
   'canvas.hintSelect':
     'Drag a point · Shift + click or drag over empty space to take several · Space + drag to pan',
   'canvas.start': 'START',
@@ -131,14 +140,12 @@ export const enMessages: Record<MessageKey, string> = {
   'layers.terrain': 'Terrain',
   'layers.terrainSub': 'Margin around the track',
   'layers.decor': 'Scenery',
-  'layers.decorSub': 'Trees, grandstands, signs',
+  'layers.decorSub': 'Trees, buildings, grandstands, signs, lights',
   'layers.planned': 'Coming',
   'layers.hide': 'Hide {layer} on the plan',
   'layers.show': 'Show {layer} on the plan',
   'layers.note': 'The active layer decides what a click picks. The eye hides a layer on the plan.',
   'inspector.aria': 'Layer settings',
-  'inspector.decor':
-    'Trees, grandstands, signs and lights will get their own layer. They will not get in the way when selecting points or barriers.',
   'start.title': 'Start',
   'soon.title': 'Coming: {tool}',
   'soon.freehand': 'Freehand',
@@ -151,10 +158,39 @@ export const enMessages: Record<MessageKey, string> = {
   'soon.sectorsNote': 'Timing sector lines will be placed here.',
   'soon.sculpt': 'Sculpt',
   'soon.sculptNote': 'Hills, banks and ditches will be sculpted here.',
-  'soon.trees': 'Trees',
-  'soon.treesNote': 'Trees will be painted in areas.',
-  'soon.grandstands': 'Grandstands',
-  'soon.grandstandsNote': 'Grandstands will be placed along the track.',
+  'scenery.title': 'Scenery items',
+  'scenery.count': '{count} ITEM | {count} ITEMS',
+  'scenery.placeAria': 'Place an item',
+  'scenery.tree': 'Tree',
+  'scenery.building': 'Building',
+  'scenery.grandstand': 'Grandstand',
+  'scenery.sign': 'Sign',
+  'scenery.light': 'Light',
+  'scenery.variantAria': 'Look',
+  'scenery.leafy': 'Leafy',
+  'scenery.conifer': 'Conifer',
+  'scenery.billboard': 'On legs',
+  'scenery.board': 'On the ground',
+  'scenery.single': 'One arm',
+  'scenery.double': 'Two arms',
+  'scenery.width': 'Width',
+  'scenery.spread': 'Diameter',
+  'scenery.reach': 'Arm length',
+  'scenery.depth': 'Depth',
+  'scenery.height': 'Height',
+  'scenery.heading': 'Heading',
+  'scenery.trees': 'Trees in the grove',
+  'scenery.solid': 'Stops cars',
+  'scenery.solidNote': 'Invisible collider in game',
+  'scenery.selected': '{count} item selected | {count} items selected',
+  'scenery.duplicate': 'Duplicate',
+  'scenery.delete': 'Delete',
+  'scenery.empty':
+    'No item yet. Pick one above and click on the plan: it is placed facing the track.',
+  'scenery.note':
+    'Items stay in place when the track changes. E turns by 15°, Ctrl+D duplicates, Del deletes.',
+  'scenery.lightsNote':
+    'Lights come on at night with Custom Shaders Patch; without it, only the lamps show.',
   'sidebar.name': 'Track name',
   'save.saved': 'Saved on this device',
   'save.pending': 'Saving…',
@@ -355,7 +391,11 @@ export const enMessages: Record<MessageKey, string> = {
   'help.shortcutFit': 'Fit everything',
   'help.shortcutUndo': 'Undo',
   'help.shortcutRedo': 'Redo',
-  'help.shortcutDelete': 'Delete a point',
+  'help.shortcutDelete': 'Delete a point or an item',
+  'help.shortcutRotate': 'Turn a scenery item',
+  'help.shortcutDuplicate': 'Duplicate a scenery item',
+  'help.keyRotate': 'E / Shift E',
+  'help.keyCtrlD': 'Ctrl D',
   'help.keyCtrlZ': 'Ctrl Z',
   'help.keyCtrlShiftZ': 'Ctrl Shift Z',
   'help.keyCtrlS': 'Ctrl S',
@@ -446,7 +486,7 @@ export const enMessages: Record<MessageKey, string> = {
   'documents.objReadme':
     'Roadbuilder — 3D sources\n\nImport track.obj into Blender (vertical axis Y, forward -Z, scale 1 m).\nTextures live in texture/. The Assetto Corsa marker transforms are in markers.json (4×4 matrices, translation on the last row).\nOBJ does not keep the AC markers: recreate them if you go through Blender/ksEditor.\nFor a direct KN5 export, use Export > Assetto Corsa in Roadbuilder.\n',
   'documents.objReadmeBarriers':
-    'The 1WALL_* meshes are the game colliders (invisible on track); the barriers decorations have no prefix.\n',
+    'The 1WALL_* meshes are the game colliders (invisible on track); the barriers decorations and the scenery items have no prefix.\n',
   'documents.installationHead':
     'ROADBUILDER — {name}\n\nEXPERIMENTAL KN5 EXPORT, TO BE CHECKED IN GAME\n\n1. Unzip this archive into a temporary folder.\n2. Copy content/tracks/{slug} into assettocorsa/content/tracks/.\n   If this name already exists, keep a copy of your previous version before replacing it.\n3. In Content Manager or Assetto Corsa, select {name}.\n4. Start a FREE PRACTICE session, with a single car and no opponents.\n\nINCLUDED\n',
   'documents.installationBarriers':
@@ -454,12 +494,16 @@ export const enMessages: Record<MessageKey, string> = {
   'documents.installationPitLane':
     'Pit lane with a pit wall, {count} pit boxes and a {count}-car starting grid.\n',
   'documents.installationSpawnPit': 'A single pit box beside the start, without a pit lane.\n',
+  'documents.installationScenery':
+    'Scenery: {count} item (trees, buildings, grandstands, signs, lights).|Scenery: {count} items (trees, buildings, grandstands, signs, lights).',
+  'documents.installationLights':
+    'Lights come on at night with Custom Shaders Patch (extension/ext_config.ini).\n',
   'documents.installationBody':
     'Road with collisions, shoulders, optional kerbs, textures embedded in the KN5,\nstart/pit markers and timing, surfaces, map and preview.\nGrass terrain with collisions, inside and around the track, joined to its relief.\nOuter terrain margin: {terrainMargin} m beyond the shoulder limits.\nPoint 1 sets the start of the track; the start line is placed after the pit.\n\nLIMITS OF THIS VERSION\nIn-game compatibility has not been verified automatically.\nNo AI lines: races against the AI are not supported.\nOpen roads: free practice only; point-to-point timing not validated.\nThe terrain stops at the dotted rectangle visible in the editor.\nBeyond this outer edge, a fall is still possible. Increase the margin if needed.\n',
   'documents.installationBarrierLimits':
     'Barriers are simple colliders: check impacts in game.\nThe terrain relief is interpolated automatically.\n',
   'documents.installationNoBarrierLimits':
-    'No barriers, bridges or scenery; the terrain relief is interpolated automatically.\n',
+    'No barriers or bridges; the terrain relief is interpolated automatically.\n',
   'documents.installationTail':
     'Not all road/shoulder edge overlaps are detected.\nFor a competition track, review and complete the model in a 3D tool.\n\nThe {projectFile} file lets you resume the work in the editor.\n',
   'documents.installationWarnings': 'WARNINGS',

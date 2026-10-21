@@ -7,6 +7,9 @@ export interface InstallationParams {
   projectFile: string;
   terrainMargin: number;
   barrierCount: number;
+  sceneryCount: number;
+  /** Whether lights are placed, lit at night by Custom Shaders Patch. */
+  lights: boolean;
   /** Pit boxes along the pit lane, or null for a track with a single box and no lane. */
   pitBoxes: number | null;
   warnings: readonly TrackIssue[];
@@ -16,8 +19,8 @@ export interface InstallationParams {
 export interface DocumentTexts {
   /** Comment header of track.obj. */
   objHeader: string;
-  /** README.txt of the OBJ archive. */
-  objReadme(barrierCount: number): string;
+  /** README.txt of the OBJ archive; `colliders` counts what has a 1WALL_* collider. */
+  objReadme(colliders: number): string;
   /** Description shown by Content Manager. */
   trackDescription(closed: boolean): string;
   /** INSTALLATION.txt of the Assetto Corsa archive. */

@@ -54,17 +54,28 @@ export function previewClick(
         else editor.selectPoint(hit.pointId);
         return;
       }
+      if (editor.layer === 'decor' && hit.sceneryId && shiftKey)
+        return editor.toggleScenery(hit.sceneryId);
       editor.select(
         pickInLayer(editor.layer, hit, project.project, project.samples, editor.selection),
       );
       return;
+    case 'tree':
+    case 'building':
+    case 'grandstand':
+    case 'sign':
+    case 'light':
+      return editor.placeScenery(editor.tool, hit.ground);
     case 'pan':
       return;
   }
 }
 
 /** The pointer moving over the preview: the band follows it, and so does a stretch being laid. */
-export function previewHover({ editor }: Pick<PreviewContext, 'editor'>, hit: TrackHit) {
+export function previewHover(
+  { editor }: Pick<PreviewContext, 'editor'>,
+  hit: Pick<TrackHit, 'road'>,
+) {
   const road = hit.road;
   editor.hoverS = road?.s ?? null;
   if (editor.barrierDraft) editor.barrierTarget = road?.s ?? null;

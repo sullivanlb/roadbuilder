@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { nextTick } from 'vue';
 import { setRoad, updatePoint } from '../src/core/project/edits';
 import { parseProjectFile, serializeProject } from '../src/core/project/schema';
+import { headingVector } from '../src/core/scene/scenery';
 import { pitLaneLayout } from '../src/core/track/pitLane';
 import { positionDistance } from '../src/core/track/positions';
 import { pickInLayer } from '../src/editor/layers';
@@ -180,9 +181,11 @@ describe('editor', () => {
     const lane = pitLaneLayout(project.project, project.samples)!;
     // One click that lands on a point, a barrier and a width zone at once.
     const hit: TrackHit = {
+      ground: { x: 0, z: 0 },
       road: { s: 200, side: 'left' },
       pointId: project.project.points[1].id,
       barrierId: barrier.id,
+      sceneryId: 'tree',
     };
     const pick = (layer: LayerId, at = hit) =>
       pickInLayer(layer, at, project.project, project.samples);
@@ -193,6 +196,70 @@ describe('editor', () => {
     const onLane = { ...hit, road: { s: lane.entry + lane.length / 2, side: lane.side } };
     expect(pick('pits', onLane)).toEqual({ kind: 'pitLane' });
     expect(pick('terrain')).toBeNull();
+    expect(pick('decor')).toEqual({ kind: 'scenery', ids: ['tree'] });
+  });
+
+  it('places scenery facing the track, then turns, copies and deletes the selection', async () => {
+    const { project, editor, ui } = stores();
+    project.replace(template('club'));
+    editor.setTool('grandstand');
+    expect(editor.layer).toBe('decor');
+    // Beside the main straight, which runs along z = 180 from x = -280 to 80.
+    editor.placeScenery('grandstand', { x: -100, z: 230 });
+    const [stand] = project.project.scenery;
+    expect(stand).toMatchObject({ kind: 'grandstand', solid: true });
+    // It faces the straight, north of it on the plan.
+    expect(headingVector(stand.heading).z).toBeLessThan(-0.95);
+    expect(editor.selection).toEqual({ kind: 'scenery', ids: [stand.id] });
+    editor.placeScenery('tree', { x: -100, z: 100 });
+    const tree = project.project.scenery[1];
+    expect(headingVector(tree.heading).z).toBeGreaterThan(0.95);
+    editor.select({ kind: 'scenery', ids: [stand.id, tree.id] });
+    editor.rotateSelectedScenery(-15);
+    expect(project.project.scenery.map((item) => item.heading)).toEqual([
+      (stand.heading + 345) % 360,
+      tree.heading - 15,
+    ]);
+    editor.duplicateSelectedScenery();
+    expect(project.project.scenery).toHaveLength(4);
+    expect(editor.selectedSceneryIds).toEqual(project.project.scenery.slice(2).map((i) => i.id));
+    editor.deleteSelection();
+    expect(project.project.scenery).toHaveLength(2);
+    expect(editor.selection).toBeNull();
+    // Undo brings the copies back but not their selection; redo drops it again.
+    editor.selectScenery(stand.id);
+    editor.deleteSelectedScenery();
+    project.undo();
+    await nextTick();
+    expect(project.project.scenery).toHaveLength(2);
+    editor.selectScenery(stand.id);
+    project.undo();
+    project.undo();
+    await nextTick();
+    expect(editor.selectedSceneryIds).toEqual([stand.id]);
+    expect(ui.notification).toBeNull();
+  });
+
+  it('places scenery from the 3D preview and picks it there', () => {
+    const { project, editor, ui } = stores();
+    project.replace(template('club'));
+    editor.setTool('light');
+    const ground = { x: -100, y: 0, z: 230 };
+    previewClick(
+      { project, editor, ui },
+      trackHitNear(project.project, project.samples, ground),
+      false,
+    );
+    const [light] = project.project.scenery;
+    expect(light).toMatchObject({ kind: 'light', x: -100, z: 230 });
+    editor.setTool('select');
+    editor.select(null);
+    previewClick(
+      { project, editor, ui },
+      trackHitNear(project.project, project.samples, ground),
+      false,
+    );
+    expect(editor.selection).toEqual({ kind: 'scenery', ids: [light.id] });
   });
 
   it('moves to the layer of a tool or a selection, and keeps each layer’s selection', () => {

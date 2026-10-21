@@ -61,6 +61,20 @@ const local = (frame: ItemFrame, u: number, v: number, h: number): Triple => [
   frame.z + frame.fz * v + frame.fx * u,
 ];
 
+/**
+ * How far a place on the plan lies outside an item's footprint, in metres: 0
+ * inside it. A tree's footprint is the round of its crown or grove.
+ */
+export function outsideScenery(item: SceneryItem, p: PlanPoint): number {
+  const front = headingVector(item.heading);
+  const dx = p.x - item.x,
+    dz = p.z - item.z;
+  if (item.kind === 'tree') return Math.max(0, Math.hypot(dx, dz) - item.width / 2);
+  const u = Math.abs(dx * -front.z + dz * front.x) - item.width / 2,
+    v = Math.abs(dx * front.x + dz * front.z) - item.depth / 2;
+  return Math.hypot(Math.max(0, u), Math.max(0, v));
+}
+
 /** The corners of an item's footprint on the plan, a rectangle around its centre. */
 export function sceneryFootprint(item: SceneryItem): PlanPoint[] {
   const front = headingVector(item.heading);

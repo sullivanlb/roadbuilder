@@ -143,6 +143,15 @@ export class PreviewRenderer {
       this.overlay.add(mesh);
       this.posts.push(mesh);
     }
+    if (overlay.outlines.length) {
+      const geometry = new BufferGeometry();
+      geometry.setAttribute('position', new Float32BufferAttribute(overlay.outlines, 3));
+      const material = new LineBasicMaterial({ color: COLORS.accent, depthTest: false });
+      const lines = new LineSegments(geometry, material);
+      // Drawn last, over the scenery it outlines.
+      lines.renderOrder = 1;
+      this.overlay.add(lines);
+    }
     const cursor = overlay.cursor;
     this.cursorMesh.visible = cursor !== null;
     if (cursor) {
@@ -295,7 +304,7 @@ export class PreviewRenderer {
     for (const child of this.content.children)
       if ('geometry' in child) (child as Mesh).geometry.dispose();
     for (const material of this.materials.values()) material.dispose();
-    this.setOverlay({ strips: [], posts: [], cursor: null });
+    this.setOverlay({ strips: [], posts: [], outlines: [], cursor: null });
     this.postGeometry.dispose();
     this.cursorMesh.geometry.dispose();
     this.cursorMesh.material.dispose();

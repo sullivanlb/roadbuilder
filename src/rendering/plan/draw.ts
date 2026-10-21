@@ -1,11 +1,12 @@
 import type { Id } from '../../core/ids';
 import type { Vec3 } from '../../core/math';
 import { DEFAULTS } from '../../core/project/rules';
-import type { Project, Side } from '../../core/project/schema';
+import type { Project, SceneryItem, Side } from '../../core/project/schema';
 import { barrierLine, barrierPath } from '../../core/scene/barriers';
 import { gridPlaces, pitBoxPlaces } from '../../core/scene/markers';
 import type { Place } from '../../core/scene/markers';
 import { startLine } from '../../core/scene/road';
+import { groveTrees, headingVector, sceneryFootprint } from '../../core/scene/scenery';
 import { sampleAt, trackLength } from '../../core/track/centerline';
 import type { Sample } from '../../core/track/centerline';
 import { arcLayout, corners } from '../../core/track/geometry';
@@ -62,6 +63,10 @@ export interface PlanScene {
   hoverS: number | null;
   /** The straight or the arc the next click would draw. */
   drawDraft: DrawDraft | null;
+  selectedSceneryIds: readonly Id[];
+  hoveredSceneryId: Id | null;
+  /** The item the active scenery tool would place under the pointer. */
+  sceneryGhost: SceneryItem | null;
   labels: {
     start: string;
     finish: string;
@@ -479,6 +484,115 @@ function drawBarriers(ctx: Context, view: PlanProjection, scene: PlanScene) {
   ctx.stroke();
 }
 
+/** The outline of a scenery item on the plan: the round of a tree or grove, the rectangle of the others. */
+function sceneryOutline(ctx: Context, view: PlanProjection, item: SceneryItem) {
+  ctx.beginPath();
+  if (item.kind === 'tree') {
+    const p = view.toScreen(item);
+    ctx.arc(p.x, p.y, Math.max(3, (item.width / 2) * view.camera.scale), 0, Math.PI * 2);
+    return;
+  }
+  sceneryFootprint(item).forEach((corner, i) => {
+    const p = view.toScreen(corner);
+    if (i) ctx.lineTo(p.x, p.y);
+    else ctx.moveTo(p.x, p.y);
+  });
+  ctx.closePath();
+}
+
+/** One scenery item as seen from above, with its front marked when it has one. */
+function drawItem(ctx: Context, view: PlanProjection, item: SceneryItem) {
+  const scale = view.camera.scale;
+  if (item.kind === 'tree') {
+    ctx.fillStyle = item.variant === 'conifer' ? COLORS.scenery.conifer : COLORS.scenery.leafy;
+    ctx.strokeStyle = COLORS.scenery.outline;
+    ctx.lineWidth = 1;
+    const front = headingVector(item.heading);
+    for (const tree of groveTrees(item)) {
+      const p = view.toScreen({
+        x: item.x + front.x * tree.v - front.z * tree.u,
+        z: item.z + front.z * tree.v + front.x * tree.u,
+      });
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, Math.max(2, (tree.crown / 2) * scale), 0, Math.PI * 2);
+      ctx.fill();
+      ctx.stroke();
+    }
+    return;
+  }
+  if (item.kind === 'light') {
+    const p = view.toScreen(item);
+    ctx.fillStyle = COLORS.scenery.glow;
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, Math.max(6, item.height * 1.2 * scale), 0, Math.PI * 2);
+    ctx.fill();
+    const front = headingVector(item.heading);
+    ctx.strokeStyle = COLORS.scenery.light;
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    for (const sign of item.variant === 'double' ? [1, -1] : [1]) {
+      const end = view.toScreen({
+        x: item.x + front.x * item.width * sign,
+        z: item.z + front.z * item.width * sign,
+      });
+      ctx.moveTo(p.x, p.y);
+      ctx.lineTo(end.x, end.y);
+    }
+    ctx.stroke();
+    ctx.fillStyle = COLORS.scenery.light;
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, 3, 0, Math.PI * 2);
+    ctx.fill();
+    return;
+  }
+  sceneryOutline(ctx, view, item);
+  ctx.fillStyle = COLORS.scenery[item.kind];
+  ctx.fill();
+  ctx.strokeStyle = COLORS.scenery.outline;
+  ctx.lineWidth = item.kind === 'sign' ? 3 : 1;
+  ctx.stroke();
+  if (item.kind === 'building') return;
+  // The front, the side that faces the track.
+  const [, , c, d] = sceneryFootprint(item).map((corner) => view.toScreen(corner));
+  ctx.strokeStyle = COLORS.scenery.front;
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.moveTo(c.x, c.y);
+  ctx.lineTo(d.x, d.y);
+  ctx.stroke();
+}
+
+/** The scenery items, the selected ones highlighted, and the one the active tool would place. */
+function drawScenery(ctx: Context, view: PlanProjection, scene: PlanScene) {
+  for (const item of scene.project.scenery) {
+    const selected = scene.selectedSceneryIds.includes(item.id);
+    if (selected || item.id === scene.hoveredSceneryId) {
+      sceneryOutline(ctx, view, item);
+      ctx.strokeStyle = selected ? COLORS.accent : COLORS.point.hover;
+      ctx.lineWidth = selected ? 5 : 2;
+      ctx.stroke();
+    }
+    drawItem(ctx, view, item);
+    // A solid item stops cars: a dashed line runs round it.
+    if (item.solid) {
+      sceneryOutline(ctx, view, item);
+      ctx.strokeStyle = COLORS.danger;
+      ctx.lineWidth = 1;
+      dashed(ctx, [3, 3], () => ctx.stroke());
+    }
+  }
+  const ghost = scene.sceneryGhost;
+  if (!ghost) return;
+  ctx.save();
+  ctx.globalAlpha = 0.5;
+  drawItem(ctx, view, ghost);
+  ctx.restore();
+  sceneryOutline(ctx, view, ghost);
+  ctx.strokeStyle = COLORS.accent;
+  ctx.lineWidth = 1.5;
+  dashed(ctx, [5, 4], () => ctx.stroke());
+}
+
 /** Control points, numbered, with the selected and the problematic ones highlighted. */
 function drawPoints(ctx: Context, view: PlanProjection, scene: PlanScene) {
   const affected = new Set(scene.tightTurns.flatMap((turn) => turn.pointIds));
@@ -695,6 +809,7 @@ export function drawPlan(ctx: Context, view: PlanProjection, scene: PlanScene, d
     inLayer(ctx, scene, 'edges', () => drawBarriers(ctx, view, scene));
     drawRange(ctx, view, scene);
   }
+  inLayer(ctx, scene, 'decor', () => drawScenery(ctx, view, scene));
   if (scene.layer === 'track') drawCorners(ctx, view, scene);
   drawPoints(ctx, view, scene);
   drawDraft(ctx, view, scene);

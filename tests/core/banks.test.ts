@@ -262,7 +262,13 @@ describe('road layer picking', () => {
     });
     const width = project.widthZones[0].id,
       bank = project.bankZones[0].id;
-    const hit = { road: { s: 200, side: 'right' as const }, pointId: null, barrierId: null };
+    const hit = {
+      ground: { x: 0, z: 0 },
+      road: { s: 200, side: 'right' as const },
+      pointId: null,
+      barrierId: null,
+      sceneryId: null,
+    };
     const pick = (current: Parameters<typeof pickInLayer>[4]) =>
       pickInLayer('road', hit, project, samples, current);
     expect(pick(null)).toEqual({ kind: 'widthZone', id: width });

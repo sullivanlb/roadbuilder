@@ -7,6 +7,7 @@ import PitSection from '../sidebar/PitSection.vue';
 import PointSection from '../sidebar/PointSection.vue';
 import PointsSection from '../sidebar/PointsSection.vue';
 import RoadSection from '../sidebar/RoadSection.vue';
+import ScenerySection from '../sidebar/ScenerySection.vue';
 import ShapeSection from '../sidebar/ShapeSection.vue';
 import StartSection from '../sidebar/StartSection.vue';
 import TerrainSection from '../sidebar/TerrainSection.vue';
@@ -41,7 +42,7 @@ const editor = useEditorStore();
       <PitSection />
     </template>
     <TerrainSection v-else-if="editor.layer === 'terrain'" />
-    <p v-else id="inspector-planned" class="planned">{{ t('inspector.decor') }}</p>
+    <ScenerySection v-else />
   </aside>
 </template>
 
@@ -58,15 +59,6 @@ h1 {
   font-size: 17px;
   font-weight: 600;
   letter-spacing: -0.3px;
-}
-.planned {
-  margin-top: 18px;
-  border: 1px dashed var(--line-strong);
-  border-radius: 8px;
-  padding: 14px;
-  font-size: 11px;
-  line-height: 1.7;
-  color: var(--muted);
 }
 @media (max-width: 860px) {
   .inspector {

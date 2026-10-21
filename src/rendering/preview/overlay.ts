@@ -1,8 +1,10 @@
 import type { Id } from '../../core/ids';
-import type { Project } from '../../core/project/schema';
+import type { Project, SceneryItem } from '../../core/project/schema';
 import type { MeshKind } from '../../core/scene/mesh';
 import { barrierLateral, barrierSamples } from '../../core/scene/barriers';
+import { groundHeight } from '../../core/scene/ground';
 import { offsetPoint } from '../../core/scene/mesh';
+import { sceneryFootprint } from '../../core/scene/scenery';
 import { sampleAt } from '../../core/track/centerline';
 import type { Sample } from '../../core/track/centerline';
 import { kerbWidth } from '../../core/track/layout';
@@ -15,9 +17,29 @@ import { COLORS } from '../theme';
 /** The layer a mesh of the scene belongs to, or null for the roadway, shown on every layer. */
 export function meshLayer(name: string, kind: MeshKind): LayerId | null {
   if (name.startsWith('1PIT') || name.startsWith('divider')) return 'pits';
+  if (kind === 'scenery') return 'decor';
   if (kind === 'terrain') return 'terrain';
   if (kind === 'barrier') return 'edges';
   return null;
+}
+
+/** The edges of a box around a scenery item standing at height `y`, as line segments. */
+function sceneryBox(item: SceneryItem, y: number): number[] {
+  const ring =
+    item.kind === 'tree'
+      ? Array.from({ length: 12 }, (_, k) => ({
+          x: item.x + (Math.cos((k * Math.PI) / 6) * item.width) / 2,
+          z: item.z + (Math.sin((k * Math.PI) / 6) * item.width) / 2,
+        }))
+      : sceneryFootprint(item);
+  const lines: number[] = [];
+  const top = y + item.height;
+  ring.forEach((p, i) => {
+    const q = ring[(i + 1) % ring.length];
+    lines.push(p.x, y, p.z, q.x, y, q.z, p.x, top, p.z, q.x, top, q.z);
+    if (item.kind !== 'tree' || i % 3 === 0) lines.push(p.x, y, p.z, p.x, top, p.z);
+  });
+  return lines;
 }
 
 /** A flat strip laid just above the ground, as triangles. */
@@ -39,6 +61,8 @@ export interface OverlayPost {
 /** Everything drawn over the scene to show what is being edited. */
 export interface PreviewOverlay {
   strips: OverlayStrip[];
+  /** Line segments drawn over everything, two points each: the boxes around selected scenery. */
+  outlines: number[];
   posts: OverlayPost[];
   /** Where the pointer is along the track: a bar across the road, tilted with its bank. */
   cursor: {
@@ -61,6 +85,7 @@ export interface OverlayState {
     | { kind: 'widthZone'; id: Id }
     | { kind: 'bankZone'; id: Id }
     | { kind: 'pitLane' }
+    | { kind: 'scenery'; ids: readonly Id[] }
     | null;
   range: TrackRange | null;
   /** The stretch being laid with a two-click tool. */
@@ -97,7 +122,7 @@ export function buildOverlay(
   samples: readonly Sample[],
   state: OverlayState,
 ): PreviewOverlay {
-  const overlay: PreviewOverlay = { strips: [], posts: [], cursor: null };
+  const overlay: PreviewOverlay = { strips: [], posts: [], outlines: [], cursor: null };
   if (samples.length < 2) return overlay;
   const kerb = kerbWidth(project.road);
   const across = (along: readonly Sample[], color: string, opacity: number, extra = 1) =>
@@ -149,6 +174,13 @@ export function buildOverlay(
           0.35,
         ),
       );
+    }
+  }
+  if (selection?.kind === 'scenery') {
+    const height = groundHeight(project, samples);
+    for (const item of project.scenery) {
+      if (!selection.ids.includes(item.id)) continue;
+      overlay.outlines.push(...sceneryBox(item, height({ x: item.x, z: item.z })));
     }
   }
   if (state.range) across(rangeSamples(samples, state.range), COLORS.accent, 0.3);

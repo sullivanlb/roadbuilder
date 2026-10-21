@@ -3,12 +3,13 @@ import { clamp, planDistance } from '../../core/math';
 import type { PlanPoint, Vec3 } from '../../core/math';
 import type { Project, Side } from '../../core/project/schema';
 import { barrierPath } from '../../core/scene/barriers';
+import { outsideScenery } from '../../core/scene/scenery';
 import type { Sample } from '../../core/track/centerline';
 import { widestHalf } from '../../core/track/layout';
 import type { PlanProjection, ScreenPoint } from './projection';
 
 /** Pick distances, in pixels. */
-const PICK = { point: 15, road: 20, barrier: 8 };
+const PICK = { point: 15, road: 20, barrier: 8, scenery: 6 };
 
 /** A position on the centerline under the cursor. */
 export interface RoadHit extends Vec3 {
@@ -110,12 +111,37 @@ export function findBarrier(
   return best;
 }
 
+/**
+ * The scenery item at a place on the plan, or within `reach` metres of it: the
+ * smallest wins, so an item standing inside a larger one can still be picked.
+ */
+export function sceneryAt(project: Project, at: PlanPoint, reach: number): Id | null {
+  let best: Id | null = null,
+    smallest = Infinity;
+  for (const item of project.scenery) {
+    if (outsideScenery(item, at) > reach) continue;
+    const area = item.width * item.depth;
+    if (area < smallest) {
+      smallest = area;
+      best = item.id;
+    }
+  }
+  return best;
+}
+
+/** The scenery item under the cursor, or null. */
+export const findScenery = (view: PlanProjection, project: Project, at: ScreenPoint) =>
+  sceneryAt(project, view.toWorld(at), PICK.scenery / view.camera.scale);
+
 /** What lies under a click, whatever the view it was made in, for the layers to pick from. */
 export interface TrackHit {
+  /** The place on the ground. */
+  ground: PlanPoint;
   /** Where the click lands on the road, when it is on or near it. */
   road: { s: number; side: Side } | null;
   pointId: Id | null;
   barrierId: Id | null;
+  sceneryId: Id | null;
 }
 
 /** Everything under the cursor that a click could pick. */
@@ -126,14 +152,16 @@ export function trackHitAt(
   at: ScreenPoint,
 ): TrackHit {
   return {
+    ground: view.toWorld(at),
     road: findRoadPosition(view, project, samples, at),
     pointId: findPoint(view, project, at),
     barrierId: findBarrier(view, project, samples, at),
+    sceneryId: findScenery(view, project, at),
   };
 }
 
 /** How close, in metres, a place on the ground must be to count as on a point or a barrier. */
-const REACH = { point: 4, barrier: 2.5 };
+const REACH = { point: 4, barrier: 2.5, scenery: 1.5 };
 
 /**
  * What lies at a place on the ground, for clicks made in the 3D preview. A
@@ -178,5 +206,11 @@ export function trackHitNear(
         barrierId = barrier.id;
       }
     }
-  return { road, pointId: point, barrierId };
+  return {
+    ground: { x: at.x, z: at.z },
+    road,
+    pointId: point,
+    barrierId,
+    sceneryId: sceneryAt(project, at, REACH.scenery),
+  };
 }

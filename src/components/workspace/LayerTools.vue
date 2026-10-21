@@ -24,6 +24,11 @@ const TOOL_LOOK: Record<ToolId, { icon: IconName; label: MessageKey }> = {
   bank: { icon: 'banking', label: 'editor.bankTitle' },
   barrier: { icon: 'wall', label: 'editor.barrierTitle' },
   pits: { icon: 'pits', label: 'editor.pitsTitle' },
+  tree: { icon: 'trees', label: 'editor.treeTitle' },
+  building: { icon: 'building', label: 'editor.buildingTitle' },
+  grandstand: { icon: 'grandstands', label: 'editor.grandstandTitle' },
+  sign: { icon: 'sign', label: 'editor.signTitle' },
+  light: { icon: 'light', label: 'editor.lightTitle' },
   pan: { icon: 'move', label: 'editor.panTitle' },
 };
 

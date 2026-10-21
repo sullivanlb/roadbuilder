@@ -176,9 +176,19 @@ export function documentTexts(target: Locale): DocumentTexts {
       tr('documents.trackDescription', {
         mode: tr(closed ? 'sidebar.closed' : 'sidebar.open'),
       }),
-    objReadme: (barrierCount) =>
-      tr('documents.objReadme') + (barrierCount ? tr('documents.objReadmeBarriers') : ''),
-    installation: ({ name, slug, projectFile, terrainMargin, barrierCount, pitBoxes, warnings }) =>
+    objReadme: (colliders) =>
+      tr('documents.objReadme') + (colliders ? tr('documents.objReadmeBarriers') : ''),
+    installation: ({
+      name,
+      slug,
+      projectFile,
+      terrainMargin,
+      barrierCount,
+      sceneryCount,
+      lights,
+      pitBoxes,
+      warnings,
+    }) =>
       tr('documents.installationHead', { name, slug }) +
       (pitBoxes === null
         ? tr('documents.installationSpawnPit')
@@ -186,6 +196,10 @@ export function documentTexts(target: Locale): DocumentTexts {
       (barrierCount
         ? tr('documents.installationBarriers', { count: barrierCount }, barrierCount) + '\n'
         : '') +
+      (sceneryCount
+        ? tr('documents.installationScenery', { count: sceneryCount }, sceneryCount) + '\n'
+        : '') +
+      (lights ? tr('documents.installationLights') : '') +
       tr('documents.installationBody', { terrainMargin }) +
       (barrierCount
         ? tr('documents.installationBarrierLimits')

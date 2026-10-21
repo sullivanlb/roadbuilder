@@ -32,6 +32,9 @@ export const ICONS = {
   sculpt: 'm2 20 6-9 4 5 3-4 7 8z',
   trees: 'm12 3 6 8h-4l4 6H6l4-6H6zM12 17v4',
   grandstands: 'M3 20h18M5 20v-4h14v4M7 16v-4h10v4M9 12V8h6v4',
+  building: 'M4 21V7l8-4 8 4v14zM2 21h20M8 10h2m4 0h2m-8 4h2m4 0h2m-6 7v-4h2v4',
+  sign: 'M3 4h18v10H3zM7 14v7m10-7v7M7 8h10',
+  light: 'M7 21h4M9 21V5h8M15 5v3h4V5M17 11v1M14 13l-1 1m7-1 1 1',
 } as const;
 
 export type IconName = keyof typeof ICONS;

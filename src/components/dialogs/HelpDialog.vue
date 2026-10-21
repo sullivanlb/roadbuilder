@@ -25,6 +25,8 @@ const shortcuts: { label: MessageKey; key: () => string }[] = [
   { label: 'help.shortcutRedo', key: () => t('help.keyCtrlShiftZ') },
   { label: 'topbar.save', key: () => t('help.keyCtrlS') },
   { label: 'help.shortcutDelete', key: () => t('help.keyDelete') },
+  { label: 'help.shortcutRotate', key: () => t('help.keyRotate') },
+  { label: 'help.shortcutDuplicate', key: () => t('help.keyCtrlD') },
 ];
 </script>
 
