@@ -32,7 +32,7 @@ Pour distribuer l’application, servez le contenu de **`dist/`** sur un héberg
 
 Le vocabulaire du domaine est défini dans [`CONTEXT.md`](CONTEXT.md), les décisions d’architecture dans [`docs/adr/`](docs/adr/) et ce qu’Assetto Corsa attend d’un export — appris en jeu ou documenté — dans [`docs/assetto-corsa.md`](docs/assetto-corsa.md). Complétez ce dernier après chaque test en jeu. Chaque couche n’importe que les couches inférieures ; ESLint le vérifie.
 
-- `src/core/` : le domaine, sans framework. `project/` contient le format v2 (schéma zod, règles et bornes, modèles, opérations d’édition immer), `track/` l’axe du tracé, les plages entre deux repères, les largeurs, les dévers et les diagnostics, `scene/` la construction de la scène (chaussée, terrain, barrières, repères).
+- `src/core/` : le domaine, sans framework. `project/` contient le format v2 (schéma zod, règles et bornes, modèles, opérations d’édition immer), `track/` l’axe du tracé (courbes, droites et points arrondis), les plages entre deux repères, les largeurs, les dévers et les diagnostics, `scene/` la construction de la scène (chaussée, terrain, barrières, repères).
 - `src/export/` : archives Assetto Corsa (KN5, fichiers ini, carte) et OBJ, encodeurs binaires PNG/ZIP. Les textes des documents exportés sont fournis par l’appelant.
 - `src/rendering/` : dessin du plan 2D et de la bande de piste (Canvas 2D), aperçu 3D (Three.js, chargé à la demande), palette de couleurs.
 - `src/workers/` : construction des archives dans un Web Worker (Comlink), pour que l’éditeur reste fluide pendant un export ; repli sur le thread principal si les workers ne sont pas disponibles.
@@ -58,13 +58,14 @@ Les fichiers `.roadbuilder.json` sont au **format version 2** : les points de co
 
 La CI (GitHub Actions) vérifie le formatage, le lint, les types, les tests et la compilation à chaque push. Les tests couvrent le format de projet et ses références, les opérations d’édition, la géométrie et les diagnostics, la scène (valeurs finies, indices valides, colliders orientés vers la piste, bridage dans les virages), la structure des archives, l’historique, la sauvegarde automatique et sa récupération, ainsi que les parcours de l’interface. Les tailles de maillage et les statistiques des modèles sont figées dans des snapshots : après une modification volontaire de la géométrie, mettez-les à jour avec `npx vitest -u` et vérifiez l’export **dans Assetto Corsa**.
 
-Pour la vérification manuelle : ouvrir les trois modèles et une page blanche, parcourir les six couches, déplacer/ajouter/supprimer des points (seuls et en groupe), régler largeur et relief, tracer une portion plus large et une plus étroite, poser un dévers dans un virage et le vérifier en 3D, poser portions, barrières et voie des stands depuis le plan, la bande et la 3D, tirer leurs bords dans la bande, utiliser « Aller à » et la mini-carte, tester zoom et raccourcis, enregistrer/recharger/importer un projet, puis télécharger les ZIP Assetto Corsa et OBJ. Comparer également le rendu aux dimensions bureau et mobile.
+Pour la vérification manuelle : ouvrir les trois modèles et une page blanche, parcourir les six couches, déplacer/ajouter/supprimer des points (seuls et en groupe), tracer droites et arcs (avec et sans Maj), arrondir un point et régler son rayon, régler largeur et relief, tracer une portion plus large et une plus étroite, poser un dévers dans un virage et le vérifier en 3D, poser portions, barrières et voie des stands depuis le plan, la bande et la 3D, tirer leurs bords dans la bande, utiliser « Aller à » et la mini-carte, tester zoom et raccourcis, enregistrer/recharger/importer un projet, puis télécharger les ZIP Assetto Corsa et OBJ. Comparer également le rendu aux dimensions bureau et mobile.
 
 ## Fonctionnalités disponibles
 
 - Circuits fermés et routes ouvertes, avec modèles club, karting, montagne et page blanche.
 - Édition par couches (tracé, chaussée, bords, stands et départ, terrain, décor à venir) : la couche active décide de ce que le clic attrape ; les autres restent visibles, atténuées, ou masquées.
 - Dessin en 2D : ajout, déplacement et suppression de points, seuls ou en groupe (rectangle de sélection, Maj + clic), zoom et navigation.
+- Dessin précis : lignes droites de longueur exacte, arcs de cercle tangents au tracé et points arrondis à rayon réglable.
 - Bande de piste : la piste déroulée sous le plan, avec l’altitude, les largeurs, les barrières ou les stands selon la couche ; on y choisit une plage pour y poser un élément et on y étire les éléments par leurs bords.
 - Repérage sur les grands circuits : virages détectés et numérotés, mini-carte, menu « Aller à ».
 - Réglage de la largeur de base, des accotements, des vibreurs et de l’altitude par point.
@@ -83,7 +84,7 @@ Pour la vérification manuelle : ouvrir les trois modèles et une page blanche, 
 
 1. Cliquez sur **Nouveau** et choisissez un modèle ou une page blanche.
 2. Choisissez une **couche** dans la colonne de gauche (touches **1** à **6**). Seuls ses éléments réagissent au clic, ses outils s’affichent au-dessus du plan et ses réglages à droite. Les outils en pointillés sont prévus : un clic explique ce qu’ils feront.
-3. Dans **Tracé**, déplacez les points. L’outil **+** ajoute un point après celui sélectionné ; un double-clic sur la chaussée insère un point à cet endroit. Glissez dans le vide pour sélectionner plusieurs points, ou Maj + clic pour en ajouter un : ils se déplacent ensemble et leur altitude se règle en groupe.
+3. Dans **Tracé**, déplacez les points. L’outil **+** ajoute un point après celui sélectionné ; un double-clic sur la chaussée insère un point à cet endroit. Les outils **Droite** (S) et **Arc** (R) prolongent le tracé avec une ligne droite ou un arc de cercle (voir « Droites, arcs et rayons »). Glissez dans le vide pour sélectionner plusieurs points, ou Maj + clic pour en ajouter un : ils se déplacent ensemble et leur altitude se règle en groupe.
 4. Dans **Chaussée**, réglez la largeur de base, les accotements, les vibreurs, les portions de largeur et les dévers. Dans **Terrain**, choisissez la marge autour du tracé. Les unités sont en mètres.
 5. Dans **Bords**, choisissez un type de barrière, puis tracez un tronçon en deux clics sur la piste, du début à la fin. Réglez son écartement, son début et sa fin, changez-le de côté ou supprimez-le.
 6. Sous le plan, la **bande de piste** déroule le circuit. Glissez sur une plage pour y poser une portion, des barrières ou la voie des stands selon la couche ; tirez les bords d’un bloc pour l’allonger. La molette zoome, un double-clic montre tout.
@@ -101,6 +102,16 @@ Le contrôle de largeur examine la courbe calculée **entre les points de contr�
 Les portions concernées sont surlignées en rouge avec un repère **!** dans les vues 2D et 3D. Leurs points de contrôle sont également signalés dans le plan 2D ; leur sélection affiche le diagnostic dans le panneau de droite. Le message indique les deux numéros, y compris le dernier et le premier point pour la fermeture d’un circuit.
 
 Utilisez **Voir le virage**, dans l’en-tête de la bande, le menu **Aller à** ou le dialogue d’export, pour revenir au plan 2D, cadrer la portion et sélectionner son premier point. Les indications se mettent à jour après chaque modification, import, annulation ou rétablissement. Écartez les points du virage ou réduisez la largeur ; l’export reste bloqué tant que le contrôle détecte ce problème.
+
+### Droites, arcs et rayons
+
+L’outil **Droite** (touche **S**) trace une ligne droite du point sélectionné, ou du dernier, jusqu’au clic ; la longueur et l’écart d’angle avec le tracé s’affichent avant de cliquer. **Maj** la garde exactement dans le prolongement du tracé, au mètre près. Le nouveau point est sélectionné : chaque clic ajoute une droite à la suite.
+
+L’outil **Arc** (touche **R**) trace un arc de cercle tangent au tracé, du point sélectionné jusqu’au clic, avec son rayon et son angle. **Maj** arrondit le rayon à 5 m et l’angle à 5°. Un arc devient un ou plusieurs **points arrondis** (un quart de tour au plus chacun), suivis d’un point à l’arrivée ; jusqu’à trois quarts de tour.
+
+Un point arrondi n’est pas sur la piste : elle arrive en ligne droite depuis le point précédent, tourne sur un arc du rayon choisi, tangent aux deux côtés, puis repart en ligne droite vers le point suivant. Le plan montre ses côtés en pointillés et son rayon. Dans la section **La forme**, **Arrondir ce point** arrondit n’importe quel point (30 m, ou moins s’il n’y a pas la place), puis le **rayon** se règle de 5 à 2 000 m. Si les côtés sont trop courts, le rayon est réduit et un avertissement le signale : écartez les points voisins. Le premier et le dernier point d’une route ne s’arrondissent pas.
+
+La même section règle le **segment suivant** : **Courbe** ou **Droite**, et la longueur d’une droite, de point à point. Une courbe qui rejoint une droite la prolonge sans cassure ; deux droites qui se rejoignent sur un point non arrondi font un angle vif, signalé par un avertissement. Les projets enregistrés avant ces outils gardent exactement la même forme.
 
 ### Terrain complet
 
@@ -149,6 +160,7 @@ L’inversion du sens du tracé retourne les tronçons, la suppression d’un po
 | Changer de couche                           | 1 à 6                               |
 | Plan / aperçu 3D                            | C                                   |
 | Sélection / ajout / déplacement de la vue   | V / A / H                           |
+| Tracer une ligne droite / un arc            | S / R                               |
 | Tracer une barrière                         | B                                   |
 | Tracer la voie des stands                   | P                                   |
 | Tracer une portion de largeur               | L                                   |
@@ -184,7 +196,7 @@ Prochaines priorités : **trajectoires IA → dévers**.
 - [x] **Vrais stands** : voie des stands avec entrée, sortie et muret, plusieurs emplacements et une grille de départ (à valider en jeu).
 - [x] **Largeur variable** : régler la largeur par portion pour élargir une ligne droite ou resserrer un passage (à valider en jeu).
 - [x] **Dévers et virages relevés** : incliner la chaussée dans les courbes.
-- [ ] **Outils de dessin précis** : ajouter des lignes droites, arcs de cercle et virages à rayon réglable.
+- [x] **Outils de dessin précis** : ajouter des lignes droites, arcs de cercle et virages à rayon réglable.
 - [ ] **Décors à placer** : ajouter arbres, bâtiments, tribunes, panneaux et éclairages.
 - [ ] **Revêtements personnalisés** : choisir asphalte, terre, gravier, marquages et vibreurs par portion.
 - [ ] **Sculpture du terrain** : créer collines, talus, fossés et dégagements.

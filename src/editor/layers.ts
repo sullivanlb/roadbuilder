@@ -44,8 +44,8 @@ export const LAYERS: readonly Layer[] = [
   {
     id: 'track',
     key: '1',
-    tools: ['add'],
-    soon: [soon('straight'), soon('arc'), soon('freehand')],
+    tools: ['add', 'straight', 'arc'],
+    soon: [soon('freehand')],
   },
   { id: 'road', key: '2', tools: ['width', 'bank'], soon: [soon('surface')] },
   { id: 'edges', key: '3', tools: ['barrier'], soon: [soon('runoff')] },

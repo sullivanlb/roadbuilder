@@ -34,6 +34,10 @@ export const RULES = {
   /** Length over which the roadway tilts at each end of a bank zone. */
   bankTransition: { min: 5, max: 200, step: 5 },
   cars: { min: 1, max: 24, step: 1 },
+  /** Radius of the arc of a rounded point. */
+  radius: { min: 5, max: 2000, step: 1 },
+  /** Length of a straight segment, from point to point. */
+  segmentLength: { min: 2, max: 5000, step: 1 },
 } as const satisfies Record<string, NumericRule | { max: number } | number>;
 
 /** Values given to the settings a new project does not choose itself. */
@@ -48,6 +52,8 @@ export const DEFAULTS = {
   bankTransition: 60,
   /** Distance of the start line after the first control point. */
   startLine: 28,
+  /** Radius given to a control point when it is rounded. */
+  radius: 30,
 } as const;
 
 /** Imported project files larger than this are refused before parsing. */

@@ -34,6 +34,8 @@ export function useShortcuts() {
     { key: 'y', mod: true, run: project.redo },
     { key: 'v', run: tool('select') },
     { key: 'a', run: tool('add') },
+    { key: 's', run: tool('straight') },
+    { key: 'r', run: tool('arc') },
     { key: 'b', run: tool('barrier') },
     { key: 'p', run: tool('pits') },
     { key: 'l', run: tool('width') },

@@ -4,6 +4,8 @@ import { createId } from '../ids';
 import type { Id } from '../ids';
 import { clamp, planDistance } from '../math';
 import type { PlanPoint, Vec3 } from '../math';
+import { arcLayout, corners } from '../track/geometry';
+import type { ArcShape } from '../track/geometry';
 import { DEFAULTS, RULES } from './rules';
 import type { NumericRule } from './rules';
 import { sampleTrack, trackLength } from '../track/centerline';
@@ -17,6 +19,7 @@ import { isCircuit } from './schema';
 import type {
   BankZone,
   Barrier,
+  ControlPoint,
   PitLane,
   Project,
   RoadSettings,
@@ -51,16 +54,117 @@ export function pointRejection(
   return null;
 }
 
-/** Inserts a control point at `index` and returns its ID. Check pointRejection() first. */
+/**
+ * Inserts a control point at `index` and returns its ID. Check pointRejection()
+ * first. A point landing on a straight splits it into two straights.
+ */
 export function insertPoint(draft: ProjectDraft, index: number, at: Vec3): Id {
   const id = createId();
-  draft.points.splice(clamp(index, 0, draft.points.length), 0, {
+  const points = draft.points;
+  index = clamp(index, 0, points.length);
+  const circuit = isCircuit(draft);
+  const previous = index > 0 ? points[index - 1] : circuit ? points.at(-1) : undefined;
+  const point: Draft<ControlPoint> = {
     id,
     x: within(RULES.coordinate, at.x),
     y: within(RULES.altitude, at.y),
     z: within(RULES.coordinate, at.z),
-  });
+  };
+  if (previous && (circuit || index < points.length)) {
+    if (previous.straight) point.straight = true;
+  } else if (previous) {
+    // The last point of a road leads nowhere yet: the new segment starts curved.
+    delete previous.straight;
+  }
+  points.splice(index, 0, point);
   return id;
+}
+
+/** Draws the segment leaving a control point as a straight line, or curved again. */
+export function setStraight(draft: ProjectDraft, id: Id, straight: boolean) {
+  const point = draft.points.find((candidate) => candidate.id === id);
+  if (!point) return;
+  if (straight) point.straight = true;
+  else delete point.straight;
+}
+
+/** Rounds a control point with an arc of `radius`, or takes the rounding off with null. */
+export function setRadius(draft: ProjectDraft, id: Id, radius: number | null) {
+  const point = draft.points.find((candidate) => candidate.id === id);
+  if (!point) return;
+  if (radius === null) delete point.radius;
+  else point.radius = within(RULES.radius, radius);
+}
+
+/**
+ * Rounds a control point with the default radius, or less when its sides leave
+ * no room for it, so the arc gets the radius it shows.
+ */
+export function roundPoint(draft: ProjectDraft, id: Id) {
+  setRadius(draft, id, DEFAULTS.radius);
+  const track: Project = current(draft);
+  const corner = corners(track).get(track.points.findIndex((point) => point.id === id));
+  if (corner && corner.radius < corner.requested) setRadius(draft, id, Math.floor(corner.radius));
+}
+
+/**
+ * Gives the segment leaving a control point another length, from point to point,
+ * by moving the next point along the segment.
+ */
+export function setSegmentLength(draft: ProjectDraft, id: Id, length: number) {
+  const points = draft.points;
+  const index = points.findIndex((candidate) => candidate.id === id);
+  const next = index < 0 ? undefined : points[(index + 1) % points.length];
+  if (!next || next === points[index] || (index === points.length - 1 && !isCircuit(draft))) return;
+  const point = points[index];
+  const current = planDistance(point, next) || 1;
+  const scale = within(RULES.segmentLength, length) / current;
+  next.x = within(RULES.coordinate, point.x + (next.x - point.x) * scale);
+  next.z = within(RULES.coordinate, point.z + (next.z - point.z) * scale);
+}
+
+/** Why an arc cannot be drawn, or null when it can. */
+export function arcRejection(
+  project: Project,
+  start: PlanPoint,
+  shape: ArcShape,
+): 'points-limit' | 'too-close' | 'too-small' | null {
+  const layout = arcLayout(start, shape);
+  if (project.points.length + layout.vertices.length + 1 > RULES.points.max) return 'points-limit';
+  if (shape.radius < RULES.radius.min || layout.tangent < RULES.pointSpacing) return 'too-small';
+  if (project.points.some((point) => planDistance(point, layout.end) < RULES.pointSpacing))
+    return 'too-close';
+  return null;
+}
+
+/**
+ * Draws an arc after the control point at `after`, from `start` along its
+ * heading: rounded points of the arc's radius, then a plain point where it
+ * ends, which is returned. Altitude stays at `y`. Check arcRejection() first.
+ */
+export function addArc(
+  draft: ProjectDraft,
+  after: number,
+  start: PlanPoint,
+  shape: ArcShape,
+  y: number,
+): Id {
+  const layout = arcLayout(start, shape);
+  const radius = within(RULES.radius, shape.radius);
+  let index = after + 1;
+  for (const vertex of layout.vertices) {
+    const id = insertPoint(draft, index++, { ...vertex, y });
+    setRadius(draft, id, radius);
+  }
+  const end = insertPoint(draft, index, { ...layout.end, y });
+  // The point the arc leaves from now leads into it: what followed it follows the arc.
+  const from = draft.points[after];
+  if (from?.straight) {
+    delete from.straight;
+    for (let i = after + 1; i < index; i++) delete draft.points[i].straight;
+    draft.points[index].straight = true;
+  }
+  return end;
 }
 
 export function updatePoint(draft: ProjectDraft, id: Id, patch: Partial<Vec3>) {
@@ -106,6 +210,12 @@ export function removePoint(draft: ProjectDraft, id: Id) {
   const removed = track.points.findIndex((point) => point.id === id);
   if (removed < 0) return;
   mapPositions(draft, (position) => reanchorPosition(track, samples, position, removed));
+  // The two segments around the point become one, straight only if both were.
+  const points = draft.points,
+    circuit = isCircuit(track);
+  const previous = removed > 0 ? points[removed - 1] : circuit ? points.at(-1) : undefined;
+  if (previous && (!points[removed].straight || (!circuit && removed === points.length - 1)))
+    delete previous.straight;
   draft.points.splice(removed, 1);
   if (!draft.points.length) delete draft.startLine;
   dropPitsUnlessCircuit(draft);
@@ -145,7 +255,14 @@ export function reverseTrack(draft: ProjectDraft) {
     distance(item.from),
     distance(item.to),
   ]);
-  if (isCircuit(draft)) draft.points = [draft.points[0], ...draft.points.slice(1).reverse()];
+  // A straight is marked on the point it leaves from, which becomes the one it arrives at.
+  const n = draft.points.length,
+    circuit = isCircuit(draft);
+  const straights = draft.points.map((_, i) =>
+    i > 0 ? draft.points[i - 1].straight : circuit ? draft.points[n - 1].straight : undefined,
+  );
+  draft.points.forEach((point, i) => setStraight(draft, point.id, straights[i] === true));
+  if (circuit) draft.points = [draft.points[0], ...draft.points.slice(1).reverse()];
   else draft.points.reverse();
   for (const barrier of draft.barriers) barrier.side = opposite(barrier.side);
   for (const zone of draft.bankZones) zone.high = opposite(zone.high);

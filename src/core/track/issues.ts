@@ -4,7 +4,8 @@ import type { PlanPoint } from '../math';
 import { RULES } from '../project/rules';
 import { isCircuit } from '../project/schema';
 import type { Project } from '../project/schema';
-import { sampleTrack, trackStats } from './centerline';
+import { controlPointSample, sampleTrack, trackStats } from './centerline';
+import { corners, straightSide } from './geometry';
 import type { Sample } from './centerline';
 import { LAYOUT } from './layout';
 import { pitBoxCapacity, pitLaneLayout } from './pitLane';
@@ -21,6 +22,8 @@ export const CHECKS = {
   steepGrade: 18,
   /** A bend is too tight when its radius falls below this fraction of the local roadway width. */
   tightRadius: 0.65,
+  /** Angle, in degrees, from which two straights meeting on a plain point are reported. */
+  sharpCorner: 2,
 } as const;
 
 /**
@@ -37,7 +40,9 @@ export type TrackIssue =
   | { code: 'pit-lane-too-short'; cars: number; capacity: number }
   | { code: 'pit-lane-too-tight'; from: number; to: number }
   | { code: 'width-zones-overlap' }
-  | { code: 'bank-zones-overlap' };
+  | { code: 'bank-zones-overlap' }
+  | { code: 'radius-reduced'; point: number; requested: number; actual: number }
+  | { code: 'sharp-corner'; point: number; angle: number };
 
 /** The worst bend of one segment that is too tight for the road width. */
 export interface TightTurn {
@@ -132,7 +137,55 @@ export function trackIssues(
       warnings.push(overlap.issue);
       locations.push(overlap);
     }
+  for (const location of [...reducedRadii(project, samples), ...sharpCorners(project, samples)]) {
+    warnings.push(location.issue);
+    locations.push(location);
+  }
   return { errors, warnings, tightTurns, locations };
+}
+
+/** Plain points where two straights meet at an angle: the track turns on the spot. */
+function sharpCorners(project: Project, samples: readonly Sample[]): IssueLocation[] {
+  const arcs = corners(project);
+  return project.points.flatMap((point, index) => {
+    if (arcs.has(index)) return [];
+    const before = straightSide(project, arcs, index, 'before'),
+      after = straightSide(project, arcs, index, 'after');
+    if (!before || !after) return [];
+    const turn = Math.atan2(
+      Math.abs(before.x * after.z - before.z * after.x),
+      before.x * after.x + before.z * after.z,
+    );
+    const angle = Math.round((turn * 180) / Math.PI);
+    if (angle < CHECKS.sharpCorner) return [];
+    const place = controlPointSample(samples, index);
+    return [
+      {
+        issue: { code: 'sharp-corner', point: index, angle },
+        sampleIndex: place ? samples.indexOf(place) : 0,
+        pointIds: [point.id],
+      },
+    ];
+  });
+}
+
+/** Rounded points whose sides leave no room for the radius asked for. */
+function reducedRadii(project: Project, samples: readonly Sample[]): IssueLocation[] {
+  return [...corners(project).values()]
+    .filter((corner) => corner.radius < corner.requested * (1 - 1e-6))
+    .map((corner) => {
+      const place = controlPointSample(samples, corner.index);
+      return {
+        issue: {
+          code: 'radius-reduced',
+          point: corner.index,
+          requested: corner.requested,
+          actual: Math.round(corner.radius * 10) / 10,
+        },
+        sampleIndex: place ? samples.indexOf(place) : 0,
+        pointIds: [project.points[corner.index].id],
+      };
+    });
 }
 
 /**

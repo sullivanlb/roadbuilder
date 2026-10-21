@@ -46,11 +46,22 @@ _Avoid_: open track, point-to-point, hillclimb
 The driving direction, which is the order of the control points. Left and right are always relative to it.
 
 **Control point** (point):
-A point placed by the user that the track passes through; it has a plan position and an altitude.
+A point placed by the user that the track passes through, unless it is rounded; it has a plan position and an altitude.
 _Avoid_: node, vertex, waypoint
 
+**Straight** (ligne droite):
+A segment drawn as a straight line between its two control points. A segment touching a rounded point is always straight.
+_Avoid_: line, straight segment
+
+**Rounded point** (sommet arrondi):
+A control point the track does not go through: it runs along the straight sides leading to it and turns on an arc of the point's radius, tangent to both. Its place on the track is the middle of the arc.
+_Avoid_: fillet, corner (a corner is detected, not drawn), vertex
+
+**Radius** (rayon):
+The radius asked for on a rounded point. When its sides are too short, the arc takes a smaller one, the effective radius, and a warning says so.
+
 **Centerline** (axe):
-The smooth curve interpolated through the control points; every surface is laid out from it.
+The curve laid out through the control points, straight on straights, on arcs at rounded points and smooth elsewhere; every surface is laid out from it.
 _Avoid_: spline, curve
 
 **Segment**:

@@ -1,10 +1,12 @@
 import { defineStore } from 'pinia';
 import { computed, ref, watch } from 'vue';
 import type { Id } from '../core/ids';
-import type { Vec3 } from '../core/math';
+import type { PlanPoint, Vec3 } from '../core/math';
 import {
+  addArc,
   addBankZone,
   addBarrier,
+  arcRejection,
   addWidthZone,
   bankZoneRejection,
   barrierRejection,
@@ -19,6 +21,7 @@ import {
   shiftAltitude,
   removeWidthZone,
   setPitLane,
+  setStraight,
   updateBarrier,
   widthZoneRejection,
 } from '../core/project/edits';
@@ -32,13 +35,16 @@ import { positionAt } from '../core/track/positions';
 import { pointDistance } from '../core/track/positions';
 import { rangeBetween, rangeContains, rangeSamples } from '../core/track/ranges';
 import type { TrackRange } from '../core/track/ranges';
+import { arcDraft, drawStart, straightDraft } from '../core/track/drawing';
+import type { DrawDraft } from '../core/track/drawing';
 import { LAYERS, layerOfSelection, layerOfTool } from '../editor/layers';
 import type { LayerId, Selection } from '../editor/layers';
 import { t } from '../i18n';
 import { useProjectStore } from './project';
 import { useUiStore } from './ui';
 
-export type ToolId = 'select' | 'add' | 'barrier' | 'pits' | 'width' | 'bank' | 'pan';
+export type ToolId =
+  'select' | 'add' | 'straight' | 'arc' | 'barrier' | 'pits' | 'width' | 'bank' | 'pan';
 export type ViewMode = '2d' | '3d';
 
 /** A place on the road and the side it points at, as a track distance. */
@@ -81,6 +87,8 @@ export const useEditorStore = defineStore('editor', () => {
   /** Track distance of the first click of the bank zone being laid; the second is awaited. */
   const bankDraft = ref<number | null>(null);
   const bankTarget = ref<number | null>(null);
+  /** Where the pointer aims the straight or the arc being drawn, and whether Shift snaps it. */
+  const drawPointer = ref<{ at: PlanPoint; snap: boolean } | null>(null);
 
   const selected = <K extends NonNullable<Selection>['kind']>(kind: K) =>
     computed(() => {
@@ -109,6 +117,24 @@ export const useEditorStore = defineStore('editor', () => {
   const selectedBankZone = computed(() =>
     store.project.bankZones.find((zone) => zone.id === selectedBankZoneId.value),
   );
+  /** The point straights and arcs are drawn on from: the selected one, or the last. */
+  const drawFrom = computed(() =>
+    drawStart(
+      store.project,
+      store.samples,
+      selectedIndex.value >= 0 ? selectedIndex.value : store.project.points.length - 1,
+    ),
+  );
+  /** The straight or the arc the next click would draw. */
+  const drawDraft = computed<DrawDraft | null>(() => {
+    const start = drawFrom.value,
+      pointer = drawPointer.value;
+    if (!start || !pointer) return null;
+    if (tool.value === 'straight') return straightDraft(start, pointer.at, pointer.snap);
+    if (tool.value === 'arc' && store.project.points.length > 1)
+      return arcDraft(start, pointer.at, pointer.snap);
+    return null;
+  });
   /** Located issues around the selected control point. */
   const selectedIssues = computed(() =>
     store.issues.locations.filter(
@@ -164,6 +190,7 @@ export const useEditorStore = defineStore('editor', () => {
     widthTarget.value = null;
     bankDraft.value = null;
     bankTarget.value = null;
+    drawPointer.value = null;
   }
 
   /** Works on another layer: its tools, its elements, and what was selected in it before. */
@@ -204,6 +231,7 @@ export const useEditorStore = defineStore('editor', () => {
       bankDraft.value = null;
       bankTarget.value = null;
     }
+    drawPointer.value = null;
   }
 
   function setView(next: ViewMode) {
@@ -368,6 +396,47 @@ export const useEditorStore = defineStore('editor', () => {
       return ui.notify(t('toast.pointTooClose', { min: RULES.pointSpacing }), true);
     const y = at.y ?? selectedPoint.value?.y ?? 0;
     const id = store.edit((draft) => insertPoint(draft, after + 1, { ...at, y }));
+    selection.value = { kind: 'points', ids: [id] };
+  }
+
+  /**
+   * Draws a straight from the selected point, or the last one, to `at`; Shift
+   * keeps it on the track heading. The new point is selected to draw on from it.
+   */
+  function drawStraight(at: PlanPoint, snap: boolean) {
+    const start = drawFrom.value;
+    if (!start) return addPoint(at);
+    const draft = straightDraft(start, at, snap);
+    const rejection = pointRejection(store.project, draft.to);
+    if (rejection === 'points-limit')
+      return ui.notify(t('toast.pointsLimit', { max: RULES.points.max }), true);
+    if (rejection === 'too-close')
+      return ui.notify(t('toast.pointTooClose', { min: RULES.pointSpacing }), true);
+    const from = store.project.points[start.index].id;
+    const id = store.edit((project) => {
+      const added = insertPoint(project, start.index + 1, { ...draft.to, y: start.y });
+      setStraight(project, from, true);
+      return added;
+    });
+    selection.value = { kind: 'points', ids: [id] };
+  }
+
+  /** Draws an arc from the selected point, or the last one, ending at `at`; Shift rounds it. */
+  function drawArc(at: PlanPoint, snap: boolean) {
+    const start = drawFrom.value;
+    if (!start || store.project.points.length < 2) return ui.notify(t('toast.arcNeedsTrack'), true);
+    const draft = arcDraft(start, at, snap);
+    if (!draft) return ui.notify(t('toast.arcStraight'), true);
+    const rejection = arcRejection(store.project, start.at, draft.shape);
+    if (rejection === 'points-limit')
+      return ui.notify(t('toast.pointsLimit', { max: RULES.points.max }), true);
+    if (rejection === 'too-small')
+      return ui.notify(t('toast.arcTooSmall', { min: RULES.radius.min }), true);
+    if (rejection === 'too-close')
+      return ui.notify(t('toast.pointTooClose', { min: RULES.pointSpacing }), true);
+    const id = store.edit((project) =>
+      addArc(project, start.index, start.at, draft.shape, start.y),
+    );
     selection.value = { kind: 'points', ids: [id] };
   }
 
@@ -550,6 +619,9 @@ export const useEditorStore = defineStore('editor', () => {
     selectedBankZoneId,
     bankDraft,
     bankTarget,
+    drawPointer,
+    drawFrom,
+    drawDraft,
     selectedIndex,
     selectedPoint,
     selectedBarrier,
@@ -577,6 +649,8 @@ export const useEditorStore = defineStore('editor', () => {
     selectWidthZone,
     selectBankZone,
     addPoint,
+    drawStraight,
+    drawArc,
     deleteSelectedPoint,
     beginBarrier,
     cancelBarrier,

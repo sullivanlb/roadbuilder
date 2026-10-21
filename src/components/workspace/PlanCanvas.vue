@@ -41,12 +41,18 @@ const scene = computed<PlanScene>(() => ({
   selectedBankZoneId: editor.selectedBankZoneId,
   bankDraft: editor.bankDraft,
   bankTarget: editor.bankDraft !== null ? editor.bankTarget : null,
+  drawDraft: editor.drawDraft,
   range: editor.range,
   hoverS: editor.hoverS,
   labels: {
     start: t('canvas.start'),
     finish: t('canvas.finish'),
     distance: (metres: number) => `${formatNumber(metres)} m`,
+    straight: (length: number, turn: number) =>
+      t('canvas.straightLabel', { length: formatNumber(length, 1), turn }),
+    arc: (radius: number, angle: number) =>
+      t('canvas.arcLabel', { radius: formatNumber(radius), angle }),
+    radius: (radius: number) => t('canvas.radius', { radius: formatNumber(radius) }),
   },
 }));
 

@@ -18,6 +18,8 @@ const ui = useUiStore();
 const TOOL_LOOK: Record<ToolId, { icon: IconName; label: MessageKey }> = {
   select: { icon: 'cursor', label: 'editor.selectTitle' },
   add: { icon: 'plus', label: 'editor.addTitle' },
+  straight: { icon: 'straight', label: 'editor.straightTitle' },
+  arc: { icon: 'arc', label: 'editor.arcTitle' },
   width: { icon: 'width', label: 'editor.widthTitle' },
   bank: { icon: 'banking', label: 'editor.bankTitle' },
   barrier: { icon: 'wall', label: 'editor.barrierTitle' },

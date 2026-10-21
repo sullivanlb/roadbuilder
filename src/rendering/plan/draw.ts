@@ -8,6 +8,8 @@ import type { Place } from '../../core/scene/markers';
 import { startLine } from '../../core/scene/road';
 import { sampleAt, trackLength } from '../../core/track/centerline';
 import type { Sample } from '../../core/track/centerline';
+import { arcLayout, corners } from '../../core/track/geometry';
+import type { ArcShape } from '../../core/track/geometry';
 import type { TightTurn } from '../../core/track/issues';
 import { kerbWidth, LAYOUT, roadEdge, terrainBounds } from '../../core/track/layout';
 import { pitLaneLayout } from '../../core/track/pitLane';
@@ -15,6 +17,8 @@ import { rangeBetween, rangeSamples } from '../../core/track/ranges';
 import { bankZoneRanges } from '../../core/track/bank';
 import { widthZoneRanges } from '../../core/track/width';
 import type { TrackRange } from '../../core/track/ranges';
+import { arcDegrees } from '../../core/track/drawing';
+import type { DrawDraft } from '../../core/track/drawing';
 import { INACTIVE_LAYER_ALPHA } from '../layers';
 import type { LayerId } from '../layers';
 import { BARRIER_STYLE, COLORS } from '../theme';
@@ -56,7 +60,18 @@ export interface PlanScene {
   range: TrackRange | null;
   /** Track distance under the pointer, here or in the band. */
   hoverS: number | null;
-  labels: { start: string; finish: string; distance: (metres: number) => string };
+  /** The straight or the arc the next click would draw. */
+  drawDraft: DrawDraft | null;
+  labels: {
+    start: string;
+    finish: string;
+    distance: (metres: number) => string;
+    /** Label of a straight being drawn: its length and its turn from the track. */
+    straight: (length: number, turn: number) => string;
+    /** Label of an arc being drawn: its radius and its turn, in degrees. */
+    arc: (radius: number, degrees: number) => string;
+    radius: (radius: number) => string;
+  };
 }
 
 type Context = CanvasRenderingContext2D;
@@ -525,6 +540,99 @@ function drawPoints(ctx: Context, view: PlanProjection, scene: PlanScene) {
   });
 }
 
+/** Rounded points: the sides from the arc to the point, dashed, and the radius. */
+function drawCorners(ctx: Context, view: PlanProjection, scene: PlanScene) {
+  ctx.font = '10px "Segoe UI", sans-serif';
+  ctx.textBaseline = 'middle';
+  for (const corner of corners(scene.project).values()) {
+    const point = scene.project.points[corner.index];
+    const enter = view.toScreen(corner.enter),
+      vertex = view.toScreen(point),
+      exit = view.toScreen(corner.exit);
+    ctx.strokeStyle = COLORS.point.label;
+    ctx.lineWidth = 1;
+    dashed(ctx, [3, 4], () => {
+      ctx.beginPath();
+      ctx.moveTo(enter.x, enter.y);
+      ctx.lineTo(vertex.x, vertex.y);
+      ctx.lineTo(exit.x, exit.y);
+      ctx.stroke();
+    });
+    for (const end of [enter, exit]) ctx.fillRect(end.x - 2, end.y - 2, 4, 4);
+    const reduced = corner.radius < corner.requested * (1 - 1e-6);
+    ctx.fillStyle = reduced ? COLORS.danger : COLORS.point.label;
+    // The radius sits outside the bend, beyond the point.
+    const middle = view.toScreen(corner.middle);
+    const dx = vertex.x - middle.x,
+      dy = vertex.y - middle.y,
+      l = Math.hypot(dx, dy) || 1;
+    ctx.textAlign = dx >= 0 ? 'left' : 'right';
+    ctx.fillText(
+      scene.labels.radius(Math.round(corner.radius)),
+      vertex.x + (dx / l) * 14,
+      vertex.y + (dy / l) * 14,
+    );
+  }
+}
+
+/** The points of an arc drawn from `from`, every few degrees. */
+function arcPath(from: Vec3 | { x: number; z: number }, shape: ArcShape) {
+  const { heading, radius, angle, sign } = shape;
+  const center = { x: from.x - heading.z * radius * sign, z: from.z + heading.x * radius * sign };
+  const ex = (from.x - center.x) / radius,
+    ez = (from.z - center.z) / radius;
+  const steps = Math.max(8, Math.ceil(angle / 0.05));
+  return Array.from({ length: steps + 1 }, (_, i) => {
+    const turn = (angle * i) / steps;
+    return {
+      x: center.x + radius * (Math.cos(turn) * ex + Math.sin(turn) * heading.x),
+      y: 0,
+      z: center.z + radius * (Math.cos(turn) * ez + Math.sin(turn) * heading.z),
+    };
+  });
+}
+
+/** The straight or the arc the next click would draw, with its measures. */
+function drawDraft(ctx: Context, view: PlanProjection, scene: PlanScene) {
+  const draft = scene.drawDraft;
+  if (!draft) return;
+  const path =
+    draft.kind === 'straight'
+      ? [
+          { ...draft.from, y: 0 },
+          { ...draft.to, y: 0 },
+        ]
+      : arcPath(draft.from, draft.shape);
+  ctx.strokeStyle = COLORS.accent;
+  ctx.lineWidth = 2;
+  dashed(ctx, [7, 5], () => {
+    trace(ctx, view, path);
+    ctx.stroke();
+  });
+  if (draft.kind === 'arc') {
+    ctx.fillStyle = COLORS.point.outline;
+    for (const vertex of arcLayout(draft.from, draft.shape).vertices) {
+      const p = view.toScreen(vertex);
+      ctx.fillRect(p.x - 2, p.y - 2, 4, 4);
+    }
+  }
+  const end = view.toScreen(draft.to);
+  ctx.beginPath();
+  ctx.arc(end.x, end.y, 4.5, 0, Math.PI * 2);
+  ctx.fillStyle = COLORS.accent;
+  ctx.fill();
+  ctx.font = '11px "Segoe UI", sans-serif';
+  ctx.textAlign = 'left';
+  ctx.textBaseline = 'middle';
+  ctx.fillText(
+    draft.kind === 'straight'
+      ? scene.labels.straight(draft.length, Math.round(draft.turn))
+      : scene.labels.arc(Math.round(draft.shape.radius), arcDegrees(draft.shape)),
+    end.x + 10,
+    end.y - 10,
+  );
+}
+
 /** The stretch picked in the band, its roadway edges dashed. */
 function drawRange(ctx: Context, view: PlanProjection, scene: PlanScene) {
   if (!scene.range) return;
@@ -587,7 +695,9 @@ export function drawPlan(ctx: Context, view: PlanProjection, scene: PlanScene, d
     inLayer(ctx, scene, 'edges', () => drawBarriers(ctx, view, scene));
     drawRange(ctx, view, scene);
   }
+  if (scene.layer === 'track') drawCorners(ctx, view, scene);
   drawPoints(ctx, view, scene);
+  drawDraft(ctx, view, scene);
   if (scene.samples.length > 1) drawCursor(ctx, view, scene);
   const box = scene.marquee;
   if (box) {

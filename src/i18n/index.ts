@@ -146,6 +146,14 @@ export function formatTrackIssue(issue: TrackIssue, target?: Locale): string {
       return tr('trackIssue.widthZonesOverlap');
     case 'bank-zones-overlap':
       return tr('trackIssue.bankZonesOverlap');
+    case 'radius-reduced':
+      return tr('trackIssue.radiusReduced', {
+        point: issue.point + 1,
+        requested: Math.round(issue.requested),
+        actual: Math.round(issue.actual),
+      });
+    case 'sharp-corner':
+      return tr('trackIssue.sharpCorner', { point: issue.point + 1, angle: issue.angle });
   }
 }
 

@@ -531,8 +531,8 @@ describe('editor interface', () => {
     expect($('layer-track').getAttribute('aria-pressed')).toBe('true');
     expect($('tool-add')).not.toBeNull();
     expect($('point-badge')).not.toBeNull();
-    await click('soon-arc');
-    expect($('toast').textContent).toContain('rayon réglable');
+    await click('soon-freehand');
+    expect($('toast').textContent).toContain('main levée');
     press('3');
     await settle();
     expect($('tool-add')).toBeNull();
@@ -549,6 +549,58 @@ describe('editor interface', () => {
     await settle();
     expect($('layer-road').getAttribute('aria-pressed')).toBe('true');
     expect($('tool-width').getAttribute('aria-pressed')).toBe('true');
+  });
+
+  it('draws straights and arcs on from the selected point, then edits their shape', async () => {
+    await mountApp();
+    const { project, editor } = stores();
+    const count = project.project.points.length;
+    const start = editor.drawFrom!;
+    press('s');
+    await settle();
+    expect($('tool-straight').getAttribute('aria-pressed')).toBe('true');
+    // Shift keeps the straight on the track heading, to the metre.
+    const aim = screen({
+      x: start.at.x + start.heading.x * 40.4 - start.heading.z * 3,
+      z: start.at.z + start.heading.z * 40.4 + start.heading.x * 3,
+    });
+    pointer('pointermove', aim, { shiftKey: true });
+    await settle();
+    const draft = editor.drawDraft;
+    expect(draft?.kind === 'straight' && [draft.length, Math.round(draft.turn)]).toEqual([40, 0]);
+    pointer('pointerdown', aim, { shiftKey: true });
+    pointer('pointerup', aim, { shiftKey: true });
+    await settle();
+    let points = (await saved()).points;
+    expect(points).toHaveLength(count + 1);
+    expect(points[0].straight).toBe(true);
+    expect(editor.selectedIndex).toBe(1);
+    // The new point is rounded from the inspector, and the straight leading to it shows its length.
+    await click('point-previous');
+    expect($('shape-straight').getAttribute('aria-pressed')).toBe('true');
+    expect($<HTMLInputElement>('shape-length').value).toBe('40');
+    await type('shape-length', '50');
+    await click('point-next');
+    await click('shape-round');
+    points = (await saved()).points;
+    expect(points[1].radius).toBeGreaterThan(0);
+    expect($('shape-radius')).not.toBeNull();
+    await click('shape-unround');
+    expect((await saved()).points[1].radius).toBeUndefined();
+    // An arc adds rounded points and ends where it was aimed.
+    press('r');
+    await settle();
+    const from = editor.drawFrom!;
+    const end = {
+      x: from.at.x + from.heading.x * 30 - from.heading.z * 30,
+      z: from.at.z + from.heading.z * 30 + from.heading.x * 30,
+    };
+    await clickPlan(screen(end));
+    points = (await saved()).points;
+    expect(points.length).toBe(count + 3);
+    expect(points[2].radius).toBeGreaterThan(0);
+    expect(points[3].x).toBeCloseTo(end.x, 0);
+    expect(points[3].z).toBeCloseTo(end.z, 0);
   });
 
   it('selects points in a rectangle, moves them together and edits them as a group', async () => {

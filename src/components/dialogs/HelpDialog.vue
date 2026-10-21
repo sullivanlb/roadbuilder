@@ -13,6 +13,8 @@ const shortcuts: { label: MessageKey; key: () => string }[] = [
   { label: 'help.shortcutView', key: () => 'C' },
   { label: 'help.shortcutSelect', key: () => 'V' },
   { label: 'help.shortcutAdd', key: () => 'A' },
+  { label: 'help.shortcutStraight', key: () => 'S' },
+  { label: 'help.shortcutArc', key: () => 'R' },
   { label: 'help.shortcutBarrier', key: () => 'B' },
   { label: 'help.shortcutPits', key: () => 'P' },
   { label: 'help.shortcutWidth', key: () => 'L' },

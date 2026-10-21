@@ -19,6 +19,13 @@ const controlPoint = z.object({
   x: ranged(RULES.coordinate),
   y: ranged(RULES.altitude),
   z: ranged(RULES.coordinate),
+  /** The segment leaving this point is a straight line (docs/adr/0012). */
+  straight: z.literal(true).optional(),
+  /**
+   * Makes the point a rounded point: the track does not go through it but turns
+   * on an arc of this radius, tangent to the straight sides leading to its neighbours.
+   */
+  radius: ranged(RULES.radius).optional(),
 });
 
 /** A place on the track: a control point plus a distance along the track after it (docs/adr/0006). */

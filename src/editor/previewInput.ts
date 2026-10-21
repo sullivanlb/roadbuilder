@@ -45,6 +45,9 @@ export function previewClick(
       editor.addPoint(sample, sample.segment);
       return;
     }
+    case 'straight':
+    case 'arc':
+      return ui.notify(t('preview.drawOnPlan'), true);
     case 'select':
       if (editor.layer === 'track' && hit.pointId) {
         if (shiftKey) editor.togglePoint(hit.pointId);
