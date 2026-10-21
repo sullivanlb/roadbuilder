@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { nextTick } from 'vue';
 import { setRoad, updatePoint } from '../src/core/project/edits';
 import { parseProjectFile, serializeProject } from '../src/core/project/schema';
-import { headingVector } from '../src/core/scene/scenery';
+import { headingVector } from '../src/core/project/scenery';
 import { pitLaneLayout } from '../src/core/track/pitLane';
 import { positionDistance } from '../src/core/track/positions';
 import { pickInLayer } from '../src/editor/layers';
@@ -204,7 +204,7 @@ describe('editor', () => {
     project.replace(template('club'));
     editor.setTool('grandstand');
     expect(editor.layer).toBe('decor');
-    // Beside the main straight, which runs along z = 180 from x = -280 to 80.
+    // Beside the main straight, which passes x = -100 at z = 203.
     editor.placeScenery('grandstand', { x: -100, z: 230 });
     const [stand] = project.project.scenery;
     expect(stand).toMatchObject({ kind: 'grandstand', solid: true });

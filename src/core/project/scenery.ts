@@ -1,3 +1,4 @@
+import type { PlanPoint } from '../math';
 import type { NumericRule } from './rules';
 import type { SceneryItem, SceneryKind } from './schema';
 
@@ -49,3 +50,45 @@ export const SCENERY_DEFAULTS: Record<SceneryKind, Size & Pick<SceneryItem, 'sol
 export const editableSize = (kind: SceneryKind, size: keyof Size) =>
   !(kind === 'tree' && size === 'depth') &&
   SCENERY_SIZES[kind][size].min < SCENERY_SIZES[kind][size].max;
+
+/** Where the front of a heading faces on the plan: heading 0 faces -Z, 90 faces +X. */
+export function headingVector(heading: number): PlanPoint {
+  const angle = (heading * Math.PI) / 180;
+  return { x: Math.sin(angle), z: -Math.cos(angle) };
+}
+
+/** The heading whose front faces from `from` towards `to`. */
+export function headingTowards(from: PlanPoint, to: PlanPoint): number {
+  const degrees = (Math.atan2(to.x - from.x, -(to.z - from.z)) * 180) / Math.PI;
+  return (degrees + 360) % 360;
+}
+
+/**
+ * How far a place on the plan lies outside an item's footprint, in metres: 0
+ * inside it. A tree's footprint is the round of its crown or grove.
+ */
+export function outsideScenery(item: SceneryItem, p: PlanPoint): number {
+  const front = headingVector(item.heading);
+  const dx = p.x - item.x,
+    dz = p.z - item.z;
+  if (item.kind === 'tree') return Math.max(0, Math.hypot(dx, dz) - item.width / 2);
+  const u = Math.abs(dx * -front.z + dz * front.x) - item.width / 2,
+    v = Math.abs(dx * front.x + dz * front.z) - item.depth / 2;
+  return Math.hypot(Math.max(0, u), Math.max(0, v));
+}
+
+/** The corners of an item's footprint on the plan, a rectangle around its centre. */
+export function sceneryFootprint(item: SceneryItem): PlanPoint[] {
+  const front = headingVector(item.heading);
+  const w = item.width / 2,
+    d = item.depth / 2;
+  return [
+    [-w, -d],
+    [w, -d],
+    [w, d],
+    [-w, d],
+  ].map(([u, v]) => ({
+    x: item.x + front.x * v - front.z * u,
+    z: item.z + front.z * v + front.x * u,
+  }));
+}

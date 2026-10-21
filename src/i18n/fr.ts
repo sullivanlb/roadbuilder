@@ -499,6 +499,9 @@ export const frMessages = {
     'Point {point} : deux lignes droites s’y rejoignent en angle vif ({angle}°). Arrondissez ce point.',
   'trackIssue.bankZonesOverlap':
     'Deux portions de dévers se chevauchent : la dernière de la liste l’emporte. Déplacez le début ou la fin de l’une d’elles.',
+  'trackIssue.sceneryOnTrack':
+    '{count} objet de décor empiète sur la piste ou ses accotements : déplacez-le ou réduisez-le.|{count} objets de décor empiètent sur la piste ou ses accotements : déplacez-les ou réduisez-les.',
+  'scenery.onTrack': 'Cet objet empiète sur la piste ou ses accotements.',
   'exportError.foldedSurface':
     'Un bord de route ou de stand se replie dans un virage. Écartez les points, réduisez la largeur ou déplacez le début du tracé vers une ligne droite.',
 

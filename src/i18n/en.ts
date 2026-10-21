@@ -478,6 +478,9 @@ export const enMessages: Record<MessageKey, string> = {
     'Point {point}: two straights meet there at a sharp angle ({angle}°). Round this point.',
   'trackIssue.bankZonesOverlap':
     'Two bank zones overlap: the last one in the list wins. Move the start or the end of one of them.',
+  'trackIssue.sceneryOnTrack':
+    '{count} scenery item reaches the track or its shoulders: move it or make it smaller.|{count} scenery items reach the track or its shoulders: move them or make them smaller.',
+  'scenery.onTrack': 'This item reaches the track or its shoulders.',
   'exportError.foldedSurface':
     'A road or pit edge folds inside a corner. Spread the points, reduce the width or move the start of the track to a straight.',
 

@@ -3,7 +3,7 @@ import { clamp, planDistance } from '../../core/math';
 import type { PlanPoint, Vec3 } from '../../core/math';
 import type { Project, Side } from '../../core/project/schema';
 import { barrierPath } from '../../core/scene/barriers';
-import { outsideScenery } from '../../core/scene/scenery';
+import { outsideScenery } from '../../core/project/scenery';
 import type { Sample } from '../../core/track/centerline';
 import { widestHalf } from '../../core/track/layout';
 import type { PlanProjection, ScreenPoint } from './projection';

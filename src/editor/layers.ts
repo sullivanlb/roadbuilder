@@ -133,6 +133,7 @@ const ISSUE_LAYER: Partial<Record<TrackIssue['code'], LayerId>> = {
   'pit-lane-too-tight': 'pits',
   'width-zones-overlap': 'road',
   'bank-zones-overlap': 'road',
+  'scenery-on-track': 'decor',
 };
 
 /** The layer where a track issue is fixed. */

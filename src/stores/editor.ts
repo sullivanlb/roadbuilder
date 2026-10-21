@@ -32,10 +32,9 @@ import {
 } from '../core/project/edits';
 import { planDistance } from '../core/math';
 import { RULES } from '../core/project/rules';
-import { SCENERY_DEFAULTS } from '../core/project/scenery';
+import { headingTowards, SCENERY_DEFAULTS } from '../core/project/scenery';
 import { isCircuit, SCENERY_KINDS, SCENERY_VARIANTS } from '../core/project/schema';
 import type { BarrierType, SceneryItem, SceneryKind, Side } from '../core/project/schema';
-import { headingTowards } from '../core/scene/scenery';
 import { outsideOf } from '../core/track/bank';
 import { trackLength } from '../core/track/centerline';
 import { LAYOUT } from '../core/track/layout';

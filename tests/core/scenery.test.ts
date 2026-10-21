@@ -5,12 +5,10 @@ import { SCENERY_KINDS } from '../../src/core/project/schema';
 import type { Project, SceneryKind } from '../../src/core/project/schema';
 import type { Mesh } from '../../src/core/scene/mesh';
 import { buildScene } from '../../src/core/scene/scene';
-import {
-  groveTrees,
-  headingTowards,
-  headingVector,
-  meshHeight,
-} from '../../src/core/scene/scenery';
+import { trackIssues } from '../../src/core/track/issues';
+import { issueLayer } from '../../src/editor/layers';
+import { headingTowards, headingVector } from '../../src/core/project/scenery';
+import { groveTrees, meshHeight } from '../../src/core/scene/scenery';
 import { template } from '../helpers';
 
 /** The club circuit with one item of each kind, well outside the track. */
@@ -111,6 +109,30 @@ describe('scenery', () => {
     for (const light of scene.lights) {
       expect(light.direction[1]).toBeLessThan(-0.9);
       expect(Math.hypot(...light.direction)).toBeCloseTo(1);
+    }
+  });
+
+  it('warns about items reaching the track or its shoulders, without blocking the export', () => {
+    const check = (at: { x: number; z: number }, kind: SceneryKind = 'building') => {
+      let id = '';
+      const project = produce(template('club'), (draft) => {
+        id = addScenery(draft, kind, at);
+      });
+      return { id, issues: trackIssues(project) };
+    };
+    // The main straight passes x = -100 at z = 203; its shoulders end 12.65 m from it.
+    const far = check({ x: -100, z: 240 });
+    expect(far.issues.warnings.map((issue) => issue.code)).not.toContain('scenery-on-track');
+    for (const at of [
+      { x: -100, z: 203 },
+      // The building is 10 m deep: its front reaches the shoulder.
+      { x: -100, z: 218 },
+    ]) {
+      const near = check(at);
+      const warning = near.issues.warnings.find((issue) => issue.code === 'scenery-on-track')!;
+      expect(warning).toEqual({ code: 'scenery-on-track', count: 1, ids: [near.id] });
+      expect(issueLayer(warning)).toBe('decor');
+      expect(near.issues.errors).toEqual([]);
     }
   });
 });

@@ -2,13 +2,14 @@ import type { Id } from '../ids';
 import { planDistance } from '../math';
 import type { PlanPoint } from '../math';
 import { RULES } from '../project/rules';
-import { isCircuit } from '../project/schema';
+import { outsideScenery } from '../project/scenery';
+import { isCircuit, SIDES } from '../project/schema';
 import type { Project } from '../project/schema';
 import { controlPointSample, sampleTrack, trackStats } from './centerline';
 import { corners, straightSide } from './geometry';
 import type { Sample } from './centerline';
 import { LAYOUT } from './layout';
-import { pitBoxCapacity, pitLaneLayout } from './pitLane';
+import { pitBoxCapacity, pitLaneLayout, sideEdge } from './pitLane';
 import { overlapStart } from './ranges';
 import type { TrackRange } from './ranges';
 import { bankZoneRanges } from './bank';
@@ -42,7 +43,8 @@ export type TrackIssue =
   | { code: 'width-zones-overlap' }
   | { code: 'bank-zones-overlap' }
   | { code: 'radius-reduced'; point: number; requested: number; actual: number }
-  | { code: 'sharp-corner'; point: number; angle: number };
+  | { code: 'sharp-corner'; point: number; angle: number }
+  | { code: 'scenery-on-track'; count: number; ids: Id[] };
 
 /** The worst bend of one segment that is too tight for the road width. */
 export interface TightTurn {
@@ -141,7 +143,46 @@ export function trackIssues(
     warnings.push(location.issue);
     locations.push(location);
   }
+  const scenery = sceneryOnTrack(project, samples);
+  if (scenery) {
+    warnings.push(scenery.issue);
+    locations.push(scenery);
+  }
   return { errors, warnings, tightTurns, locations };
+}
+
+/**
+ * Scenery items whose footprint reaches the roadway, the kerbs, the shoulders or
+ * the pit lane (docs/adr/0013): they stay where they were put when the track
+ * moves, so the track may come to run through them.
+ */
+function sceneryOnTrack(project: Project, samples: readonly Sample[]): IssueLocation | null {
+  if (!project.scenery.length || samples.length < 2) return null;
+  const lane = pitLaneLayout(project, samples);
+  // Outer edge of the shoulders on each side, from the centerline.
+  const reach = samples.map((sample) =>
+    SIDES.map((side) => sideEdge(project, lane, sample, side) + project.road.shoulder),
+  );
+  const widest = Math.max(...reach.flat());
+  const ids: Id[] = [];
+  let first = -1;
+  for (const item of project.scenery) {
+    const radius = Math.hypot(item.width, item.depth) / 2;
+    const index = samples.findIndex((sample, i) => {
+      if (planDistance(sample, item) > radius + widest) return false;
+      const lateral = (item.x - sample.x) * sample.nx + (item.z - sample.z) * sample.nz;
+      return outsideScenery(item, sample) < reach[i][lateral < 0 ? 0 : 1];
+    });
+    if (index < 0) continue;
+    ids.push(item.id);
+    if (first < 0) first = index;
+  }
+  if (!ids.length) return null;
+  return {
+    issue: { code: 'scenery-on-track', count: ids.length, ids },
+    sampleIndex: first,
+    pointIds: [],
+  };
 }
 
 /** Plain points where two straights meet at an angle: the track turns on the spot. */

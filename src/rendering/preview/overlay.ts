@@ -4,7 +4,7 @@ import type { MeshKind } from '../../core/scene/mesh';
 import { barrierLateral, barrierSamples } from '../../core/scene/barriers';
 import { groundHeight } from '../../core/scene/ground';
 import { offsetPoint } from '../../core/scene/mesh';
-import { sceneryFootprint } from '../../core/scene/scenery';
+import { sceneryFootprint } from '../../core/project/scenery';
 import { sampleAt } from '../../core/track/centerline';
 import type { Sample } from '../../core/track/centerline';
 import { kerbWidth } from '../../core/track/layout';

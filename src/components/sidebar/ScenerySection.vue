@@ -33,6 +33,12 @@ const SIZES = ['width', 'depth', 'height'] as const;
 
 const items = computed(() => store.project.scenery);
 const selected = computed(() => editor.selectedScenery);
+/** Selected items standing on the track, reported by the track checks. */
+const onTrack = computed(() => {
+  const issue = store.issues.warnings.find((warning) => warning.code === 'scenery-on-track');
+  const ids = issue?.code === 'scenery-on-track' ? issue.ids : [];
+  return selected.value.some((item) => ids.includes(item.id));
+});
 /** The item whose settings are shown: the selection, when it holds a single one. */
 const single = computed(() => (selected.value.length === 1 ? selected.value[0] : null));
 
@@ -153,6 +159,9 @@ function edit(patch: SceneryPatch) {
       {{ t('scenery.selected', { count: selected.length }, selected.length) }}
     </p>
     <template v-if="selected.length">
+      <p v-if="onTrack" id="scenery-on-track" class="note warning" role="status">
+        {{ t('scenery.onTrack') }}
+      </p>
       <ToggleField
         id="scenery-solid"
         v-model="solid"
@@ -221,6 +230,9 @@ function edit(patch: SceneryPatch) {
 h2 {
   font-size: 12px;
   font-weight: 600;
+}
+.warning {
+  color: var(--red);
 }
 .actions {
   display: flex;

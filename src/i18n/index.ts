@@ -156,6 +156,8 @@ export function formatTrackIssue(issue: TrackIssue, target?: Locale): string {
       });
     case 'sharp-corner':
       return tr('trackIssue.sharpCorner', { point: issue.point + 1, angle: issue.angle });
+    case 'scenery-on-track':
+      return tr('trackIssue.sceneryOnTrack', { count: issue.count }, issue.count);
   }
 }
 
