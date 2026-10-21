@@ -4,9 +4,10 @@ import type { MaterialId } from './materials';
 
 /**
  * What a mesh is for. `surface` and `terrain` are driven on and face up;
- * `barrier` meshes are vertical and excluded from the fold-back check.
+ * `barrier` and `scenery` meshes stand on them and are excluded from the
+ * fold-back check.
  */
-export type MeshKind = 'surface' | 'terrain' | 'barrier';
+export type MeshKind = 'surface' | 'terrain' | 'barrier' | 'scenery';
 
 /**
  * Triangle mesh with flat attribute arrays: 3 numbers per position and normal,

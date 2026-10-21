@@ -1,6 +1,6 @@
 import { produce } from 'immer';
 import { describe, expect, it } from 'vitest';
-import { addBarrier } from '../../src/core/project/edits';
+import { addBarrier, addScenery } from '../../src/core/project/edits';
 import { parseProjectFile } from '../../src/core/project/schema';
 import { buildArchive } from '../../src/export/archive';
 import { crc32 } from '../../src/export/binary/crc32';
@@ -61,6 +61,20 @@ describe('Assetto Corsa archive', () => {
     expect(parseProjectFile(archive.files['rb_test_club.roadbuilder.json'] as string)).toEqual(
       project,
     );
+  });
+
+  it('lights the lamps at night through Custom Shaders Patch', () => {
+    const root = `content/tracks/rb_test_club/`;
+    const config = `${root}extension/ext_config.ini`;
+    expect(buildArchive(template('club'), 'assetto', texts).files[config]).toBeUndefined();
+    const lit = produce(template('club'), (draft) => {
+      addScenery(draft, 'light', { x: -150, z: 0 });
+    });
+    const ini = buildArchive(lit, 'assetto', texts).files[config] as string;
+    expect(ini).toContain('[CONDITION_0]\nNAME=ROADBUILDER_NIGHT\nINPUT=SUN');
+    expect(ini).toContain('[MATERIAL_ADJUSTMENT_0]\nMATERIALS=lamp\nKEY_0=ksEmissive');
+    expect(ini.match(/^\[LIGHT_\d+\]$/gm)).toEqual(['[LIGHT_0]']);
+    expect(ini).toMatch(/POSITION=-150(\.\d+)?, [-\d.]+, [-\d.]+/);
   });
 
   it('includes barrier materials and documents them', () => {

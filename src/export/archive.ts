@@ -4,7 +4,14 @@ import type { Project } from '../core/project/schema';
 import { buildScene, findFoldedSurface } from '../core/scene/scene';
 import { sampleTrack, trackStats } from '../core/track/centerline';
 import { trackIssues } from '../core/track/issues';
-import { grooveIni, lightingIni, modelsIni, surfacesIni, uiTrackJson } from './assetto/files';
+import {
+  extConfigIni,
+  grooveIni,
+  lightingIni,
+  modelsIni,
+  surfacesIni,
+  uiTrackJson,
+} from './assetto/files';
 import { encodeKn5 } from './assetto/kn5';
 import { makeMap } from './assetto/map';
 import { zipFiles } from './binary/zip';
@@ -55,6 +62,7 @@ export function buildArchive(input: Project, format: ExportFormat, texts: Docume
     files[`${root}data/map.ini`] = map.ini;
     files[`${root}data/lighting.ini`] = lightingIni();
     files[`${root}data/groove.ini`] = grooveIni();
+    if (scene.lights.length) files[`${root}extension/ext_config.ini`] = extConfigIni(scene.lights);
     files[`${root}map.png`] = map.png;
     files[`${root}ui/outline.png`] = map.png;
     files[`${root}ui/preview.png`] = preview.png;

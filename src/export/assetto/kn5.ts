@@ -1,18 +1,20 @@
 import { bounds } from '../../core/math';
 import type { Scene } from '../../core/scene/scene';
+import { emissive } from '../../core/scene/materials';
+import type { MaterialId } from '../../core/scene/materials';
 import { vertexCount } from '../../core/scene/mesh';
 import { BinaryWriter, utf8 } from '../binary/writer';
 import { texture, textureFile, usedMaterials } from '../textures';
 
 const IDENTITY = [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1];
 const TANGENT = [1, 0, 0];
-const SHADING = {
+const shading = (material: MaterialId) => ({
   ksAmbient: 0.35,
   ksDiffuse: 0.65,
   ksSpecular: 0.05,
   ksSpecularEXP: 12,
-  ksEmissive: 0,
-};
+  ksEmissive: emissive(material),
+});
 
 // KN5 v5 field layout independently implemented from the public AcTools format.
 // Reference: github.com/gro-ove/actools/blob/master/AcTools/Kn5File/Kn5Writer.cs
@@ -28,9 +30,17 @@ export function encodeKn5(scene: Scene) {
   writer.u32(materials.length);
   for (const material of materials) {
     writer.string(material).string('ksPerPixel').u8(0).u8(0).u32(0);
-    writer.u32(Object.keys(SHADING).length);
-    for (const [name, value] of Object.entries(SHADING))
-      writer.string(name).f32(value).floats(new Array<number>(9).fill(0));
+    const properties = shading(material);
+    writer.u32(Object.keys(properties).length);
+    // Each property holds a float, then a vec2, a vec3 and a vec4; ksEmissive is a
+    // colour, read from the vec3.
+    for (const [name, value] of Object.entries(properties)) {
+      const colour = name === 'ksEmissive' ? [value, value, value] : [0, 0, 0];
+      writer
+        .string(name)
+        .f32(value)
+        .floats([0, 0, ...colour, 0, 0, 0, 0]);
+    }
     writer.u32(1).string('txDiffuse').u32(0).string(textureFile(material));
   }
   writer

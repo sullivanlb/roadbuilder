@@ -25,7 +25,7 @@ import {
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import { bounds } from '../../core/math';
 import type { PlanPoint, Vec3 } from '../../core/math';
-import { MATERIALS } from '../../core/scene/materials';
+import { emissive, MATERIALS } from '../../core/scene/materials';
 import type { MaterialId } from '../../core/scene/materials';
 import type { Scene as TrackScene } from '../../core/scene/scene';
 import type { Sample } from '../../core/track/centerline';
@@ -88,6 +88,7 @@ export class PreviewRenderer {
     let material = this.materials.get(key);
     if (!material) {
       material = new MeshLambertMaterial({ color: rgb(MATERIALS[id].color), side: DoubleSide });
+      if (emissive(id)) material.emissive = material.color.clone().multiplyScalar(emissive(id));
       if (dimmed) {
         material.transparent = true;
         material.opacity = INACTIVE_LAYER_ALPHA;

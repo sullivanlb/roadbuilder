@@ -61,7 +61,7 @@ describe('scene', () => {
   });
 
   it('is empty without a track', () => {
-    expect(buildScene(template('blank'))).toEqual({ meshes: [], markers: [] });
+    expect(buildScene(template('blank'))).toEqual({ meshes: [], markers: [], lights: [] });
   });
 });
 

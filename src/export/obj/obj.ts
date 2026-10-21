@@ -1,4 +1,5 @@
 import type { Scene } from '../../core/scene/scene';
+import { emissive } from '../../core/scene/materials';
 import { vertexCount } from '../../core/scene/mesh';
 import { textureFile, usedMaterials } from '../textures';
 
@@ -29,7 +30,9 @@ export function encodeObj(scene: Scene, header: string) {
   const mtl = usedMaterials(scene)
     .map(
       (material) =>
-        `newmtl ${material}\nKa 0.35 0.35 0.35\nKd 1 1 1\nKs 0.05 0.05 0.05\nmap_Kd texture/${textureFile(material)}\n`,
+        `newmtl ${material}\nKa 0.35 0.35 0.35\nKd 1 1 1\nKs 0.05 0.05 0.05\n` +
+        (emissive(material) ? `Ke ${Array(3).fill(emissive(material)).join(' ')}\n` : '') +
+        `map_Kd texture/${textureFile(material)}\n`,
     )
     .join('\n');
   return { obj: lines.join('\n') + '\n', mtl };

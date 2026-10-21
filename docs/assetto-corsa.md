@@ -28,6 +28,8 @@ Add to this file every time a test in game teaches something, and update the sta
 
 **Solid walls (concrete barrier, pit wall) use two vertical faces about a metre apart and no top.** Both block cars. _Confirmed in game._ Why this shape is needed is _assumed_: a thin closed slab with a top at body height was suspected of letting cars through, but the pit wall's real problem turned out to be its name. Forum reports describe double-sided barriers making cars stick to walls ([assettocorsamods.net](https://assettocorsamods.net/threads/assetto-mods-and-track-creation.3349)), so faces close together are best avoided.
 
+**Scenery colliders** are invisible `1WALL_scenery` meshes: vertical faces around the footprint of each solid scenery item, at least a metre apart, open on top, from 0.4 m below the ground to 4 m. Built like the barrier colliders, so they should stop cars; _assumed_ until tried in game.
+
 ## KN5 model
 
 **Vertex indices are 16 bits**: a mesh holds at most 65,535 vertices. Larger meshes are split into `name_0`, `name_1`… at 60,000 vertices. _Documented_ (KN5 layout, see below).
@@ -35,6 +37,18 @@ Add to this file every time a test in game teaches something, and update the sta
 **Field layout of KN5 v5** follows the AcTools writer: [Kn5Writer.cs](https://github.com/gro-ove/actools/blob/master/AcTools/Kn5File/Kn5Writer.cs). Our encoder is an independent implementation. _Documented._
 
 **Axes**: Y up, the car's forward is local -Z. Track geometry is written in metres without conversion. _Confirmed in game_ (tracks load upright and to scale).
+
+**`ksEmissive` is a colour read from the vec3 of the material property.** The lamps of lights write their glow there (0.6 by day). _Assumed_ from the AcTools property layout (float, vec2, vec3, vec4).
+
+## Custom Shaders Patch
+
+**CSP reads `extension/ext_config.ini` in the track folder.** _Documented_ ([CSP config wiki](https://github.com/ac-custom-shaders-patch/acc-extension-config/wiki)). The game without CSP ignores it.
+
+**A `[LIGHT_n]` section with `POSITION` and `DIRECTION` places one light**, with `SPOT`, `SPOT_SHARPNESS`, `RANGE`, `RANGE_GRADIENT_OFFSET`, `COLOR` (r, g, b, intensity), `FADE_AT`, `FADE_SMOOTH` and the `CONDITION` controlling its brightness. _Documented_ ([Tracks – Lights](https://github.com/ac-custom-shaders-patch/acc-extension-config/wiki/Tracks-%E2%80%93-Lights)). Whether our values light the track well is _assumed_.
+
+**A `[CONDITION_n]` with `INPUT = SUN` follows the sun angle**, 0 at the zenith and 90 at the horizon, through a `LUT`. _Documented_ ([Tracks – Conditions](https://github.com/ac-custom-shaders-patch/acc-extension-config/wiki/Tracks-%E2%80%93-Conditions)). Ours, `ROADBUILDER_NIGHT`, goes from 0 at 86° to 1 at 96°: lights on at dusk is _assumed_.
+
+**`[MATERIAL_ADJUSTMENT_0]` raises `ksEmissive` of the `lamp` material at night** (`KEY_0`, `VALUE_0`, `VALUE_0_OFF`, `CONDITION`). _Assumed_ from published track configs; not found in the wiki pages read.
 
 ## Markers
 
@@ -59,3 +73,4 @@ Empty nodes read by the game, each a 4×4 transform with local Y up and local -Z
 
 - Whether timing works on open roads (point-to-point sessions).
 - How the game reads `ai/fast_lane.ai` and `ai/pit_lane.ai` (needed for AI lines).
+- Whether scenery colliders stop cars, and whether the night lights and glowing lamps work with CSP.

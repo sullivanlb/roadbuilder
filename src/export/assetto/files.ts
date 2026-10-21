@@ -1,5 +1,6 @@
 import { isCircuit } from '../../core/project/schema';
 import type { Project } from '../../core/project/schema';
+import type { SceneLight } from '../../core/scene/scenery';
 import { isClockwise } from '../../core/track/centerline';
 import type { Sample, TrackStats } from '../../core/track/centerline';
 import type { DocumentTexts } from '../documents';
@@ -57,6 +58,41 @@ export const modelsIni = (kn5: string) =>
   ini({ MODEL_0: { FILE: kn5, POSITION: '0,0,0', ROTATION: '0,0,0' } });
 
 export const lightingIni = () => ini({ LIGHTING: { SUN_PITCH_ANGLE: 45, SUN_HEADING_ANGLE: 30 } });
+
+const vector = (values: readonly number[]) => values.map((v) => +v.toFixed(3)).join(', ');
+
+/**
+ * extension/ext_config.ini, read by Custom Shaders Patch: one light per lamp and
+ * the lamp material glowing brighter, both lit when the sun sets. `SUN` is the
+ * sun angle from the zenith, 90 at the horizon (docs/assetto-corsa.md).
+ */
+export function extConfigIni(lights: readonly SceneLight[]) {
+  const sections: IniSections = {
+    CONDITION_0: { NAME: 'ROADBUILDER_NIGHT', INPUT: 'SUN', LUT: '(|0=0|86=0|96=1|180=1|)' },
+    MATERIAL_ADJUSTMENT_0: {
+      MATERIALS: 'lamp',
+      KEY_0: 'ksEmissive',
+      VALUE_0: '30, 28, 24',
+      VALUE_0_OFF: '0.6, 0.6, 0.6',
+      CONDITION: 'ROADBUILDER_NIGHT',
+    },
+  };
+  lights.forEach((light, i) => {
+    sections[`LIGHT_${i}`] = {
+      POSITION: vector(light.position),
+      DIRECTION: vector(light.direction),
+      COLOR: '1, 0.92, 0.8, 30',
+      SPOT: 140,
+      SPOT_SHARPNESS: 0.3,
+      RANGE: 45,
+      RANGE_GRADIENT_OFFSET: 0.2,
+      FADE_AT: 500,
+      FADE_SMOOTH: 50,
+      CONDITION: 'ROADBUILDER_NIGHT',
+    };
+  });
+  return ini(sections);
+}
 
 export const grooveIni = () => ini({ GROOVE: { VIRTUAL_LAPS: 1, MAX_LAPS: 30, STARTING_LAPS: 0 } });
 
