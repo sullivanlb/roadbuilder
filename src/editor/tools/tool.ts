@@ -4,6 +4,12 @@ import type { useEditorStore } from '../../stores/editor';
 import type { useProjectStore } from '../../stores/project';
 import type { useViewportStore } from '../../stores/viewport';
 
+/** Grid the plan snaps to while Shift is held, in metres. */
+export const SNAP_GRID = 5;
+
+/** A coordinate on the plan, moved to the nearest grid line. */
+export const onGrid = (value: number) => Math.round(value / SNAP_GRID) * SNAP_GRID;
+
 /** The stores a tool works with. */
 export interface ToolContext {
   project: ReturnType<typeof useProjectStore>;

@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { DEFAULTS, RULES } from './rules';
 import type { NumericRule } from './rules';
 import { ProjectError } from './errors';
+import { SCENERY_SIZE_NAMES, SCENERY_SIZES, SCENERY_VARIANTS } from './scenery';
 import type { ProjectErrorDetail } from './errors';
 
 export const PROJECT_FORMAT = 'roadbuilder';
@@ -11,8 +12,8 @@ export const PROJECT_VERSION = 2;
 export const BARRIER_TYPES = ['guardrail', 'tires', 'tecpro', 'wall'] as const;
 export const SIDES = ['left', 'right'] as const;
 export const SCENERY_KINDS = ['tree', 'building', 'grandstand', 'sign', 'light'] as const;
-/** The looks a scenery item may take; each kind accepts its own (SCENERY_VARIANTS in scenery.ts). */
-export const SCENERY_LOOKS = [
+/** Every variant a scenery item may take; each kind accepts its own (SCENERY_VARIANTS in scenery.ts). */
+export const VARIANT_NAMES = [
   'leafy',
   'conifer',
   'billboard',
@@ -97,7 +98,7 @@ const sceneryItem = z.object({
   width: ranged(RULES.scenerySize),
   depth: ranged(RULES.scenerySize),
   height: ranged(RULES.scenerySize),
-  variant: z.enum(SCENERY_LOOKS).optional(),
+  variant: z.enum(VARIANT_NAMES).optional(),
   /** Trees in a grove, scattered from the item's ID so they stay in place. */
   count: z.number().int().min(RULES.groveCount.min).max(RULES.groveCount.max).optional(),
 });
@@ -182,6 +183,10 @@ function checkReferences(project: ProjectShape, ctx: z.RefinementCtx<ProjectShap
   project.scenery.forEach((item, index) => {
     if (item.variant && !SCENERY_VARIANTS[item.kind].includes(item.variant))
       fail('invalid-value', ['scenery', index, 'variant']);
+    for (const size of SCENERY_SIZE_NAMES) {
+      const { min, max } = SCENERY_SIZES[item.kind][size];
+      if (item[size] < min || item[size] > max) fail('invalid-value', ['scenery', index, size]);
+    }
   });
   if (project.pitLane && !circuit) return fail('pit-lane-on-road', ['pitLane']);
   if (project.cars > 1 && !project.pitLane) fail('cars-without-pit-lane', ['cars']);
@@ -202,16 +207,7 @@ export type TrackPosition = NonNullable<Project['startLine']>;
 export type PitLane = NonNullable<Project['pitLane']>;
 export type SceneryItem = Project['scenery'][number];
 export type SceneryKind = SceneryItem['kind'];
-export type SceneryLook = NonNullable<SceneryItem['variant']>;
-
-/** The looks each kind of scenery accepts, the first one by default; none for buildings and grandstands. */
-export const SCENERY_VARIANTS: Record<SceneryKind, readonly SceneryLook[]> = {
-  tree: ['leafy', 'conifer'],
-  building: [],
-  grandstand: [],
-  sign: ['billboard', 'board'],
-  light: ['single', 'double'],
-};
+export type SceneryVariant = NonNullable<SceneryItem['variant']>;
 
 /** A circuit needs three control points to close; with fewer it is driven as a road. */
 export const isCircuit = (project: Pick<Project, 'road' | 'points'>) =>

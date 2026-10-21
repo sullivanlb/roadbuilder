@@ -7,6 +7,9 @@ import { useEditorStore } from '../../stores/editor';
 import type { ToolId } from '../../stores/editor';
 import { useProjectStore } from '../../stores/project';
 import { useUiStore } from '../../stores/ui';
+import { SCENERY_KINDS } from '../../core/project/schema';
+import type { SceneryKind } from '../../core/project/schema';
+import { SCENERY_ICON } from '../ui/icons';
 import type { IconName } from '../ui/icons';
 import ToolButton from '../ui/ToolButton.vue';
 
@@ -24,11 +27,12 @@ const TOOL_LOOK: Record<ToolId, { icon: IconName; label: MessageKey }> = {
   bank: { icon: 'banking', label: 'editor.bankTitle' },
   barrier: { icon: 'wall', label: 'editor.barrierTitle' },
   pits: { icon: 'pits', label: 'editor.pitsTitle' },
-  tree: { icon: 'trees', label: 'editor.treeTitle' },
-  building: { icon: 'building', label: 'editor.buildingTitle' },
-  grandstand: { icon: 'grandstands', label: 'editor.grandstandTitle' },
-  sign: { icon: 'sign', label: 'editor.signTitle' },
-  light: { icon: 'light', label: 'editor.lightTitle' },
+  ...(Object.fromEntries(
+    SCENERY_KINDS.map((kind) => [
+      kind,
+      { icon: SCENERY_ICON[kind], label: `editor.${kind}Title` as MessageKey },
+    ]),
+  ) as Record<SceneryKind, { icon: IconName; label: MessageKey }>),
   pan: { icon: 'move', label: 'editor.panTitle' },
 };
 

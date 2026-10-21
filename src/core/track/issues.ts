@@ -2,7 +2,7 @@ import type { Id } from '../ids';
 import { planDistance } from '../math';
 import type { PlanPoint } from '../math';
 import { RULES } from '../project/rules';
-import { outsideScenery } from '../project/scenery';
+import { outsideScenery, sceneryReach } from '../project/scenery';
 import { isCircuit, SIDES } from '../project/schema';
 import type { Project } from '../project/schema';
 import { controlPointSample, sampleTrack, trackStats } from './centerline';
@@ -160,18 +160,18 @@ function sceneryOnTrack(project: Project, samples: readonly Sample[]): IssueLoca
   if (!project.scenery.length || samples.length < 2) return null;
   const lane = pitLaneLayout(project, samples);
   // Outer edge of the shoulders on each side, from the centerline.
-  const reach = samples.map((sample) =>
+  const shoulders = samples.map((sample) =>
     SIDES.map((side) => sideEdge(project, lane, sample, side) + project.road.shoulder),
   );
-  const widest = Math.max(...reach.flat());
+  const widest = Math.max(...shoulders.flat());
   const ids: Id[] = [];
   let first = -1;
   for (const item of project.scenery) {
-    const radius = Math.hypot(item.width, item.depth) / 2;
+    const reach = sceneryReach(item);
     const index = samples.findIndex((sample, i) => {
-      if (planDistance(sample, item) > radius + widest) return false;
+      if (planDistance(sample, item) > reach + widest) return false;
       const lateral = (item.x - sample.x) * sample.nx + (item.z - sample.z) * sample.nz;
-      return outsideScenery(item, sample) < reach[i][lateral < 0 ? 0 : 1];
+      return outsideScenery(item, sample) < shoulders[i][lateral < 0 ? 0 : 1];
     });
     if (index < 0) continue;
     ids.push(item.id);

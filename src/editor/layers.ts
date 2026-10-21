@@ -1,4 +1,5 @@
 import type { Id } from '../core/ids';
+import { SCENERY_KINDS } from '../core/project/schema';
 import type { Project } from '../core/project/schema';
 import type { Sample } from '../core/track/centerline';
 import type { TrackIssue } from '../core/track/issues';
@@ -52,9 +53,9 @@ export const LAYERS: readonly Layer[] = [
   { id: 'pits', key: '4', tools: ['pits'], soon: [soon('sectors')] },
   { id: 'terrain', key: '5', tools: [], soon: [soon('sculpt')] },
   {
-    id: 'decor',
+    id: 'scenery',
     key: '6',
-    tools: ['tree', 'building', 'grandstand', 'sign', 'light'],
+    tools: SCENERY_KINDS,
     soon: [],
   },
 ];
@@ -79,7 +80,7 @@ const SELECTION_LAYER: Record<NonNullable<Selection>['kind'], LayerId> = {
   bankZone: 'road',
   barrier: 'edges',
   pitLane: 'pits',
-  scenery: 'decor',
+  scenery: 'scenery',
 };
 
 /** The layer whose elements a selection holds. */
@@ -121,7 +122,7 @@ export function pickInLayer(
       const onLane = lane && hit.road?.side === lane.side && lane.along(hit.road.s) !== null;
       return onLane ? { kind: 'pitLane' } : null;
     }
-    case 'decor':
+    case 'scenery':
       return hit.sceneryId ? { kind: 'scenery', ids: [hit.sceneryId] } : null;
     case 'terrain':
       return null;
@@ -133,7 +134,7 @@ const ISSUE_LAYER: Partial<Record<TrackIssue['code'], LayerId>> = {
   'pit-lane-too-tight': 'pits',
   'width-zones-overlap': 'road',
   'bank-zones-overlap': 'road',
-  'scenery-on-track': 'decor',
+  'scenery-on-track': 'scenery',
 };
 
 /** The layer where a track issue is fixed. */

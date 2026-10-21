@@ -43,6 +43,7 @@ const overlay = computed(() =>
     range: editor.range,
     draft: draft.value,
     hoverS: editor.hoverS,
+    sceneryFloors: scene.value.sceneryFloors,
   }),
 );
 

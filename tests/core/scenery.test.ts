@@ -7,7 +7,14 @@ import type { Mesh } from '../../src/core/scene/mesh';
 import { buildScene } from '../../src/core/scene/scene';
 import { trackIssues } from '../../src/core/track/issues';
 import { issueLayer } from '../../src/editor/layers';
-import { headingTowards, headingVector } from '../../src/core/project/scenery';
+import {
+  headingTowards,
+  headingVector,
+  outsideScenery,
+  sceneryFootprint,
+} from '../../src/core/project/scenery';
+import { parseProject } from '../../src/core/project/schema';
+import { asJson } from '../helpers';
 import { groveTrees, meshHeight } from '../../src/core/scene/scenery';
 import { template } from '../helpers';
 
@@ -131,8 +138,28 @@ describe('scenery', () => {
       const near = check(at);
       const warning = near.issues.warnings.find((issue) => issue.code === 'scenery-on-track')!;
       expect(warning).toEqual({ code: 'scenery-on-track', count: 1, ids: [near.id] });
-      expect(issueLayer(warning)).toBe('decor');
+      expect(issueLayer(warning)).toBe('scenery');
       expect(near.issues.errors).toEqual([]);
     }
+  });
+
+  it('covers a light from its pole to the lamps at the end of its arms', () => {
+    const light = withScenery(['light']).scenery[0];
+    const front = headingVector(light.heading);
+    const lamp = { x: light.x + front.x * light.width, z: light.z + front.z * light.width };
+    const behind = { x: light.x - front.x * light.width, z: light.z - front.z * light.width };
+    expect(outsideScenery(light, lamp)).toBe(0);
+    expect(outsideScenery(light, behind)).toBeGreaterThan(light.width - 1);
+    const double = { ...light, variant: 'double' as const };
+    expect(outsideScenery(double, behind)).toBe(0);
+    // The front edge, the last two corners, is beyond the lamp.
+    const [, , c] = sceneryFootprint(light);
+    expect((c.x - light.x) * front.x + (c.z - light.z) * front.z).toBeGreaterThan(light.width);
+  });
+
+  it('refuses a file whose item is out of the sizes of its kind', () => {
+    const json = asJson(withScenery(['sign']));
+    (json.scenery as { depth: number }[])[0].depth = 5;
+    expect(() => parseProject(json)).toThrow('invalid-value');
   });
 });

@@ -37,4 +37,12 @@ export const ICONS = {
   light: 'M7 21h4M9 21V5h8M15 5v3h4V5M17 11v1M14 13l-1 1m7-1 1 1',
 } as const;
 
+/** The icon of each kind of scenery, in the tool palette and the inspector. */
+export const SCENERY_ICON = {
+  tree: 'trees',
+  building: 'building',
+  grandstand: 'grandstands',
+  sign: 'sign',
+  light: 'light',
+} as const satisfies Record<string, keyof typeof ICONS>;
 export type IconName = keyof typeof ICONS;

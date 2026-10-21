@@ -30,10 +30,9 @@ import {
   updateScenery,
   widthZoneRejection,
 } from '../core/project/edits';
-import { planDistance } from '../core/math';
 import { RULES } from '../core/project/rules';
-import { headingTowards, SCENERY_DEFAULTS } from '../core/project/scenery';
-import { isCircuit, SCENERY_KINDS, SCENERY_VARIANTS } from '../core/project/schema';
+import { facingTrack, newScenery } from '../core/project/scenery';
+import { isCircuit, SCENERY_KINDS } from '../core/project/schema';
 import type { BarrierType, SceneryItem, SceneryKind, Side } from '../core/project/schema';
 import { outsideOf } from '../core/track/bank';
 import { trackLength } from '../core/track/centerline';
@@ -45,7 +44,9 @@ import type { TrackRange } from '../core/track/ranges';
 import { arcDraft, drawStart, straightDraft } from '../core/track/drawing';
 import type { DrawDraft } from '../core/track/drawing';
 import { LAYERS, layerOfSelection, layerOfTool } from '../editor/layers';
+import { hasBand } from '../rendering/band';
 import type { LayerId, Selection } from '../editor/layers';
+import { SNAP_GRID } from '../editor/tools/tool';
 import { t } from '../i18n';
 import { useProjectStore } from './project';
 import { useUiStore } from './ui';
@@ -62,9 +63,12 @@ export type ToolId =
   | SceneryKind
   | 'pan';
 
-/** The tool placing a kind of scenery, or null for the other tools. */
-export const sceneryKindOf = (tool: ToolId): SceneryKind | null =>
-  (SCENERY_KINDS as readonly string[]).includes(tool) ? (tool as SceneryKind) : null;
+/** Whether a tool places scenery: each kind of scenery is placed by its own tool. */
+export const isSceneryTool = (tool: ToolId): tool is SceneryKind =>
+  (SCENERY_KINDS as readonly ToolId[]).includes(tool);
+
+/** How far the turn shortcuts turn scenery, in degrees: three steps of the heading. */
+export const TURN_STEP = 3 * RULES.heading.step;
 export type ViewMode = '2d' | '3d';
 
 /** A place on the road and the side it points at, as a track distance. */
@@ -162,33 +166,12 @@ export const useEditorStore = defineStore('editor', () => {
       return arcDraft(start, pointer.at, pointer.snap);
     return null;
   });
-  /** The heading of an item placed at `at`: facing the nearest part of the track. */
-  function facingTrack(at: PlanPoint) {
-    let nearest = store.samples[0],
-      best = Infinity;
-    for (const sample of store.samples) {
-      const d = planDistance(sample, at);
-      if (d < best) {
-        best = d;
-        nearest = sample;
-      }
-    }
-    return nearest ? headingTowards(at, nearest) : 0;
-  }
   /** The item the active scenery tool would place under the pointer, to show it beforehand. */
   const sceneryGhost = computed<SceneryItem | null>(() => {
-    const kind = sceneryKindOf(tool.value),
+    const kind = tool.value,
       at = sceneryPointer.value;
-    if (!kind || !at) return null;
-    const variant = SCENERY_VARIANTS[kind][0];
-    return {
-      id: 'ghost',
-      kind,
-      ...at,
-      heading: facingTrack(at),
-      ...SCENERY_DEFAULTS[kind],
-      ...(variant ? { variant } : {}),
-    };
+    if (!isSceneryTool(kind) || !at) return null;
+    return newScenery('ghost', kind, at, facingTrack(store.samples, at));
   });
   /** Located issues around the selected control point. */
   const selectedIssues = computed(() =>
@@ -263,6 +246,8 @@ export const useEditorStore = defineStore('editor', () => {
     store.commit();
     remembered.set(layer.value, selection.value);
     layer.value = next;
+    // A stretch is picked in the band, which a layer without rows does not show.
+    if (!hasBand(next)) range.value = null;
     selection.value = stillThere(remembered.get(next) ?? null);
     clearDrafts();
     if (layerOfTool(tool.value) !== null) tool.value = 'select';
@@ -639,7 +624,7 @@ export const useEditorStore = defineStore('editor', () => {
   function placeScenery(kind: SceneryKind, at: PlanPoint) {
     if (sceneryRejection(store.project))
       return void refuse(t('toast.sceneryLimit', { max: RULES.scenery.max }));
-    const heading = facingTrack(at);
+    const heading = facingTrack(store.samples, at);
     const id = store.edit((draft) => addScenery(draft, kind, at, heading));
     selection.value = { kind: 'scenery', ids: [id] };
   }
@@ -661,7 +646,7 @@ export const useEditorStore = defineStore('editor', () => {
   }
 
   /** Turns every selected scenery item about itself by `degrees`, clockwise on the plan. */
-  function rotateSelectedScenery(degrees: number) {
+  function turnSelectedScenery(degrees: number) {
     const items = selectedScenery.value;
     if (items.length)
       store.edit((draft) => {
@@ -676,7 +661,9 @@ export const useEditorStore = defineStore('editor', () => {
     if (!ids.length) return;
     if (sceneryRejection(store.project, ids.length))
       return void refuse(t('toast.sceneryLimit', { max: RULES.scenery.max }));
-    const copies = store.edit((draft) => duplicateScenery(draft, ids, { x: 5, z: 5 }));
+    // One grid step aside, so a copy snapped to the grid lands on the next node.
+    const aside = { x: SNAP_GRID, z: SNAP_GRID };
+    const copies = store.edit((draft) => duplicateScenery(draft, ids, aside));
     selection.value = { kind: 'scenery', ids: copies };
   }
 
@@ -794,7 +781,7 @@ export const useEditorStore = defineStore('editor', () => {
     selectScenery,
     toggleScenery,
     deleteSelectedScenery,
-    rotateSelectedScenery,
+    turnSelectedScenery,
     duplicateSelectedScenery,
     deleteSelection,
   };

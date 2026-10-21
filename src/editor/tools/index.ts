@@ -1,3 +1,5 @@
+import { SCENERY_KINDS } from '../../core/project/schema';
+import type { SceneryKind } from '../../core/project/schema';
 import type { ToolId } from '../../stores/editor';
 import { addTool } from './add';
 import { arcTool } from './arc';
@@ -20,11 +22,10 @@ export const TOOLS: Record<ToolId, Tool> = {
   pits: pitsTool,
   width: widthTool,
   bank: bankTool,
-  tree: placeTool('tree'),
-  building: placeTool('building'),
-  grandstand: placeTool('grandstand'),
-  sign: placeTool('sign'),
-  light: placeTool('light'),
+  ...(Object.fromEntries(SCENERY_KINDS.map((kind) => [kind, placeTool(kind)])) as Record<
+    SceneryKind,
+    Tool
+  >),
   pan: panTool,
 };
 

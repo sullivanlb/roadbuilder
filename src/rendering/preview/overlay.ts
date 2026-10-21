@@ -2,7 +2,6 @@ import type { Id } from '../../core/ids';
 import type { Project, SceneryItem } from '../../core/project/schema';
 import type { MeshKind } from '../../core/scene/mesh';
 import { barrierLateral, barrierSamples } from '../../core/scene/barriers';
-import { groundHeight } from '../../core/scene/ground';
 import { offsetPoint } from '../../core/scene/mesh';
 import { sceneryFootprint } from '../../core/project/scenery';
 import { sampleAt } from '../../core/track/centerline';
@@ -17,7 +16,7 @@ import { COLORS } from '../theme';
 /** The layer a mesh of the scene belongs to, or null for the roadway, shown on every layer. */
 export function meshLayer(name: string, kind: MeshKind): LayerId | null {
   if (name.startsWith('1PIT') || name.startsWith('divider')) return 'pits';
-  if (kind === 'scenery') return 'decor';
+  if (kind === 'scenery') return 'scenery';
   if (kind === 'terrain') return 'terrain';
   if (kind === 'barrier') return 'edges';
   return null;
@@ -90,6 +89,8 @@ export interface OverlayState {
   range: TrackRange | null;
   /** The stretch being laid with a two-click tool. */
   draft: TrackRange | null;
+  /** Height of each scenery item's floor in the scene, by ID. */
+  sceneryFloors: Readonly<Record<Id, number>>;
   hoverS: number | null;
 }
 
@@ -176,13 +177,10 @@ export function buildOverlay(
       );
     }
   }
-  if (selection?.kind === 'scenery') {
-    const height = groundHeight(project, samples);
-    for (const item of project.scenery) {
-      if (!selection.ids.includes(item.id)) continue;
-      overlay.outlines.push(...sceneryBox(item, height({ x: item.x, z: item.z })));
-    }
-  }
+  if (selection?.kind === 'scenery')
+    for (const item of project.scenery)
+      if (selection.ids.includes(item.id))
+        overlay.outlines.push(...sceneryBox(item, state.sceneryFloors[item.id] ?? 0));
   if (state.range) across(rangeSamples(samples, state.range), COLORS.accent, 0.3);
   if (state.draft) across(rangeSamples(samples, state.draft), COLORS.accent, 0.45);
   if (state.layer === 'track') {

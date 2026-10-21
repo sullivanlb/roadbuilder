@@ -1,6 +1,6 @@
 # The editor works on one layer at a time
 
-Each new tool brought its own selection rule: a click picked a point, a barrier or a width zone depending on what lay closest, and the same spot often held all three. Large tracks made it worse. The editor now has layers (track, road, edges, pits and start, terrain, decor). The active layer decides what a click picks and which tools are offered; the other layers stay visible, dimmed, and can be hidden.
+Each new tool brought its own selection rule: a click picked a point, a barrier or a width zone depending on what lay closest, and the same spot often held all three. Large tracks made it worse. The editor now has layers (track, road, edges, pits and start, terrain, scenery). The active layer decides what a click picks and which tools are offered; the other layers stay visible, dimmed, and can be hidden.
 
 ## Consequences
 

@@ -15,8 +15,8 @@ import { overlapStart } from '../track/ranges';
 import { bankZoneRanges } from '../track/bank';
 import { widthZoneRanges } from '../track/width';
 import type { TrackRange } from '../track/ranges';
-import { SCENERY_DEFAULTS, SCENERY_SIZES } from './scenery';
-import { isCircuit, SCENERY_VARIANTS } from './schema';
+import { newScenery, SCENERY_SIZES, SCENERY_VARIANTS } from './scenery';
+import { isCircuit } from './schema';
 import type {
   BankZone,
   Barrier,
@@ -544,17 +544,8 @@ const turn = (heading: number) => Math.round(((heading % 360) + 360) % 360) % 36
 /** Places a scenery item of a kind, with the defaults of its kind, facing `heading`. */
 export function addScenery(draft: ProjectDraft, kind: SceneryKind, at: PlanPoint, heading = 0): Id {
   const id = createId();
-  const variant = SCENERY_VARIANTS[kind][0];
-  draft.scenery.push({
-    id,
-    kind,
-    x: within(RULES.coordinate, at.x),
-    z: within(RULES.coordinate, at.z),
-    heading: turn(heading),
-    ...SCENERY_DEFAULTS[kind],
-    ...(variant ? { variant } : {}),
-    ...(kind === 'tree' ? { count: 1 } : {}),
-  });
+  const place = { x: within(RULES.coordinate, at.x), z: within(RULES.coordinate, at.z) };
+  draft.scenery.push(newScenery(id, kind, place, turn(heading)));
   return id;
 }
 
@@ -562,7 +553,7 @@ export type SceneryPatch = Partial<
   Pick<SceneryItem, 'x' | 'z' | 'heading' | 'solid' | 'width' | 'depth' | 'height' | 'variant'>
 > & { count?: number };
 
-/** Changes a scenery item, within the sizes and looks its kind accepts. */
+/** Changes a scenery item, within the sizes and variants its kind accepts. */
 export function updateScenery(draft: ProjectDraft, id: Id, patch: SceneryPatch) {
   const item = draft.scenery.find((candidate) => candidate.id === id);
   if (!item) return;

@@ -1,6 +1,7 @@
 import { sampleAt } from '../core/track/centerline';
 import type { TrackHit } from '../rendering/plan/hitTest';
 import { t } from '../i18n';
+import { isSceneryTool } from '../stores/editor';
 import type { useUiStore } from '../stores/ui';
 import { pickInLayer } from './layers';
 import type { ToolContext } from './tools';
@@ -18,6 +19,7 @@ export function previewClick(
   shiftKey: boolean,
 ) {
   const road = hit.road;
+  if (isSceneryTool(editor.tool)) return editor.placeScenery(editor.tool, hit.ground);
   switch (editor.tool) {
     case 'barrier':
       if (!road) return;
@@ -54,18 +56,12 @@ export function previewClick(
         else editor.selectPoint(hit.pointId);
         return;
       }
-      if (editor.layer === 'decor' && hit.sceneryId && shiftKey)
+      if (editor.layer === 'scenery' && hit.sceneryId && shiftKey)
         return editor.toggleScenery(hit.sceneryId);
       editor.select(
         pickInLayer(editor.layer, hit, project.project, project.samples, editor.selection),
       );
       return;
-    case 'tree':
-    case 'building':
-    case 'grandstand':
-    case 'sign':
-    case 'light':
-      return editor.placeScenery(editor.tool, hit.ground);
     case 'pan':
       return;
   }

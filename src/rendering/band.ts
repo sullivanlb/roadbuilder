@@ -92,8 +92,12 @@ const ROWS: Record<LayerId, [BandRowId, number][]> = {
     ['start', 1],
   ],
   terrain: [['empty', 1]],
-  decor: [['empty', 1]],
+  // Scenery stands free of the track: nothing to unroll along it.
+  scenery: [],
 };
+
+/** Whether a layer shows the track band: the scenery layer does not. */
+export const hasBand = (layer: LayerId) => ROWS[layer].length > 0;
 
 /** The rows of a layer, stacked in the band. */
 export function bandRows(layer: LayerId, size: BandSize): BandRow[] {

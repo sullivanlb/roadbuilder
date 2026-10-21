@@ -3,16 +3,21 @@ import { computed } from 'vue';
 import { updateScenery } from '../../core/project/edits';
 import type { SceneryPatch } from '../../core/project/edits';
 import { RULES } from '../../core/project/rules';
-import { editableSize, SCENERY_SIZES } from '../../core/project/scenery';
-import { SCENERY_KINDS, SCENERY_VARIANTS } from '../../core/project/schema';
-import type { SceneryKind, SceneryLook } from '../../core/project/schema';
+import {
+  editableSize,
+  SCENERY_SIZE_NAMES,
+  SCENERY_SIZES,
+  SCENERY_VARIANTS,
+} from '../../core/project/scenery';
+import { SCENERY_KINDS } from '../../core/project/schema';
+import type { SceneryKind, SceneryVariant } from '../../core/project/schema';
 import { t } from '../../i18n';
 import type { MessageKey } from '../../i18n';
 import { useEditorStore } from '../../stores/editor';
 import { useProjectStore } from '../../stores/project';
 import AppButton from '../ui/AppButton.vue';
 import AppIcon from '../ui/AppIcon.vue';
-import type { IconName } from '../ui/icons';
+import { SCENERY_ICON } from '../ui/icons';
 import RangeField from '../ui/RangeField.vue';
 import SegmentedControl from '../ui/SegmentedControl.vue';
 import SidebarSection from '../ui/SidebarSection.vue';
@@ -21,15 +26,6 @@ import ToggleField from '../ui/ToggleField.vue';
 /** The scenery items: the kinds to place, and the settings of the selected ones. */
 const store = useProjectStore();
 const editor = useEditorStore();
-
-const KIND_ICON: Record<SceneryKind, IconName> = {
-  tree: 'trees',
-  building: 'building',
-  grandstand: 'grandstands',
-  sign: 'sign',
-  light: 'light',
-};
-const SIZES = ['width', 'depth', 'height'] as const;
 
 const items = computed(() => store.project.scenery);
 const selected = computed(() => editor.selectedScenery);
@@ -44,7 +40,7 @@ const single = computed(() => (selected.value.length === 1 ? selected.value[0] :
 
 const variant = computed({
   get: () => single.value?.variant ?? SCENERY_VARIANTS.tree[0],
-  set: (next: SceneryLook) => edit({ variant: next }),
+  set: (next: SceneryVariant) => edit({ variant: next }),
 });
 const variants = computed(() =>
   (single.value ? SCENERY_VARIANTS[single.value.kind] : []).map((value) => ({
@@ -57,7 +53,7 @@ const variants = computed(() =>
 const sizes = computed(() => {
   const item = single.value;
   if (!item) return [];
-  return SIZES.filter((size) => editableSize(item.kind, size)).map((size) => ({
+  return SCENERY_SIZE_NAMES.filter((size) => editableSize(item.kind, size)).map((size) => ({
     size,
     rule: SCENERY_SIZES[item.kind][size],
     label: t(
@@ -112,7 +108,7 @@ function edit(patch: SceneryPatch) {
         :aria-pressed="editor.tool === kind"
         @click="editor.setTool(kind)"
       >
-        <AppIcon :name="KIND_ICON[kind]" />{{ t(`scenery.${kind}`) }}
+        <AppIcon :name="SCENERY_ICON[kind]" />{{ t(`scenery.${kind}`) }}
       </button>
     </div>
     <div v-if="single" id="scenery-editor" class="editor">
@@ -145,7 +141,6 @@ function edit(patch: SceneryPatch) {
         @commit="store.commit()"
       />
       <RangeField
-        v-if="single.kind !== 'tree'"
         id="scenery-heading"
         :label="t('scenery.heading')"
         :value="single.heading"

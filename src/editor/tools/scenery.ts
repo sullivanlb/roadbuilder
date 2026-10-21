@@ -1,16 +1,12 @@
 import type { PlanPoint } from '../../core/math';
 import type { SceneryKind } from '../../core/project/schema';
 import type { PlanProjection, ScreenPoint } from '../../rendering/plan/projection';
+import { onGrid } from './tool';
 import type { Tool } from './tool';
-
-/** Grid used while Shift is held, in metres. */
-const SNAP = 5;
 
 function placeAt(view: PlanProjection, at: ScreenPoint, snap: boolean): PlanPoint {
   const world = view.toWorld(at);
-  return snap
-    ? { x: Math.round(world.x / SNAP) * SNAP, z: Math.round(world.z / SNAP) * SNAP }
-    : world;
+  return snap ? { x: onGrid(world.x), z: onGrid(world.z) } : world;
 }
 
 /**

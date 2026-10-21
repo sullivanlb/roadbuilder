@@ -54,7 +54,7 @@ describe('track band', () => {
     expect(rows.map((row) => row.id)).toEqual(['left', 'right']);
     expect(rows[0].y).toBe(BAND.top);
     expect(rows[1].y + rows[1].height).toBeCloseTo(size.height - BAND.bottom, 9);
-    expect(bandRows('decor', size).map((row) => row.id)).toEqual(['empty']);
+    expect(bandRows('scenery', size)).toEqual([]);
   });
 
   it('splits a range running through the start of a circuit', () => {

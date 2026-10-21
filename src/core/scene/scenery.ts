@@ -17,11 +17,11 @@ import type { Mesh, Triple } from './mesh';
 /** Walls and posts reach this far below the ground, so nothing floats on uneven terrain. */
 const FOUNDATION = 0.4;
 /** Colliders stop at this height: cars never climb higher. */
-const COLLIDER_TOP = 4;
+const COLLIDER_TOP = 3;
 /** A collider is never thinner than this, so a car touching one face never reaches the other. */
 const COLLIDER_MIN = 1;
 /** Facets of trunks, crowns and poles. */
-const FACETS = 7;
+const FACETS = 6;
 /** Height of one storey of a building, for its window bands. */
 const STOREY = 3.2;
 
@@ -497,6 +497,8 @@ function floorProbes(item: SceneryItem): PlanPoint[] {
 export interface SceneryOutput {
   meshes: Mesh[];
   lights: SceneLight[];
+  /** Height of each item's floor, by ID: where it stands. */
+  floors: Record<string, number>;
 }
 
 /**
@@ -509,11 +511,12 @@ export function buildScenery(
   samples: readonly Sample[],
   ground: readonly Mesh[],
 ): SceneryOutput {
-  if (!project.scenery.length) return { meshes: [], lights: [] };
+  if (!project.scenery.length) return { meshes: [], lights: [], floors: {} };
   const onMesh = meshHeight(ground);
   const smooth = groundHeight(project, samples);
   const heightAt = (p: PlanPoint) => onMesh(p) ?? smooth(p);
   const parts = new Parts();
+  const floors: Record<string, number> = {};
   for (const item of project.scenery) {
     const front = headingVector(item.heading);
     const frame = { x: item.x, z: item.z, y: 0, fx: front.x, fz: front.z };
@@ -524,12 +527,13 @@ export function buildScenery(
         const single = { ...item, count: 1, height: one.height, width: one.crown };
         tree(parts, { ...frame, x, z, y: heightAt({ x, z }) }, single);
       }
+      floors[item.id] = heightAt(item);
       continue;
     }
-    frame.y = Math.min(...floorProbes(item).map(heightAt));
+    frame.y = floors[item.id] = Math.min(...floorProbes(item).map(heightAt));
     BUILDERS[item.kind](parts, frame, item);
   }
   const meshes = [...parts.meshes.values()];
   if (parts.collider.indices.length) meshes.push(parts.collider);
-  return { meshes, lights: parts.lights };
+  return { meshes, lights: parts.lights, floors };
 }

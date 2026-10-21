@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, defineAsyncComponent } from 'vue';
 import { t } from '../../i18n';
+import { hasBand } from '../../rendering/band';
 import { useEditorStore } from '../../stores/editor';
 import type { ViewMode } from '../../stores/editor';
 import { useProjectStore } from '../../stores/project';
@@ -48,7 +49,7 @@ const views = computed(() => [
       </div>
       <ZoomControls />
     </div>
-    <TrackBand />
+    <TrackBand v-if="hasBand(editor.layer)" />
   </section>
 </template>
 

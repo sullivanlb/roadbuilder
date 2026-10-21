@@ -1,5 +1,5 @@
 import { useEventListener } from '@vueuse/core';
-import { useEditorStore } from '../stores/editor';
+import { TURN_STEP, useEditorStore } from '../stores/editor';
 import type { ToolId } from '../stores/editor';
 import { useFilesStore } from '../stores/files';
 import { useProjectStore } from '../stores/project';
@@ -46,8 +46,8 @@ export function useShortcuts() {
     ...editor.layers.map((layer) => ({ key: layer.key, run: () => editor.setLayer(layer.id) })),
     { key: 'delete', run: editor.deleteSelection },
     { key: 'backspace', run: editor.deleteSelection },
-    { key: 'e', run: () => editor.rotateSelectedScenery(15) },
-    { key: 'e', shift: true, run: () => editor.rotateSelectedScenery(-15) },
+    { key: 'e', run: () => editor.turnSelectedScenery(TURN_STEP) },
+    { key: 'e', shift: true, run: () => editor.turnSelectedScenery(-TURN_STEP) },
     { key: 'd', mod: true, run: editor.duplicateSelectedScenery },
     {
       key: 'escape',

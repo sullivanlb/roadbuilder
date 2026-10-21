@@ -18,13 +18,15 @@ export interface Scene {
   markers: Marker[];
   /** The lamps of the lights, lit at night by Custom Shaders Patch. */
   lights: SceneLight[];
+  /** Height of each scenery item's floor, by ID. */
+  sceneryFloors: Record<string, number>;
 }
 
 export function buildScene(
   project: Project,
   samples: readonly Sample[] = sampleTrack(project),
 ): Scene {
-  if (samples.length < 2) return { meshes: [], markers: [], lights: [] };
+  if (samples.length < 2) return { meshes: [], markers: [], lights: [], sceneryFloors: {} };
   const road = buildRoad(project, samples);
   // The terrain is cut around everything that lies on the ground, markings excepted.
   const ground = [road.road, road.shoulders, road.kerbRed, road.kerbWhite, road.pit];
@@ -46,7 +48,12 @@ export function buildScene(
   // Scenery stands on the terrain as meshed, or on the surfaces where it reaches them.
   const scenery = buildScenery(project, samples, [...ground, ...terrain]);
   meshes.push(...scenery.meshes.flatMap(splitMesh));
-  return { meshes, markers: buildMarkers(project, samples), lights: scenery.lights };
+  return {
+    meshes,
+    markers: buildMarkers(project, samples),
+    lights: scenery.lights,
+    sceneryFloors: scenery.floors,
+  };
 }
 
 /** Whether a ground triangle faces down after projection, i.e. the surface folds over itself. */

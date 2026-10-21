@@ -1,16 +1,15 @@
+import type { Id } from '../../core/ids';
 import { updatePoint, updateScenery } from '../../core/project/edits';
 import { findPoint, findRoad, findScenery, trackHitAt } from '../../rendering/plan/hitTest';
 import { pickInLayer } from '../layers';
+import { onGrid } from './tool';
 import type { Gesture, Tool, ToolContext } from './tool';
 import type { ScreenPoint } from '../../rendering/plan/projection';
-
-/** Grid used while Shift is held during a drag, in metres. */
-const SNAP = 5;
 
 /** Drags the selected control points together, the grabbed one snapping to the grid with Shift. */
 function dragPoints(
   { project, editor, viewport }: ToolContext,
-  grabbed: string,
+  grabbed: Id,
   at: ScreenPoint,
 ): Gesture {
   const view = viewport.projection;
@@ -26,8 +25,8 @@ function dragPoints(
       let x = origin.x + pointer.x - grab.x,
         z = origin.z + pointer.z - grab.z;
       if (shiftKey) {
-        x = Math.round(x / SNAP) * SNAP;
-        z = Math.round(z / SNAP) * SNAP;
+        x = onGrid(x);
+        z = onGrid(z);
       }
       const dx = x - origin.x,
         dz = z - origin.z;
@@ -46,7 +45,7 @@ function dragPoints(
 /** Drags the selected scenery items together, the grabbed one snapping to the grid with Shift. */
 function dragScenery(
   { project, editor, viewport }: ToolContext,
-  grabbed: string,
+  grabbed: Id,
   at: ScreenPoint,
 ): Gesture {
   const view = viewport.projection;
@@ -59,8 +58,8 @@ function dragScenery(
       let x = origin.x + pointer.x - grab.x,
         z = origin.z + pointer.z - grab.z;
       if (shiftKey) {
-        x = Math.round(x / SNAP) * SNAP;
-        z = Math.round(z / SNAP) * SNAP;
+        x = onGrid(x);
+        z = onGrid(z);
       }
       const dx = x - origin.x,
         dz = z - origin.z;
@@ -85,8 +84,8 @@ function marquee(
   at: ScreenPoint,
   add: boolean,
 ): Gesture {
-  const decor = editor.layer === 'decor';
-  const before = add ? (decor ? editor.selectedSceneryIds : editor.selectedPointIds) : [];
+  const onScenery = editor.layer === 'scenery';
+  const before = add ? (onScenery ? editor.selectedSceneryIds : editor.selectedPointIds) : [];
   editor.marquee = { x0: at.x, y0: at.y, x1: at.x, y1: at.y };
   return {
     move({ at: now }) {
@@ -99,14 +98,14 @@ function marquee(
       const [top, bottom] = [Math.min(box.y0, box.y1), Math.max(box.y0, box.y1)];
       if (right - left < 4 && bottom - top < 4)
         return void editor.select(add ? editor.selection : null);
-      const inside = (decor ? project.project.scenery : project.project.points)
+      const inside = (onScenery ? project.project.scenery : project.project.points)
         .filter((item) => {
           const p = viewport.projection.toScreen(item);
           return p.x >= left && p.x <= right && p.y >= top && p.y <= bottom;
         })
         .map((item) => item.id);
       const ids = [...new Set([...before, ...inside])];
-      editor.select(ids.length ? { kind: decor ? 'scenery' : 'points', ids } : null);
+      editor.select(ids.length ? { kind: onScenery ? 'scenery' : 'points', ids } : null);
     },
   };
 }
@@ -123,7 +122,7 @@ export const selectTool: Tool = {
   hint: ({ editor }) =>
     editor.layer === 'track'
       ? 'canvas.hintSelect'
-      : editor.layer === 'decor'
+      : editor.layer === 'scenery'
         ? 'canvas.hintSelectScenery'
         : 'canvas.hintSelectLayer',
   press(context, { at, shiftKey }) {
@@ -138,14 +137,15 @@ export const selectTool: Tool = {
       if (!editor.selectedPointIds.includes(id)) editor.selectPoint(id);
       return dragPoints(context, id, at);
     }
-    if (editor.layer === 'decor') {
-      const id = findScenery(view, project.project, at);
+    const hit = trackHitAt(view, project.project, project.samples, at);
+    if (editor.layer === 'scenery') {
+      const picked = pickInLayer('scenery', hit, project.project, project.samples);
+      const id = picked?.kind === 'scenery' ? picked.ids[0] : null;
       if (!id) return marquee(context, at, shiftKey);
       if (shiftKey) return void editor.toggleScenery(id);
       if (!editor.selectedSceneryIds.includes(id)) editor.selectScenery(id);
       return dragScenery(context, id, at);
     }
-    const hit = trackHitAt(view, project.project, project.samples, at);
     editor.select(
       pickInLayer(editor.layer, hit, project.project, project.samples, editor.selection),
     );
@@ -154,7 +154,7 @@ export const selectTool: Tool = {
     editor.hoveredPointId =
       editor.layer === 'track' ? findPoint(viewport.projection, project.project, at) : null;
     editor.hoveredSceneryId =
-      editor.layer === 'decor' ? findScenery(viewport.projection, project.project, at) : null;
+      editor.layer === 'scenery' ? findScenery(viewport.projection, project.project, at) : null;
   },
   doubleClick({ project, editor, viewport }, { at }) {
     if (editor.layer !== 'track') return;

@@ -28,7 +28,7 @@ Add to this file every time a test in game teaches something, and update the sta
 
 **Solid walls (concrete barrier, pit wall) use two vertical faces about a metre apart and no top.** Both block cars. _Confirmed in game._ Why this shape is needed is _assumed_: a thin closed slab with a top at body height was suspected of letting cars through, but the pit wall's real problem turned out to be its name. Forum reports describe double-sided barriers making cars stick to walls ([assettocorsamods.net](https://assettocorsamods.net/threads/assetto-mods-and-track-creation.3349)), so faces close together are best avoided.
 
-**Scenery colliders** are invisible `1WALL_scenery` meshes: vertical faces around the footprint of each solid scenery item, at least a metre apart, open on top, from 0.4 m below the ground to 4 m. Built like the barrier colliders, so they should stop cars; _assumed_ until tried in game.
+**Scenery colliders** are invisible `1WALL_scenery` meshes: vertical faces around the footprint of each solid scenery item, at least a metre apart, open on top, from 0.4 m below the ground to 3 m. Built like the barrier colliders, so they should stop cars; _assumed_ until tried in game.
 
 ## KN5 model
 

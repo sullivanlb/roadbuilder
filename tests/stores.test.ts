@@ -196,14 +196,14 @@ describe('editor', () => {
     const onLane = { ...hit, road: { s: lane.entry + lane.length / 2, side: lane.side } };
     expect(pick('pits', onLane)).toEqual({ kind: 'pitLane' });
     expect(pick('terrain')).toBeNull();
-    expect(pick('decor')).toEqual({ kind: 'scenery', ids: ['tree'] });
+    expect(pick('scenery')).toEqual({ kind: 'scenery', ids: ['tree'] });
   });
 
   it('places scenery facing the track, then turns, copies and deletes the selection', async () => {
     const { project, editor, ui } = stores();
     project.replace(template('club'));
     editor.setTool('grandstand');
-    expect(editor.layer).toBe('decor');
+    expect(editor.layer).toBe('scenery');
     // Beside the main straight, which passes x = -100 at z = 203.
     editor.placeScenery('grandstand', { x: -100, z: 230 });
     const [stand] = project.project.scenery;
@@ -215,7 +215,7 @@ describe('editor', () => {
     const tree = project.project.scenery[1];
     expect(headingVector(tree.heading).z).toBeGreaterThan(0.95);
     editor.select({ kind: 'scenery', ids: [stand.id, tree.id] });
-    editor.rotateSelectedScenery(-15);
+    editor.turnSelectedScenery(-15);
     expect(project.project.scenery.map((item) => item.heading)).toEqual([
       (stand.heading + 345) % 360,
       tree.heading - 15,

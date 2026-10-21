@@ -810,7 +810,7 @@ export function drawPlan(ctx: Context, view: PlanProjection, scene: PlanScene, d
     inLayer(ctx, scene, 'edges', () => drawBarriers(ctx, view, scene));
     drawRange(ctx, view, scene);
   }
-  inLayer(ctx, scene, 'decor', () => drawScenery(ctx, view, scene));
+  inLayer(ctx, scene, 'scenery', () => drawScenery(ctx, view, scene));
   if (scene.layer === 'track') drawCorners(ctx, view, scene);
   drawPoints(ctx, view, scene);
   drawDraft(ctx, view, scene);

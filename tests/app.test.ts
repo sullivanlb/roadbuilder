@@ -542,9 +542,11 @@ describe('editor interface', () => {
     await click('layer-eye-edges');
     expect(stores().editor.hiddenLayers).toEqual(['edges']);
     expect($('layer-eye-edges').getAttribute('aria-pressed')).toBe('false');
-    await click('layer-decor');
+    expect($('band-canvas')).not.toBeNull();
+    await click('layer-scenery');
     expect($('tool-tree')).not.toBeNull();
     expect($('scenery-empty')).not.toBeNull();
+    expect($('band-canvas')).toBeNull();
     // A tool key of another layer moves to that layer.
     press('l');
     await settle();

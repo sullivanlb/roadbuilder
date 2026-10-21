@@ -1,6 +1,6 @@
 import { produce } from 'immer';
 import { describe, expect, it } from 'vitest';
-import { addWidthZone } from '../src/core/project/edits';
+import { addScenery, addWidthZone } from '../src/core/project/edits';
 import { buildScene } from '../src/core/scene/scene';
 import { sampleTrack } from '../src/core/track/centerline';
 import { positionAt } from '../src/core/track/positions';
@@ -36,6 +36,7 @@ describe('3D preview by layers', () => {
       range: { start: 500, length: 100 },
       draft: null,
       hoverS: 50,
+      sceneryFloors: {},
     };
     const overlay = buildOverlay(project, sampleTrack(project), state);
     expect(overlay.strips).toHaveLength(2);
@@ -51,5 +52,26 @@ describe('3D preview by layers', () => {
     expect(track.posts.filter((post) => post.selected).map((post) => post.id)).toEqual([
       project.points[1].id,
     ]);
+  });
+
+  it('outlines the selected scenery items from the floor they stand on', () => {
+    let id = '';
+    const project = produce(template('club'), (draft) => {
+      id = addScenery(draft, 'building', { x: -100, z: 260 });
+    });
+    const scene = buildScene(project);
+    const overlay = buildOverlay(project, sampleTrack(project), {
+      layer: 'scenery',
+      selection: { kind: 'scenery', ids: [id] },
+      range: null,
+      draft: null,
+      hoverS: null,
+      sceneryFloors: scene.sceneryFloors,
+    });
+    const heights = overlay.outlines.filter((_, i) => i % 3 === 1);
+    const floor = scene.sceneryFloors[id];
+    expect(Math.min(...heights)).toBeCloseTo(floor);
+    expect(Math.max(...heights)).toBeCloseTo(floor + project.scenery[0].height);
+    expect(meshLayer('scenery_facade_0', 'scenery')).toBe('scenery');
   });
 });
