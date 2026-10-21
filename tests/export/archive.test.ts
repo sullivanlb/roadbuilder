@@ -71,12 +71,13 @@ describe('Assetto Corsa archive', () => {
       addScenery(draft, 'light', { x: -150, z: 0 });
     });
     const ini = buildArchive(lit, 'assetto', texts).files[config] as string;
+    expect(ini.startsWith('[INCLUDE]\nINCLUDE=common/conditions.ini\n')).toBe(true);
     expect(ini).toContain('[LIGHTING]\nLIT_MULT=1\nCAR_LIGHTS_LIT_MULT=1');
     expect(ini).toContain('[MATERIAL_ADJUSTMENT_0]\nACTIVE=1\nMATERIALS=lamp\nKEY_0=ksEmissive');
     expect(ini).not.toContain('CONDITION_');
     expect(ini.match(/^CONDITION=.*$/gm)).toEqual([
-      'CONDITION=NightLights',
-      'CONDITION=NightLights',
+      'CONDITION=NIGHT_SMOOTH',
+      'CONDITION=NIGHT_SMOOTH',
     ]);
     expect(ini.match(/^\[LIGHT_\d+\]$/gm)).toEqual(['[LIGHT_0]']);
     expect(ini).toMatch(/POSITION=-150(\.\d+)?, [-\d.]+, [-\d.]+/);

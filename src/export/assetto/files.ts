@@ -61,17 +61,20 @@ export const lightingIni = () => ini({ LIGHTING: { SUN_PITCH_ANGLE: 45, SUN_HEAD
 
 const vector = (values: readonly number[]) => values.map((v) => +v.toFixed(3)).join(', ');
 
-/** The CSP condition lighting the lamps: its default one for track lights. */
-const NIGHT = 'NightLights';
+/**
+ * The condition lighting the lamps, from the conditions CSP ships in
+ * extension/config/tracks/common/conditions.ini: on once the sun has set.
+ */
+const NIGHT = 'NIGHT_SMOOTH';
 
 /**
  * extension/ext_config.ini, read by Custom Shaders Patch: one light per lamp and
- * the lamp material glowing brighter, both lit at night (docs/assetto-corsa.md).
- * A custom condition on the sun angle lit nothing in game; lights now use the
- * condition CSP gives them by default.
+ * the lamp material glowing brighter, both lit at night. Laid out like the
+ * configs of tracks whose lights work (docs/assetto-corsa.md).
  */
 export function extConfigIni(lights: readonly SceneLight[]) {
   const sections: IniSections = {
+    INCLUDE: { INCLUDE: 'common/conditions.ini' },
     LIGHTING: { LIT_MULT: 1, CAR_LIGHTS_LIT_MULT: 1 },
     MATERIAL_ADJUSTMENT_0: {
       ACTIVE: 1,
