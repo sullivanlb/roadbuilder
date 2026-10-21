@@ -46,7 +46,7 @@ Add to this file every time a test in game teaches something, and update the sta
 
 **A `[LIGHT_n]` section with `POSITION` and `DIRECTION` places one light**, with `SPOT`, `SPOT_SHARPNESS`, `RANGE`, `RANGE_GRADIENT_OFFSET`, `COLOR` (r, g, b, intensity), `FADE_AT`, `FADE_SMOOTH` and the `CONDITION` controlling its brightness. _Documented_ ([Tracks – Lights](https://cup.acstuff.club/docs/csp/tracks/lights)). Whether our values light the track well is _assumed_.
 
-**A light's `CONDITION` must name a condition the config defines.** The docs give `NightLights` as the default, but no config of the user's CSP defines it, and lights on it stayed off. Installed tracks write `[INCLUDE] INCLUDE = common/conditions.ini`, which CSP ships in `extension/config/tracks/common/` and which defines `NIGHT_SMOOTH` (`INPUT = SUN`, on from 88°), then use `CONDITION = NIGHT_SMOOTH`. The export does the same. _Observed_ in the installed configs; that our lamps then light up is _assumed_ until tried. Earlier exports (a custom sun condition, then `NightLights`) were never seen working: the first test had the file in the wrong place.
+**Lights on `CONDITION = NIGHT_SMOOTH`, with `[INCLUDE] INCLUDE = common/conditions.ini`, light the track at night.** _Confirmed in game_ with Sol. `common/conditions.ini` ships with CSP in `extension/config/tracks/common/` and defines `NIGHT_SMOOTH` (`INPUT = SUN`, on from 88°); installed tracks use it the same way. `NightLights`, given as the default condition by the docs, is defined in no config of the user's CSP, so the export does not rely on it. The night must be set in Content Manager: CSP's log gives the start time of a session (« Weather FX: start time=… »), and `race.ini` its `SUN_ANGLE`.
 
 **`[MATERIAL_ADJUSTMENT_0]` raises `ksEmissive` of the `lamp` material at night** (`ACTIVE`, `MATERIALS`, `KEY_0`, `VALUE_0`, `VALUE_0_OFF`, `CONDITION`). _Assumed_ from a config reported working ([assettocorsamods.net](https://assettocorsamods.net/threads/how-to-model-track-lights-for-custom-shaders-patch.1559/)). It only brightens the lamps; the light on the track comes from the `[LIGHT_n]` sections.
 
@@ -73,4 +73,3 @@ Empty nodes read by the game, each a 4×4 transform with local Y up and local -Z
 
 - Whether timing works on open roads (point-to-point sessions).
 - How the game reads `ai/fast_lane.ai` and `ai/pit_lane.ai` (needed for AI lines).
-- Whether the night lights and glowing lamps work with CSP, and where CSP looks for the track's config.
