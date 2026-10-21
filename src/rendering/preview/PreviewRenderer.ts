@@ -1,3 +1,4 @@
+import type { Texture } from 'three';
 import {
   BoxGeometry,
   BufferGeometry,
@@ -15,17 +16,20 @@ import {
   MeshLambertMaterial,
   PerspectiveCamera,
   Raycaster,
+  RepeatWrapping,
   Scene,
   Spherical,
   SRGBColorSpace,
+  TextureLoader,
   Vector2,
   Vector3,
   WebGLRenderer,
 } from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
+import { SCENERY_TEXTURE_URLS } from '../../assets/scenery';
 import { bounds } from '../../core/math';
 import type { PlanPoint, Vec3 } from '../../core/math';
-import { emissive, MATERIALS } from '../../core/scene/materials';
+import { emissive, look } from '../../core/scene/materials';
 import type { MaterialId } from '../../core/scene/materials';
 import type { Scene as TrackScene } from '../../core/scene/scene';
 import type { Sample } from '../../core/track/centerline';
@@ -64,6 +68,9 @@ export class PreviewRenderer {
   );
   /** One material per scene material, and a see-through one for the layers not edited. */
   private readonly materials = new Map<string, MeshLambertMaterial>();
+  /** The scenery images, loaded once each, shared by plain and dimmed materials. */
+  private readonly textures = new Map<string, Texture>();
+  private readonly loader = new TextureLoader();
   private layers: { active: LayerId; hidden: readonly LayerId[] } = { active: 'track', hidden: [] };
   private readonly highlight = new LineBasicMaterial({ color: COLORS.danger, depthTest: false });
   private frame: number | null = null;
@@ -87,8 +94,15 @@ export class PreviewRenderer {
     const key = `${id}${dimmed ? ':dimmed' : ''}`;
     let material = this.materials.get(key);
     if (!material) {
-      material = new MeshLambertMaterial({ color: rgb(MATERIALS[id].color), side: DoubleSide });
-      if (emissive(id)) material.emissive = material.color.clone().multiplyScalar(emissive(id));
+      const { color, image, alphaTest } = look(id);
+      material = new MeshLambertMaterial({ color: rgb(color), side: DoubleSide });
+      if (image) {
+        // The image shows as loaded; until then the material keeps its colour.
+        material.color.set(0xffffff);
+        material.map = this.texture(image);
+        if (alphaTest) material.alphaTest = 0.5;
+      }
+      if (emissive(id)) material.emissive = rgb(color).multiplyScalar(emissive(id));
       if (dimmed) {
         material.transparent = true;
         material.opacity = INACTIVE_LAYER_ALPHA;
@@ -97,6 +111,18 @@ export class PreviewRenderer {
       this.materials.set(key, material);
     }
     return material;
+  }
+
+  private texture(image: string) {
+    let texture = this.textures.get(image);
+    if (!texture) {
+      texture = this.loader.load(SCENERY_TEXTURE_URLS[image], () => this.requestRender());
+      texture.colorSpace = SRGBColorSpace;
+      texture.wrapS = texture.wrapT = RepeatWrapping;
+      texture.anisotropy = 4;
+      this.textures.set(image, texture);
+    }
+    return texture;
   }
 
   /** Dims what belongs to the layers not being edited and hides the hidden ones. */
@@ -223,6 +249,7 @@ export class PreviewRenderer {
       const geometry = new BufferGeometry();
       geometry.setAttribute('position', new Float32BufferAttribute(mesh.positions, 3));
       geometry.setAttribute('normal', new Float32BufferAttribute(mesh.normals, 3));
+      geometry.setAttribute('uv', new Float32BufferAttribute(mesh.uvs, 2));
       geometry.setIndex(mesh.indices);
       const layer = meshLayer(mesh.name, mesh.kind);
       const shown = new Mesh(
@@ -304,6 +331,7 @@ export class PreviewRenderer {
     for (const child of this.content.children)
       if ('geometry' in child) (child as Mesh).geometry.dispose();
     for (const material of this.materials.values()) material.dispose();
+    for (const texture of this.textures.values()) texture.dispose();
     this.setOverlay({ strips: [], posts: [], outlines: [], cursor: null });
     this.postGeometry.dispose();
     this.cursorMesh.geometry.dispose();

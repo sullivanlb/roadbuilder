@@ -50,6 +50,10 @@ Add to this file every time a test in game teaches something, and update the sta
 
 **`[MATERIAL_ADJUSTMENT_0]` raises `ksEmissive` of the `lamp` material at night** (`ACTIVE`, `MATERIALS`, `KEY_0`, `VALUE_0`, `VALUE_0_OFF`, `CONDITION`). _Assumed_ from a config reported working ([assettocorsamods.net](https://assettocorsamods.net/threads/how-to-model-track-lights-for-custom-shaders-patch.1559/)). It only brightens the lamps; the light on the track comes from the `[LIGHT_n]` sections.
 
+**Foliage uses the alpha-tested shader `ksPerPixelAT`**, with the material's alpha-tested flag set and a PNG whose alpha cuts the leaves out. _Assumed_ from the shaders of the official tracks; to be confirmed in game.
+
+**Texture coordinates start at the top of an image in the game**, as in DirectX: the KN5 writer flips them from the scene, whose origin is at the bottom like Blender and the preview. _Assumed_; boards whose text would read upside down would show it wrong.
+
 ## Markers
 
 Empty nodes read by the game, each a 4×4 transform with local Y up and local -Z forward:

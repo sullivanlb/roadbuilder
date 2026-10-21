@@ -100,6 +100,46 @@ export function offsetPoint(frame: CrossFrame, lateral: number, height = 0): Tri
 /** KN5 indexes vertices with 16 bits: larger meshes are split. */
 export const MAX_MESH_VERTICES = 60000;
 
+/**
+ * Splits a triangle mesh into pieces small enough for 16-bit indices, keeping
+ * whole triangles and the vertices they use; an empty mesh yields none.
+ */
+export function splitTriangles(mesh: Mesh): Mesh[] {
+  const pieces: Mesh[] = [];
+  let piece: Mesh | null = null,
+    remap = new Map<number, number>();
+  for (let i = 0; i < mesh.indices.length; i += 3) {
+    const corners = mesh.indices.slice(i, i + 3);
+    const fresh = corners.filter((index) => !remap.has(index)).length;
+    if (!piece || vertexCount(piece) + fresh > MAX_MESH_VERTICES) {
+      piece = {
+        ...mesh,
+        name: `${mesh.name}_${pieces.length}`,
+        positions: [],
+        normals: [],
+        uvs: [],
+        indices: [],
+      };
+      pieces.push(piece);
+      remap = new Map();
+    }
+    for (const index of corners) {
+      let mapped = remap.get(index);
+      if (mapped === undefined) {
+        mapped = addVertex(
+          piece,
+          vertexPosition(mesh, index),
+          [mesh.normals[index * 3], mesh.normals[index * 3 + 1], mesh.normals[index * 3 + 2]],
+          [mesh.uvs[index * 2], mesh.uvs[index * 2 + 1]],
+        );
+        remap.set(index, mapped);
+      }
+      piece.indices.push(mapped);
+    }
+  }
+  return pieces;
+}
+
 /** Splits a quad-based mesh into pieces small enough for 16-bit indices; an empty mesh yields none. */
 export function splitMesh(mesh: Mesh): Mesh[] {
   const count = vertexCount(mesh);

@@ -1,3 +1,5 @@
+import { readdirSync, readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { createPinia, setActivePinia } from 'pinia';
 import { createApp } from 'vue';
 import { vi } from 'vitest';
@@ -8,6 +10,14 @@ import type { Template } from '../src/core/project/templates';
 import { installPlatform } from '../src/platform/platform';
 import type { KeyValueStorage, OutgoingFile, PickedFile, Platform } from '../src/platform/platform';
 import tightTurn from './fixtures/tight-turn.roadbuilder.json';
+
+const TEXTURES = join(import.meta.dirname, '..', 'src', 'assets', 'scenery', 'textures');
+
+/** The scenery images read from the repository, as the app fetches them for exports. */
+export const sceneryImages = () =>
+  Object.fromEntries(
+    readdirSync(TEXTURES).map((file) => [file, new Uint8Array(readFileSync(join(TEXTURES, file)))]),
+  );
 
 /** A template project with a fixed name. */
 export const template = (name: Template = 'club'): Project => createProject(name, `Test ${name}`);

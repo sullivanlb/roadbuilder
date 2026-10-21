@@ -4,12 +4,12 @@ import type { Sample } from '../track/centerline';
 import { buildBarriers } from './barriers';
 import { buildMarkers } from './markers';
 import type { Marker } from './markers';
-import { splitMesh } from './mesh';
+import { splitMesh, splitTriangles } from './mesh';
 import { buildPitWall } from './pits';
 import type { Mesh } from './mesh';
 import { buildRoad } from './road';
 import { buildScenery } from './scenery';
-import type { SceneLight } from './scenery';
+import type { SceneLight } from './scenery/kit';
 import { buildTerrain } from './terrain';
 
 /** Everything generated from a project to be seen or driven; the preview and the exports share it. */
@@ -47,7 +47,8 @@ export function buildScene(
   meshes.push(...terrain);
   // Scenery stands on the terrain as meshed, or on the surfaces where it reaches them.
   const scenery = buildScenery(project, samples, [...ground, ...terrain]);
-  meshes.push(...scenery.meshes.flatMap(splitMesh));
+  // Scenery holds models made of triangles, not only quads.
+  meshes.push(...scenery.meshes.flatMap(splitTriangles));
   return {
     meshes,
     markers: buildMarkers(project, samples),

@@ -15,7 +15,8 @@ import {
 } from '../../src/core/project/scenery';
 import { parseProject } from '../../src/core/project/schema';
 import { asJson } from '../helpers';
-import { groveTrees, meshHeight } from '../../src/core/scene/scenery';
+import { meshHeight } from '../../src/core/scene/scenery';
+import { groveTrees } from '../../src/core/scene/scenery/grove';
 import { template } from '../helpers';
 
 /** The club circuit with one item of each kind, well outside the track. */
@@ -46,31 +47,46 @@ function windsOutward(mesh: Mesh) {
 }
 
 describe('scenery', () => {
-  it('builds every kind from quads grouped by material, faces winding outward', () => {
+  it('builds every kind by material, built faces winding outward', () => {
     const meshes = scenery(withScenery());
-    expect(meshes.map((mesh) => mesh.name).sort()).toEqual(
-      [
-        'scenery_bark',
-        'scenery_concrete',
-        'scenery_facade',
-        'scenery_foliage',
-        'scenery_glass',
-        'scenery_lamp',
-        'scenery_roof',
-        'scenery_seat',
-        'scenery_signBoard',
-        'scenery_steel',
-        // Buildings and grandstands stop cars by default.
-        '1WALL_scenery',
-      ]
-        .map((name) => `${name}_0`)
-        .sort(),
-    );
+    const names = meshes.map((mesh) => mesh.name);
+    for (const material of [
+      'bark',
+      'leaves',
+      'brick',
+      'stone',
+      'glass',
+      'seat',
+      'sheet',
+      'galvanised',
+      'lamp',
+    ])
+      expect(names, material).toContain(`scenery_${material}_0`);
+    // Buildings and grandstands stop cars by default.
+    expect(names).toContain('1WALL_scenery_0');
+    expect(names.some((name) => /^scenery_ad\d_0$/.test(name))).toBe(true);
+    // Tree models carry smoothed normals; everything else is built from faces.
+    const models = new Set<string>(['bark', 'branches', 'leaves', 'firBark', 'needles']);
     for (const mesh of meshes) {
-      expect(mesh.indices.length, mesh.name).toBe((mesh.positions.length / 12) * 6);
-      expect(windsOutward(mesh), mesh.name).toBe(true);
+      expect(mesh.indices.length % 3, mesh.name).toBe(0);
+      expect(Math.max(...mesh.indices), mesh.name).toBeLessThan(mesh.positions.length / 3);
+      if (!models.has(mesh.material)) expect(windsOutward(mesh), mesh.name).toBe(true);
     }
     expect(meshes.find((mesh) => mesh.name.startsWith('1WALL'))!.visible).toBe(false);
+  });
+
+  it('scales trees to their height, and grows the conifer when asked', () => {
+    const height = (project: Project, material: string) => {
+      const mesh = scenery(project).find((m) => m.material === material)!;
+      const ys = mesh.positions.filter((_, i) => i % 3 === 1);
+      return Math.max(...ys) - Math.min(...ys);
+    };
+    const leafy = withScenery(['tree'], { height: 10 });
+    expect(height(leafy, 'leaves')).toBeGreaterThan(5);
+    expect(height(leafy, 'leaves')).toBeLessThan(10.5);
+    const fir = withScenery(['tree'], { height: 20, variant: 'conifer' });
+    expect(scenery(fir).map((mesh) => mesh.material)).toContain('needles');
+    expect(height(fir, 'needles')).toBeGreaterThan(15);
   });
 
   it('adds a collider only to solid items', () => {
@@ -84,8 +100,8 @@ describe('scenery', () => {
     const project = withScenery(['building']);
     const scene = buildScene(project);
     const ground = meshHeight(scene.meshes.filter((mesh) => mesh.kind === 'terrain'));
-    const facade = scene.meshes.find((mesh) => mesh.name === 'scenery_facade_0')!;
-    const lowest = Math.min(...facade.positions.filter((_, i) => i % 3 === 1));
+    const walls = scene.meshes.find((mesh) => mesh.name === 'scenery_brick_0')!;
+    const lowest = Math.min(...walls.positions.filter((_, i) => i % 3 === 1));
     const item = project.scenery[0];
     const under = ground({ x: item.x, z: item.z })!;
     expect(under).not.toBeNull();
@@ -114,7 +130,8 @@ describe('scenery', () => {
     const scene = buildScene(withScenery(['light', 'light'], { variant: 'double' }));
     expect(scene.lights).toHaveLength(4);
     for (const light of scene.lights) {
-      expect(light.direction[1]).toBeLessThan(-0.9);
+      // Down, leaning a little the way its arm reaches.
+      expect(light.direction[1]).toBeLessThan(-0.85);
       expect(Math.hypot(...light.direction)).toBeCloseTo(1);
     }
   });

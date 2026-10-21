@@ -3,7 +3,13 @@ import { describe, expect, it } from 'vitest';
 import { addBarrier, setRoad } from '../../src/core/project/edits';
 import type { BarrierType, Project, Side } from '../../src/core/project/schema';
 import { barrierLateral } from '../../src/core/scene/barriers';
-import { vertexCount } from '../../src/core/scene/mesh';
+import {
+  addVertex,
+  createMesh,
+  MAX_MESH_VERTICES,
+  splitTriangles,
+  vertexCount,
+} from '../../src/core/scene/mesh';
 import type { Mesh } from '../../src/core/scene/mesh';
 import { buildScene, findFoldedSurface } from '../../src/core/scene/scene';
 import { sampleTrack } from '../../src/core/track/centerline';
@@ -58,6 +64,24 @@ describe('scene', () => {
         indices: mesh.indices.length,
       })),
     ).toMatchSnapshot();
+  });
+
+  it('split triangle meshes for 16-bit indices, keeping every triangle whole', () => {
+    const mesh = createMesh('model', 'bark', 'scenery');
+    // A fan of triangles sharing their first corner, more vertices than one piece holds.
+    const centre = addVertex(mesh, [0, 0, 0], [0, 1, 0], [0, 0]);
+    for (let i = 0; i < MAX_MESH_VERTICES + 10; i++) {
+      addVertex(mesh, [Math.cos(i), 0, Math.sin(i)], [0, 1, 0], [i, 0]);
+      if (i) mesh.indices.push(centre, i, i + 1);
+    }
+    const pieces = splitTriangles(mesh);
+    expect(pieces.map((piece) => piece.name)).toEqual(['model_0', 'model_1']);
+    expect(pieces.reduce((sum, piece) => sum + piece.indices.length, 0)).toBe(mesh.indices.length);
+    for (const piece of pieces) {
+      expect(vertexCount(piece)).toBeLessThanOrEqual(MAX_MESH_VERTICES);
+      expect(piece.indices.every((index) => index < vertexCount(piece))).toBe(true);
+    }
+    expect(splitTriangles(createMesh('empty', 'bark', 'scenery'))).toEqual([]);
   });
 
   it('is empty without a track', () => {

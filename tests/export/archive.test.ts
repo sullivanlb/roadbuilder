@@ -7,7 +7,7 @@ import { crc32 } from '../../src/export/binary/crc32';
 import { zipFiles } from '../../src/export/binary/zip';
 import { ExportError } from '../../src/export/errors';
 import { documentTexts } from '../../src/i18n';
-import { onPoint, template, tightTurnProject } from '../helpers';
+import { onPoint, sceneryImages, template, tightTurnProject } from '../helpers';
 
 const texts = documentTexts('fr');
 
@@ -70,7 +70,7 @@ describe('Assetto Corsa archive', () => {
     const lit = produce(template('club'), (draft) => {
       addScenery(draft, 'light', { x: -150, z: 0 });
     });
-    const ini = buildArchive(lit, 'assetto', texts).files[config] as string;
+    const ini = buildArchive(lit, 'assetto', texts, sceneryImages()).files[config] as string;
     expect(ini.startsWith('[INCLUDE]\nINCLUDE=common/conditions.ini\n')).toBe(true);
     expect(ini).toContain('[LIGHTING]\nLIT_MULT=1\nCAR_LIGHTS_LIT_MULT=1');
     expect(ini).toContain('[MATERIAL_ADJUSTMENT_0]\nACTIVE=1\nMATERIALS=lamp\nKEY_0=ksEmissive');
@@ -120,6 +120,27 @@ describe('OBJ sources', () => {
     expect(archive.files['track.mtl']).toContain('map_Kd texture/kerb_red.png');
     expect(archive.files['texture/concrete.png']).toBeInstanceOf(Uint8Array);
     expect(archive.files['README.txt']).toContain('1WALL');
+  });
+
+  it('ships the scenery images, the foliage cut out where they are transparent', () => {
+    const project = produce(template('club'), (draft) => {
+      addScenery(draft, 'tree', { x: -150, z: 0 });
+      addScenery(draft, 'building', { x: -100, z: 0 });
+    });
+    const images = sceneryImages();
+    const obj = buildArchive(project, 'obj', texts, images);
+    expect(obj.files['texture/leaves.png']).toEqual(images['leaves.png']);
+    expect(obj.files['texture/brick.png']).toEqual(images['brick.png']);
+    expect(obj.files['track.mtl']).toContain('newmtl leaves');
+    expect(obj.files['track.mtl']).toContain('map_d texture/leaves.png');
+    expect(obj.files['track.mtl']).not.toContain('map_d texture/brick.png');
+    const kn5 = buildArchive(project, 'assetto', texts, images).files[
+      'content/tracks/rb_test_club/rb_test_club.kn5'
+    ] as Uint8Array;
+    const text = new TextDecoder('latin1').decode(kn5);
+    expect(text).toContain('ksPerPixelAT');
+    expect(text).toContain('leaves.png');
+    expect(() => buildArchive(project, 'obj', texts)).toThrow('Missing scenery image');
   });
 });
 

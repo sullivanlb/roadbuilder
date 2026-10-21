@@ -342,12 +342,13 @@ describe('editor interface', () => {
     await click('export-project');
     await type('export-author', 'Pilote');
     await click('download-export');
-    await settle(60);
+    // The export job loads on first use, outside the fake clock.
+    await vi.waitFor(() => expect(platform.saved).toHaveLength(1));
     expect(platform.saved.at(-1)!.name).toMatch(/_assetto\.zip$/);
     await click('export-project');
     document.querySelector<HTMLInputElement>('input[value="obj"]')!.click();
     await click('download-export');
-    await settle(60);
+    await vi.waitFor(() => expect(platform.saved).toHaveLength(2));
     expect(platform.saved.at(-1)!.name).toMatch(/_obj\.zip$/);
     expect((await saved()).author).toBe('Pilote');
     await click('new-project');

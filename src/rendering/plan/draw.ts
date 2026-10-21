@@ -7,7 +7,7 @@ import { gridPlaces, pitBoxPlaces } from '../../core/scene/markers';
 import type { Place } from '../../core/scene/markers';
 import { startLine } from '../../core/scene/road';
 import { headingVector, sceneryFootprint } from '../../core/project/scenery';
-import { groveTrees } from '../../core/scene/scenery';
+import { groveTrees } from '../../core/scene/scenery/grove';
 import { sampleAt, trackLength } from '../../core/track/centerline';
 import type { Sample } from '../../core/track/centerline';
 import { arcLayout, corners } from '../../core/track/geometry';

@@ -1,7 +1,22 @@
 /**
- * Look of every material in the scene: base colour (sRGB 0–255), texture grain
- * and, for what glows, how bright it shines by itself.
+ * Look of a material. Most take a generated texture: a base colour (sRGB
+ * 0–255) with some grain. Scenery materials take an image from
+ * src/assets/scenery/textures instead (docs/adr/0014); their colour then
+ * stands for the image where it cannot be shown.
  */
+export interface MaterialLook {
+  color: readonly [number, number, number];
+  grain: number;
+  /** How bright it shines by itself; absent for what does not glow. */
+  emissive?: number;
+  /** File name of its image among the scenery textures. */
+  image?: string;
+  /** Cut out where the image is transparent, like foliage. */
+  alphaTest?: true;
+  /** Metres covered by one repeat of the image, on surfaces that tile it. */
+  tile?: number;
+}
+
 export const MATERIALS = {
   asphalt: { color: [67, 72, 76], grain: 12 },
   grass: { color: [76, 103, 62], grain: 25 },
@@ -13,27 +28,44 @@ export const MATERIALS = {
   tecproRed: { color: [172, 48, 40], grain: 12 },
   tecproWhite: { color: [226, 224, 214], grain: 12 },
   concrete: { color: [186, 184, 176], grain: 12 },
-  bark: { color: [88, 66, 48], grain: 20 },
-  foliage: { color: [64, 98, 50], grain: 30 },
-  conifer: { color: [42, 74, 52], grain: 30 },
-  facade: { color: [198, 190, 172], grain: 12 },
-  roof: { color: [78, 82, 86], grain: 12 },
-  glass: { color: [72, 98, 116], grain: 6 },
-  seat: { color: [52, 92, 150], grain: 8 },
-  signBoard: { color: [226, 172, 46], grain: 6 },
-  steel: { color: [124, 130, 134], grain: 10 },
+  // Scenery: trees.
+  bark: { color: [96, 82, 70], grain: 0, image: 'bark.png' },
+  branches: { color: [110, 96, 80], grain: 0, image: 'branches.png' },
+  leaves: { color: [72, 100, 74], grain: 0, image: 'leaves.png', alphaTest: true },
+  firBark: { color: [80, 66, 56], grain: 0, image: 'fir_bark.png' },
+  needles: { color: [78, 98, 58], grain: 0, image: 'needles.png', alphaTest: true },
+  // Scenery: buildings and grandstands, tiled over their surfaces.
+  brick: { color: [150, 110, 96], grain: 0, image: 'brick.png', tile: 1.6 },
+  stone: { color: [196, 190, 176], grain: 0, image: 'stone.png', tile: 2 },
+  roofing: { color: [96, 96, 94], grain: 0, image: 'roofing.png', tile: 3 },
+  cladding: { color: [128, 136, 142], grain: 0, image: 'cladding.png', tile: 2 },
+  sheet: { color: [146, 150, 154], grain: 0, image: 'sheet.png', tile: 2 },
+  glass: { color: [40, 50, 58], grain: 0, image: 'glass.png' },
+  frame: { color: [20, 22, 24], grain: 6 },
+  door: { color: [34, 44, 54], grain: 6 },
+  seat: { color: [26, 70, 150], grain: 6 },
+  // Scenery: lights and signs.
+  steel: { color: [52, 56, 62], grain: 8 },
+  galvanised: { color: [160, 164, 166], grain: 10 },
+  housing: { color: [62, 64, 68], grain: 6 },
+  grating: { color: [86, 86, 86], grain: 20 },
+  panelBack: { color: [146, 150, 156], grain: 8 },
   lamp: { color: [255, 241, 206], grain: 4, emissive: 0.6 },
-} as const satisfies Record<
-  string,
-  { color: readonly [number, number, number]; grain: number; emissive?: number }
->;
-
-/** How bright a material shines by itself, 0 for what does not glow. */
-export const emissive = (material: MaterialId): number => {
-  const look = MATERIALS[material];
-  return 'emissive' in look ? look.emissive : 0;
-};
+  ad0: { color: [20, 40, 90], grain: 0, image: 'ad_0.png' },
+  ad1: { color: [20, 20, 20], grain: 0, image: 'ad_1.png' },
+  ad2: { color: [180, 20, 20], grain: 0, image: 'ad_2.png' },
+  ad3: { color: [20, 80, 40], grain: 0, image: 'ad_3.png' },
+} as const satisfies Record<string, MaterialLook>;
 
 export type MaterialId = keyof typeof MATERIALS;
 
 export const MATERIAL_IDS = Object.keys(MATERIALS) as MaterialId[];
+
+/** The look of a material, with its optional fields. */
+export const look = (material: MaterialId): MaterialLook => MATERIALS[material];
+
+/** How bright a material shines by itself, 0 for what does not glow. */
+export const emissive = (material: MaterialId): number => look(material).emissive ?? 0;
+
+/** The advertising boards, in turn along a grandstand or by sign. */
+export const AD_MATERIALS = ['ad0', 'ad1', 'ad2', 'ad3'] as const satisfies readonly MaterialId[];

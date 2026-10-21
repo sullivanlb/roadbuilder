@@ -17,14 +17,17 @@ Conservez cette même adresse pour retrouver la sauvegarde automatique. `localho
 
 ## Développement et distribution
 
-| Commande            | Usage                                                            |
-| ------------------- | ---------------------------------------------------------------- |
-| `npm run dev`       | Serveur de développement avec rechargement automatique           |
-| `npm run typecheck` | Typage strict de l’application, de la configuration et des tests |
-| `npm test`          | Tests du domaine, des exports, des stores et de l’interface      |
-| `npm run test:ui`   | Tests de l’interface Vue avec DOM et canvas simulés              |
-| `npm run build`     | Vérification des types et compilation dans `dist/`               |
-| `npm run preview`   | Aperçu local de la compilation, à l’adresse affichée par Vite    |
+| Commande                 | Usage                                                                             |
+| ------------------------ | --------------------------------------------------------------------------------- |
+| `npm run dev`            | Serveur de développement avec rechargement automatique                            |
+| `npm run typecheck`      | Typage strict de l’application, de la configuration et des tests                  |
+| `npm test`               | Tests du domaine, des exports, des stores et de l’interface                       |
+| `npm run test:ui`        | Tests de l’interface Vue avec DOM et canvas simulés                               |
+| `npm run build`          | Vérification des types et compilation dans `dist/`                                |
+| `npm run preview`        | Aperçu local de la compilation, à l’adresse affichée par Vite                     |
+| `npm run assets:scenery` | Reconstruit arbres et textures du décor avec Blender (Python 3 et Blender requis) |
+
+Les assets du décor sont versionnés dans `src/assets/scenery` : la compilation n’a pas besoin de Blender. `npm run assets:scenery` télécharge les sources CC0 de Poly Haven dans `.cache/` et les régénère (docs/adr/0014) ; la variable `BLENDER` indique Blender s’il n’est pas trouvé.
 
 Pour distribuer l’application, servez le contenu de **`dist/`** sur un hébergement statique HTTP(S). Les chemins des ressources sont relatifs pour permettre un sous-répertoire. Aucun PHP ni serveur applicatif n’est requis ; `dist/index.html` n’est pas prévu pour une ouverture directe par double-clic. La sauvegarde automatique est propre à l’adresse de l’hébergement : utilisez l’export/import JSON pour transférer vos projets.
 
@@ -72,7 +75,7 @@ Pour la vérification manuelle : ouvrir les trois modèles et une page blanche, 
 - Largeur variable : portions plus larges ou plus étroites, tracées en deux clics n’importe où sur la piste.
 - Dévers : la chaussée s’incline par portions dans les virages, jusqu’au virage relevé d’un ovale (35°).
 - Barrières avec collision : glissières, pneus, blocs TecPro et murs en béton, tracés en deux clics le long de la piste.
-- Décor : arbres et bosquets, bâtiments, tribunes, panneaux et éclairages posés librement sur le plan ou en 3D, face à la piste ; bâtiments et tribunes arrêtent les voitures (réglable par objet), les éclairages s’allument la nuit avec Custom Shaders Patch.
+- Décor détaillé et texturé (modèles et textures préparés dans Blender à partir de sources CC0) : arbres et bosquets, bâtiments, tribunes, panneaux et éclairages posés librement sur le plan ou en 3D, face à la piste ; bâtiments et tribunes arrêtent les voitures (réglable par objet), les éclairages s’allument la nuit avec Custom Shaders Patch.
 - Terrain complet en herbe, raccordé au relief, à l’intérieur et autour du tracé, avec une marge réglable de 50 à 500 m et des collisions dans Assetto Corsa.
 - Aperçu 3D orientable, où l’on sélectionne et pose comme sur le plan.
 - Annulation et rétablissement des modifications.

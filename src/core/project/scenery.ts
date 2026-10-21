@@ -109,8 +109,8 @@ export function facingTrack(samples: readonly Sample[], at: PlanPoint): number {
   return nearest ? headingTowards(at, nearest) : 0;
 }
 
-/** Half the size of a lamp head along a light's arm, beyond the arm's end. */
-const LAMP_REACH = 0.35;
+/** How far a light's lantern reaches beyond the end of its arm. */
+const LAMP_REACH = 0.75;
 
 /**
  * The rectangle an item covers on the plan, in its own frame: `u` across its

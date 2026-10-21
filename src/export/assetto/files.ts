@@ -1,6 +1,6 @@
 import { isCircuit } from '../../core/project/schema';
 import type { Project } from '../../core/project/schema';
-import type { SceneLight } from '../../core/scene/scenery';
+import type { SceneLight } from '../../core/scene/scenery/kit';
 import { isClockwise } from '../../core/track/centerline';
 import type { Sample, TrackStats } from '../../core/track/centerline';
 import type { DocumentTexts } from '../documents';
