@@ -3,7 +3,7 @@ import { isCircuit } from '../project/schema';
 import type { Project, Side } from '../project/schema';
 import { sampleAt, trackLength } from './centerline';
 import type { Sample } from './centerline';
-import { LAYOUT, roadEdge } from './layout';
+import { clampToBend, LAYOUT, roadEdge } from './layout';
 import { positionDistance } from './positions';
 
 /** How far the lane reaches at one place along it, in metres from the centerline (unsigned). */
@@ -93,6 +93,24 @@ export function sideEdge(
   const edge = roadEdge(project.road, sample);
   if (!lane || lane.side !== side) return edge;
   return Math.max(edge, lane.profile(sample.s)?.outer ?? edge);
+}
+
+/**
+ * Lateral distance from the centerline to the outer edge of the shoulders on one
+ * side. On the inside of a bend they narrow before the centre of curvature, so
+ * they never fold over themselves on tight karting corners.
+ */
+export function shoulderEdge(
+  project: Project,
+  lane: PitLaneLayout | null,
+  sample: Pick<Sample, 's' | 'half' | 'curvature'>,
+  side: Side,
+): number {
+  const inner = sideEdge(project, lane, sample, side);
+  return Math.max(
+    inner,
+    clampToBend(project.road, sample, side === 'right' ? 1 : -1, inner + project.road.shoulder),
+  );
 }
 
 /** How many pit boxes fit along the parallel part of the lane. */

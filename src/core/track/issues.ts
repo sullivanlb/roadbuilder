@@ -9,8 +9,10 @@ import { controlPointSample, sampleTrack, trackStats } from './centerline';
 import { corners, straightSide } from './geometry';
 import type { Sample } from './centerline';
 import { LAYOUT } from './layout';
-import { pitBoxCapacity, pitLaneLayout, sideEdge } from './pitLane';
-import { overlapStart } from './ranges';
+import { earthworkRanges } from './earthworks';
+import { clampToBend } from './layout';
+import { pitBoxCapacity, pitLaneLayout, shoulderEdge, sideEdge } from './pitLane';
+import { overlapStart, rangeSamples } from './ranges';
 import type { TrackRange } from './ranges';
 import { bankZoneRanges } from './bank';
 import { widthZoneRanges } from './width';
@@ -44,7 +46,8 @@ export type TrackIssue =
   | { code: 'bank-zones-overlap' }
   | { code: 'radius-reduced'; point: number; requested: number; actual: number }
   | { code: 'sharp-corner'; point: number; angle: number }
-  | { code: 'scenery-on-track'; count: number; ids: Id[] };
+  | { code: 'scenery-on-track'; count: number; ids: Id[] }
+  | { code: 'earthwork-on-track'; count: number; ids: Id[] };
 
 /** The worst bend of one segment that is too tight for the road width. */
 export interface TightTurn {
@@ -143,11 +146,11 @@ export function trackIssues(
     warnings.push(location.issue);
     locations.push(location);
   }
-  const scenery = sceneryOnTrack(project, samples);
-  if (scenery) {
-    warnings.push(scenery.issue);
-    locations.push(scenery);
-  }
+  for (const location of [sceneryOnTrack(project, samples), earthworksOnTrack(project, samples)])
+    if (location) {
+      warnings.push(location.issue);
+      locations.push(location);
+    }
   return { errors, warnings, tightTurns, locations };
 }
 
@@ -208,6 +211,80 @@ function sharpCorners(project: Project, samples: readonly Sample[]): IssueLocati
       },
     ];
   });
+}
+
+/** Size of the cells samples are filed in, to find the parts of the track near a place. */
+const NEAR_CELL = 20;
+
+/**
+ * Earthworks reaching another part of the track, across a hairpin or onto the pit
+ * lane (docs/adr/0015): their strip would cover its surfaces. Each earthwork is
+ * checked across its width, out from the shoulders, against the parts of the
+ * track farther along than it reaches across.
+ */
+function earthworksOnTrack(project: Project, samples: readonly Sample[]): IssueLocation | null {
+  const ranges = earthworkRanges(project, samples);
+  if (!ranges.length) return null;
+  const lane = pitLaneLayout(project, samples);
+  const shoulders = samples.map((sample) =>
+    SIDES.map((side) => shoulderEdge(project, lane, sample, side)),
+  );
+  const widest = Math.max(...shoulders.flat());
+  const cells = new Map<string, number[]>();
+  const cell = (x: number, z: number) =>
+    `${Math.floor(x / NEAR_CELL)},${Math.floor(z / NEAR_CELL)}`;
+  samples.forEach((sample, i) => {
+    const key = cell(sample.x, sample.z);
+    if (!cells.has(key)) cells.set(key, []);
+    cells.get(key)!.push(i);
+  });
+  const reachCells = Math.ceil(widest / NEAR_CELL);
+  const total = samples.at(-1)!.s;
+  /** Whether a place lies on the track's surfaces away from track distance `s`. */
+  const onTrack = (p: PlanPoint, s: number, away: number) => {
+    const cx = Math.floor(p.x / NEAR_CELL),
+      cz = Math.floor(p.z / NEAR_CELL);
+    for (let x = cx - reachCells; x <= cx + reachCells; x++)
+      for (let z = cz - reachCells; z <= cz + reachCells; z++)
+        for (const j of cells.get(`${x},${z}`) ?? []) {
+          const sample = samples[j];
+          const gap = Math.abs(sample.s - s);
+          if (Math.min(gap, isCircuit(project) ? total - gap : gap) < away) continue;
+          const lateral = (p.x - sample.x) * sample.nx + (p.z - sample.z) * sample.nz;
+          if (planDistance(sample, p) < shoulders[j][lateral < 0 ? 0 : 1]) return true;
+        }
+    return false;
+  };
+  const ids: Id[] = [];
+  let first = -1;
+  for (const { earthwork, ...range } of ranges) {
+    const sign = earthwork.side === 'right' ? 1 : -1;
+    const side = earthwork.side === 'right' ? 1 : 0;
+    const crossing = rangeSamples(samples, range).find((sample) => {
+      const index = Math.max(0, samples.findIndex((other) => other.s >= sample.s) - 1);
+      const edge = shoulders[index][side];
+      return [0, 0.5, 1].some((share) => {
+        const beyond = earthwork.offset + earthwork.width * share;
+        const lateral = sign * clampToBend(project.road, sample, sign, edge + beyond);
+        const p = { x: sample.x + sample.nx * lateral, z: sample.z + sample.nz * lateral };
+        // Parts of the track nearer along it than across belong to the same pass.
+        return onTrack(p, sample.s, 3 * (edge + beyond));
+      });
+    });
+    if (!crossing) continue;
+    ids.push(earthwork.id);
+    if (first < 0)
+      first = Math.max(
+        0,
+        samples.findIndex((sample) => sample.s >= crossing.s),
+      );
+  }
+  if (!ids.length) return null;
+  return {
+    issue: { code: 'earthwork-on-track', count: ids.length, ids },
+    sampleIndex: first,
+    pointIds: [],
+  };
 }
 
 /** Rounded points whose sides leave no room for the radius asked for. */

@@ -2,6 +2,8 @@ import type { Project } from '../project/schema';
 import { sampleTrack } from '../track/centerline';
 import type { Sample } from '../track/centerline';
 import { buildBarriers } from './barriers';
+import { buildEarthworks } from './earthworks';
+import { groundHeight } from './ground';
 import { buildMarkers } from './markers';
 import type { Marker } from './markers';
 import { splitMesh, splitTriangles } from './mesh';
@@ -28,8 +30,9 @@ export function buildScene(
 ): Scene {
   if (samples.length < 2) return { meshes: [], markers: [], lights: [], sceneryFloors: {} };
   const road = buildRoad(project, samples);
+  const earthworks = buildEarthworks(project, samples, groundHeight(project, samples));
   // The terrain is cut around everything that lies on the ground, markings excepted.
-  const ground = [road.road, road.shoulders, road.kerbRed, road.kerbWhite, road.pit];
+  const ground = [road.road, road.shoulders, road.kerbRed, road.kerbWhite, road.pit, ...earthworks];
   const surfaces = [
     road.road,
     road.shoulders,
@@ -44,7 +47,7 @@ export function buildScene(
     ...buildBarriers(project, samples),
   ].flatMap(splitMesh);
   const terrain = buildTerrain(project, samples, ground);
-  meshes.push(...terrain);
+  meshes.push(...earthworks.flatMap(splitTriangles), ...terrain);
   // Scenery stands on the terrain as meshed, or on the surfaces where it reaches them.
   const scenery = buildScenery(project, samples, [...ground, ...terrain]);
   // Scenery holds models made of triangles, not only quads.

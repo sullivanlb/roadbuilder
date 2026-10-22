@@ -135,6 +135,7 @@ const ISSUE_LAYER: Partial<Record<TrackIssue['code'], LayerId>> = {
   'width-zones-overlap': 'road',
   'bank-zones-overlap': 'road',
   'scenery-on-track': 'scenery',
+  'earthwork-on-track': 'terrain',
 };
 
 /** The layer where a track issue is fixed. */

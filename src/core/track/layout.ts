@@ -31,6 +31,8 @@ export const LAYOUT = {
   widthTaper: 20,
   /** Ground beyond the shoulders: kept flat over `flat`, then eased into the far terrain over `blend`. */
   terrain: { flat: 8, blend: 40 },
+  /** Length over which an earthwork takes shape at each end. */
+  earthworkTaper: 15,
 } as const;
 
 export const kerbWidth = (road: RoadSettings) => (road.kerbs ? LAYOUT.kerbWidth : 0);

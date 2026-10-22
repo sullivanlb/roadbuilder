@@ -483,6 +483,8 @@ export const enMessages: Record<MessageKey, string> = {
   'trackIssue.sceneryOnTrack':
     '{count} scenery item reaches the track or its shoulders: move it or make it smaller.|{count} scenery items reach the track or its shoulders: move them or make them smaller.',
   'scenery.onTrack': 'This item reaches the track or its shoulders.',
+  'trackIssue.earthworkOnTrack':
+    '{count} earthwork reaches another part of the track: narrow it or bring it closer.|{count} earthworks reach another part of the track: narrow them or bring them closer.',
   'exportError.foldedSurface':
     'A road or pit edge folds inside a corner. Spread the points, reduce the width or move the start of the track to a straight.',
 

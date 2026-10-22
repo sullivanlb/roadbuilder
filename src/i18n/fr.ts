@@ -504,6 +504,8 @@ export const frMessages = {
   'trackIssue.sceneryOnTrack':
     '{count} objet de décor empiète sur la piste ou ses accotements : déplacez-le ou réduisez-le.|{count} objets de décor empiètent sur la piste ou ses accotements : déplacez-les ou réduisez-les.',
   'scenery.onTrack': 'Cet objet empiète sur la piste ou ses accotements.',
+  'trackIssue.earthworkOnTrack':
+    '{count} terrassement atteint une autre partie de la piste : réduisez sa largeur ou son écart.|{count} terrassements atteignent une autre partie de la piste : réduisez leur largeur ou leur écart.',
   'exportError.foldedSurface':
     'Un bord de route ou de stand se replie dans un virage. Écartez les points, réduisez la largeur ou déplacez le début du tracé vers une ligne droite.',
 

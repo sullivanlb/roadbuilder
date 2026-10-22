@@ -3,8 +3,8 @@ import { isCircuit } from '../project/schema';
 import type { Project, Side } from '../project/schema';
 import { sampleAt, trackLength } from '../track/centerline';
 import type { Sample } from '../track/centerline';
-import { clampToBend, kerbWidth, LAYOUT, roadEdge } from '../track/layout';
-import { pitLaneLayout, sideEdge } from '../track/pitLane';
+import { kerbWidth, LAYOUT, roadEdge } from '../track/layout';
+import { pitLaneLayout, shoulderEdge, sideEdge } from '../track/pitLane';
 import type { PitLaneLayout } from '../track/pitLane';
 import { positionDistance, startLinePosition, wrapDistance } from '../track/positions';
 import { look } from './materials';
@@ -77,19 +77,17 @@ export function buildRoad(project: Project, samples: readonly Sample[]): RoadMes
   };
   const road = project.road,
     kerb = kerbWidth(road);
-  // Shoulders start beyond the kerb, or beyond the pit lane where it runs. On the
-  // inside of a bend they narrow before the centre of curvature, so they never
-  // fold over themselves on tight karting corners.
+  // Shoulders start beyond the kerb, or beyond the pit lane where it runs.
   const shoulder = (a: Sample, b: Sample, side: Side) => {
     const sign = side === 'right' ? 1 : -1;
     const inner = (p: Sample) => sideEdge(project, lane, p, side);
-    const outer = (p: Sample) => clampToBend(road, p, sign, inner(p) + road.shoulder);
+    const outer = (p: Sample) => shoulderEdge(project, lane, p, side);
     strip(
       meshes.shoulders,
       a,
       b,
-      across(sign, inner(a), Math.max(inner(a), outer(a))),
-      across(sign, inner(b), Math.max(inner(b), outer(b))),
+      across(sign, inner(a), outer(a)),
+      across(sign, inner(b), outer(b)),
       -0.04,
     );
   };

@@ -162,6 +162,8 @@ export function formatTrackIssue(issue: TrackIssue, target?: Locale): string {
       return tr('trackIssue.sharpCorner', { point: issue.point + 1, angle: issue.angle });
     case 'scenery-on-track':
       return tr('trackIssue.sceneryOnTrack', { count: issue.count }, issue.count);
+    case 'earthwork-on-track':
+      return tr('trackIssue.earthworkOnTrack', { count: issue.count }, issue.count);
   }
 }
 
