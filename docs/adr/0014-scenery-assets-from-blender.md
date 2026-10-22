@@ -14,3 +14,4 @@ The work is split by what can be known in advance:
 - Foliage is alpha-tested: `ksPerPixelAT` in the KN5, an alpha test in the preview. Texture coordinates follow Blender and the preview (origin at the bottom); the KN5 writer flips them for the game.
 - Scenery meshes are triangle lists, split for 16-bit indices by triangles rather than by quads.
 - A tree is scaled uniformly to its height; a grove scales each tree.
+- The roadway asphalt takes an image too, made from a CC0 track asphalt at twice the resolution of the scenery, since the driver sees it from up close; it repeats every 2 m. Every export therefore loads the images, scenery or not.

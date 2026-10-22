@@ -30,6 +30,13 @@ for name, poly_haven, tint in SURFACES:
     common.save_texture(source(poly_haven), os.path.join(TEXTURES, f'{name}.png'), 512, tint)
     print('SURFACE', name)
 
+# The roadway is seen from up close: twice the resolution. Track asphalt comes
+# out nearly black and brownish: it is made grey and lifted to a worn track's
+# tone (average sRGB colour).
+common.save_texture(source('asphalt_track'), os.path.join(TEXTURES, 'asphalt.png'), 1024,
+                    saturation=0.25, mean=(78, 80, 82))
+print('SURFACE', 'asphalt')
+
 # Glazing: dark inside towards the bottom, the sky reflected towards the top.
 height = 256
 v = np.linspace(0, 1, height)[:, None]

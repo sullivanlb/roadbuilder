@@ -98,14 +98,23 @@ def save_atlas(tiles, size, path):
     return image
 
 
-def save_texture(source, path, size, tint=(1, 1, 1)):
-    """A source image resized to a square of `size` and tinted, saved as PNG."""
+def save_texture(source, path, size, tint=(1, 1, 1), saturation=1.0, mean=None):
+    """A source image resized to a square of `size` and tinted, saved as PNG.
+    `saturation` moves its colours towards grey (0) or away from it; `mean`, an
+    sRGB colour (0-255), rescales each channel so the image averages to it."""
     import numpy as np
 
     image = bpy.data.images.load(source)
     image.scale(size, size)
     pixels = np.array(image.pixels[:], dtype=np.float32).reshape(-1, 4)
-    pixels[:, :3] = np.clip(pixels[:, :3] * np.array(tint, dtype=np.float32), 0, 1)
+    rgb = pixels[:, :3]
+    grey = rgb @ np.array([0.2126, 0.7152, 0.0722], dtype=np.float32)
+    rgb = grey[:, None] + (rgb - grey[:, None]) * saturation
+    if mean is not None:
+        # The pixels of an 8-bit image come as stored, in sRGB.
+        target = np.array(mean, dtype=np.float32) / 255
+        rgb = rgb * target / np.maximum(rgb.mean(axis=0), 1e-6)
+    pixels[:, :3] = np.clip(rgb * np.array(tint, dtype=np.float32), 0, 1)
     out = bpy.data.images.new(os.path.basename(path), size, size, alpha=False)
     out.pixels = pixels.ravel()
     out.filepath_raw = path

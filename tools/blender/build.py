@@ -35,7 +35,7 @@ MODELS = {
     # Its twigs' colour comes as JPEG: the cut-out is a separate map.
     'fir_tree_01': ['twig_alpha'],
 }
-TEXTURES = ['brick_wall_02', 'concrete_wall_008', 'corrugated_iron_02']
+TEXTURES = ['brick_wall_02', 'concrete_wall_008', 'corrugated_iron_02', 'asphalt_track']
 
 
 def fetch(url, path):

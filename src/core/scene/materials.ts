@@ -1,6 +1,6 @@
 /**
  * Look of a material. Most take a generated texture: a base colour (sRGB
- * 0–255) with some grain. Scenery materials take an image from
+ * 0–255) with some grain. Scenery and roadway materials take an image from
  * src/assets/scenery/textures instead (docs/adr/0014); their colour then
  * stands for the image where it cannot be shown.
  */
@@ -18,7 +18,8 @@ export interface MaterialLook {
 }
 
 export const MATERIALS = {
-  asphalt: { color: [67, 72, 76], grain: 12 },
+  // The roadway, a photographed track asphalt at its real scale.
+  asphalt: { color: [78, 80, 82], grain: 0, image: 'asphalt.png', tile: 2 },
   grass: { color: [76, 103, 62], grain: 25 },
   kerbRed: { color: [184, 57, 48], grain: 12 },
   paint: { color: [224, 225, 211], grain: 12 },

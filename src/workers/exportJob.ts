@@ -14,14 +14,15 @@ import type { Locale } from '../i18n';
 export type ExportResult =
   { ok: true; filename: string; bytes: Uint8Array } | { ok: false; detail: ExportErrorDetail };
 
-/** Builds the archive with its documents in the given language, and the scenery textures it needs. */
+/** Builds the archive with its documents in the given language, and the textures it needs. */
 export async function runExport(
   project: Project,
   format: ExportFormat,
   locale: Locale,
 ): Promise<ExportResult> {
   try {
-    const images = project.scenery.length ? await loadSceneryImages() : {};
+    // The roadway always takes images, scenery or not.
+    const images = await loadSceneryImages();
     const archive = buildArchive(project, format, documentTexts(locale), images);
     return { ok: true, filename: archive.filename, bytes: archive.bytes };
   } catch (error) {

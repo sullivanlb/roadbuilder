@@ -23,7 +23,7 @@ const failure = (run: () => unknown) => {
 describe('Assetto Corsa archive', () => {
   it('lays out the track folder with a valid KN5', () => {
     const project = template('club');
-    const archive = buildArchive(project, 'assetto', texts);
+    const archive = buildArchive(project, 'assetto', texts, sceneryImages());
     const root = `content/tracks/rb_test_club/`;
     expect(archive.filename).toBe('rb_test_club_assetto.zip');
     expect(Object.keys(archive.files)).toEqual([
@@ -66,7 +66,9 @@ describe('Assetto Corsa archive', () => {
   it('lights the lamps at night through Custom Shaders Patch', () => {
     const root = `content/tracks/rb_test_club/`;
     const config = `${root}extension/ext_config.ini`;
-    expect(buildArchive(template('club'), 'assetto', texts).files[config]).toBeUndefined();
+    expect(
+      buildArchive(template('club'), 'assetto', texts, sceneryImages()).files[config],
+    ).toBeUndefined();
     const lit = produce(template('club'), (draft) => {
       addScenery(draft, 'light', { x: -150, z: 0 });
     });
@@ -92,7 +94,7 @@ describe('Assetto Corsa archive', () => {
         to: onPoint(draft.points[3]),
       });
     });
-    const archive = buildArchive(project, 'assetto', texts);
+    const archive = buildArchive(project, 'assetto', texts, sceneryImages());
     const kn5 = Object.entries(archive.files).find(([path]) =>
       path.endsWith('.kn5'),
     )![1] as Uint8Array;
@@ -112,7 +114,7 @@ describe('OBJ sources', () => {
         to: onPoint(draft.points[2]),
       });
     });
-    const archive = buildArchive(project, 'obj', texts);
+    const archive = buildArchive(project, 'obj', texts, sceneryImages());
     expect(archive.filename).toBe('rb_test_club_obj.zip');
     expect(archive.files['track.obj']).toContain('mtllib track.mtl');
     expect(archive.files['track.obj']).toContain('o 1GRASS_terrain_0');
@@ -146,12 +148,14 @@ describe('OBJ sources', () => {
 
 describe('export checks', () => {
   it('refuses a track with blocking issues', () => {
-    const issues = failure(() => buildArchive(tightTurnProject(), 'assetto', texts));
+    const issues = failure(() =>
+      buildArchive(tightTurnProject(), 'assetto', texts, sceneryImages()),
+    );
     expect(issues).toBeInstanceOf(ExportError);
     expect(issues.detail.code).toBe('invalid-track');
-    expect(failure(() => buildArchive(template('blank'), 'obj', texts)).detail.code).toBe(
-      'invalid-track',
-    );
+    expect(
+      failure(() => buildArchive(template('blank'), 'obj', texts, sceneryImages())).detail.code,
+    ).toBe('invalid-track');
   });
 });
 

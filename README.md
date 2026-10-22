@@ -210,7 +210,6 @@ Prochaines priorités : **trajectoires IA → dévers**.
 - [x] **Dévers et virages relevés** : incliner la chaussée dans les courbes.
 - [x] **Outils de dessin précis** : ajouter des lignes droites, arcs de cercle et virages à rayon réglable.
 - [x] **Décors à placer** : ajouter arbres, bâtiments, tribunes, panneaux et éclairages (collisions et lumières CSP à valider en jeu).
-- [ ] **Revêtements personnalisés** : choisir asphalte, terre, gravier, marquages et vibreurs par portion.
 - [ ] **Sculpture du terrain** : créer collines, talus, fossés et dégagements.
 - [ ] **Image de fond** : importer un plan ou une vue aérienne et dessiner dessus à l’échelle.
 - [ ] **Départ et chronométrage personnalisables** : déplacer les lignes de départ et d’arrivée ainsi que les secteurs.

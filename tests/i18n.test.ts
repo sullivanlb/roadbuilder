@@ -13,7 +13,7 @@ import {
 import { enMessages } from '../src/i18n/en';
 import { frMessages } from '../src/i18n/fr';
 import type { MessageKey } from '../src/i18n/fr';
-import { template } from './helpers';
+import { sceneryImages, template } from './helpers';
 
 const tooClose = new ExportError({
   code: 'invalid-track',
@@ -163,8 +163,9 @@ describe('English catalogue', () => {
 
   it('localises the archives', () => {
     const project = template('club');
-    const english = buildArchive(project, 'assetto', documentTexts('en'));
-    const french = buildArchive(project, 'assetto', documentTexts('fr'));
+    const images = sceneryImages();
+    const english = buildArchive(project, 'assetto', documentTexts('en'), images);
+    const french = buildArchive(project, 'assetto', documentTexts('fr'), images);
     expect(english.files['INSTALLATION.txt']).toContain('EXPERIMENTAL KN5 EXPORT');
     expect(english.files['INSTALLATION.txt']).toContain('The rb_test_club.roadbuilder.json file');
     expect(french.files['INSTALLATION.txt']).toContain('EXPORT KN5 EXPÉRIMENTAL');
@@ -174,10 +175,10 @@ describe('English catalogue', () => {
     expect(jsonFile(french.files, 'ui/ui_track.json').description).toContain(
       'Créé avec Roadbuilder',
     );
-    const englishObj = buildArchive(project, 'obj', documentTexts('en'));
+    const englishObj = buildArchive(project, 'obj', documentTexts('en'), images);
     expect(englishObj.files['README.txt']).toContain('Import track.obj into Blender');
     expect(englishObj.files['track.obj']).toContain('# Roadbuilder — meters');
-    expect(buildArchive(project, 'obj', documentTexts('fr')).files['track.obj']).toContain(
+    expect(buildArchive(project, 'obj', documentTexts('fr'), images).files['track.obj']).toContain(
       '# Roadbuilder — mètres',
     );
   });

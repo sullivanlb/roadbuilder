@@ -7,6 +7,7 @@ import { clampToBend, kerbWidth, LAYOUT, roadEdge } from '../track/layout';
 import { pitLaneLayout, sideEdge } from '../track/pitLane';
 import type { PitLaneLayout } from '../track/pitLane';
 import { positionDistance, startLinePosition, wrapDistance } from '../track/positions';
+import { look } from './materials';
 import { addQuad, createMesh, offsetPoint } from './mesh';
 import type { Mesh } from './mesh';
 
@@ -24,12 +25,18 @@ export interface RoadMeshes {
 // Samples are guaranteed by the caller: at least two.
 const at = (samples: readonly Sample[], s: number) => sampleAt(samples, s)!;
 
-/** UVs of a strip: one texture tile every 4 m across and along the track. */
-const stripUvs = (a: Sample, b: Sample, left: number, right: number): [number, number][] => [
-  [left / 4, a.s / 4],
-  [right / 4, a.s / 4],
-  [right / 4, b.s / 4],
-  [left / 4, b.s / 4],
+/** UVs of a strip: one texture tile every `tile` metres across and along the track. */
+const stripUvs = (
+  a: Sample,
+  b: Sample,
+  left: number,
+  right: number,
+  tile: number,
+): [number, number][] => [
+  [left / tile, a.s / tile],
+  [right / tile, a.s / tile],
+  [right / tile, b.s / tile],
+  [left / tile, b.s / tile],
 ];
 
 /** A flat strip between two lateral offsets (left < right) at each end, facing up. */
@@ -49,7 +56,8 @@ function strip(
       offsetPoint(b, rightB, height),
       offsetPoint(b, leftB, height),
     ],
-    stripUvs(a, b, leftA, rightA),
+    // Images repeat at their own scale; generated grains every 4 m.
+    stripUvs(a, b, leftA, rightA, look(mesh.material).tile ?? 4),
   );
 }
 
