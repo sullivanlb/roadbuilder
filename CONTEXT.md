@@ -110,11 +110,37 @@ The grass strip beyond the kerbs on each side.
 _Avoid_: verge, run-off
 
 **Terrain** (terrain):
-The ground that fills the area around and inside the track, out to the terrain margin.
+The ground that fills the area around and inside the track, out to the terrain margin and over every hill. Its relief follows the track, shaped by earthworks and hills.
 _Avoid_: ground plane, floor
 
 **Terrain margin** (marge du terrain):
 How far the terrain extends beyond the outermost part of the track.
+
+### Shaping the terrain
+
+**Earthwork** (terrassement):
+A shape given to the ground along a range on one side of the track, beyond the shoulders: an embankment, a ditch or a run-off. It moves with the track.
+_Avoid_: sculpt zone, terrain zone
+
+**Embankment** (talus):
+An earthwork where the ground rises, or falls when its height is negative, over its width at some offset from the shoulders, then holds that level before joining the relief.
+_Avoid_: bank (reserved for banking), slope, berm
+
+**Ditch** (fossé):
+An earthwork hollowing the ground along the track, at some offset from the shoulders.
+_Avoid_: trench, gutter
+
+**Run-off** (dégagement):
+An earthwork keeping the ground flat at the height of the shoulders out to its width, before it joins the relief.
+_Avoid_: gravel trap (a surface laid on it, planned in the edges layer), escape road
+
+**Hill** (colline):
+A rise of the ground placed freely on the plan, oval and oriented, or a hollow when its height is negative. It fades out near the track, whose shoulders keep their heights.
+_Avoid_: mound, bump, sculpt
+
+**Gravel trap** (bac à graviers):
+A gravel surface beside the track, planned in the edges layer.
+_Avoid_: run-off (the shape of the ground)
 
 ### Barriers
 
