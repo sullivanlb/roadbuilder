@@ -1,5 +1,5 @@
 import type { Id } from '../core/ids';
-import { SCENERY_KINDS } from '../core/project/schema';
+import { EARTHWORK_TYPES, SCENERY_KINDS } from '../core/project/schema';
 import type { Project } from '../core/project/schema';
 import type { Sample } from '../core/track/centerline';
 import type { TrackIssue } from '../core/track/issues';
@@ -49,9 +49,9 @@ export const LAYERS: readonly Layer[] = [
     soon: [soon('freehand')],
   },
   { id: 'road', key: '2', tools: ['width', 'bank'], soon: [soon('surface')] },
-  { id: 'edges', key: '3', tools: ['barrier'], soon: [soon('runoff')] },
+  { id: 'edges', key: '3', tools: ['barrier'], soon: [soon('gravel')] },
   { id: 'pits', key: '4', tools: ['pits'], soon: [soon('sectors')] },
-  { id: 'terrain', key: '5', tools: [], soon: [soon('sculpt')] },
+  { id: 'terrain', key: '5', tools: ['hill', ...EARTHWORK_TYPES], soon: [] },
   {
     id: 'scenery',
     key: '6',
@@ -72,6 +72,8 @@ export type Selection =
   | { kind: 'bankZone'; id: Id }
   | { kind: 'pitLane' }
   | { kind: 'scenery'; ids: readonly Id[] }
+  | { kind: 'earthwork'; id: Id }
+  | { kind: 'hill'; id: Id }
   | null;
 
 const SELECTION_LAYER: Record<NonNullable<Selection>['kind'], LayerId> = {
@@ -81,6 +83,8 @@ const SELECTION_LAYER: Record<NonNullable<Selection>['kind'], LayerId> = {
   barrier: 'edges',
   pitLane: 'pits',
   scenery: 'scenery',
+  earthwork: 'terrain',
+  hill: 'terrain',
 };
 
 /** The layer whose elements a selection holds. */
@@ -125,7 +129,9 @@ export function pickInLayer(
     case 'scenery':
       return hit.sceneryId ? { kind: 'scenery', ids: [hit.sceneryId] } : null;
     case 'terrain':
-      return null;
+      // Earthworks lie beside the track, often on a hill: they answer first.
+      if (hit.earthworkId) return { kind: 'earthwork', id: hit.earthworkId };
+      return hit.hillId ? { kind: 'hill', id: hit.hillId } : null;
   }
 }
 

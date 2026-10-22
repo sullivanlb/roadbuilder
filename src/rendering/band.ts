@@ -1,5 +1,5 @@
 import { RULES } from '../core/project/rules';
-import type { BankZone, BarrierType, Project } from '../core/project/schema';
+import type { BankZone, BarrierType, EarthworkType, Project } from '../core/project/schema';
 import { startLine } from '../core/scene/road';
 import { controlPointSample, trackLength, trackStats } from '../core/track/centerline';
 import type { Sample } from '../core/track/centerline';
@@ -8,6 +8,7 @@ import { pitLaneLayout } from '../core/track/pitLane';
 import { positionRange } from '../core/track/ranges';
 import type { TrackRange } from '../core/track/ranges';
 import { bankZoneRanges } from '../core/track/bank';
+import { earthworkRanges } from '../core/track/earthworks';
 import { widthZoneRanges } from '../core/track/width';
 import type { LayerId } from './layers';
 import { BARRIER_STYLE, COLORS } from './theme';
@@ -33,16 +34,7 @@ export interface BandView {
 }
 
 export type BandRowId =
-  | 'altitude'
-  | 'width'
-  | 'zones'
-  | 'bank'
-  | 'bankZones'
-  | 'left'
-  | 'right'
-  | 'lane'
-  | 'start'
-  | 'empty';
+  'altitude' | 'width' | 'zones' | 'bank' | 'bankZones' | 'left' | 'right' | 'lane' | 'start';
 
 export interface BandRow {
   id: BandRowId;
@@ -50,7 +42,8 @@ export interface BandRow {
   height: number;
 }
 
-export type BandBlockKind = 'widthZone' | 'bankZone' | 'barrier' | 'pitLane' | 'startLine';
+export type BandBlockKind =
+  'widthZone' | 'bankZone' | 'barrier' | 'earthwork' | 'pitLane' | 'startLine';
 
 /** Something laid along the track, as drawn in the band. A start line is a block of no length. */
 export interface BandBlock {
@@ -66,11 +59,11 @@ export interface BandBlock {
 export interface BandLabels {
   rows: Record<BandRowId, string>;
   barrier: Record<BarrierType, string>;
+  earthwork: Record<EarthworkType, string>;
   width: (width: number) => string;
   bank: (zone: Pick<BankZone, 'angle' | 'high'>) => string;
   lane: string;
   start: string;
-  empty: string;
   distance: (metres: number) => string;
   corner: (corner: Corner) => string;
 }
@@ -91,7 +84,10 @@ const ROWS: Record<LayerId, [BandRowId, number][]> = {
     ['lane', 1],
     ['start', 1],
   ],
-  terrain: [['empty', 1]],
+  terrain: [
+    ['left', 1],
+    ['right', 1],
+  ],
   // Scenery stands free of the track: nothing to unroll along it.
   scenery: [],
 };
@@ -155,6 +151,15 @@ export function bandBlocks(
           ]
         : [];
     });
+  if (layer === 'terrain')
+    return earthworkRanges(project, samples).map(({ earthwork, start, length }) => ({
+      kind: 'earthwork' as const,
+      id: earthwork.id,
+      row: earthwork.side,
+      range: { start, length },
+      color: COLORS.earthwork[earthwork.type],
+      label: labels.earthwork[earthwork.type],
+    }));
   if (layer === 'pits') {
     const blocks: BandBlock[] = [
       {
@@ -404,12 +409,6 @@ function drawRow(ctx: Context, size: BandSize, scene: BandScene, row: BandRow) {
     ctx.strokeStyle = COLORS.bankZone;
     ctx.lineWidth = 1.5;
     ctx.stroke();
-  }
-  if (row.id === 'empty') {
-    ctx.font = '11px "Segoe UI", sans-serif';
-    ctx.textBaseline = 'middle';
-    ctx.fillStyle = COLORS.band.label;
-    ctx.fillText(scene.labels.empty, BAND.left + 12, row.y + row.height / 2);
   }
 }
 

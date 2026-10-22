@@ -4,6 +4,8 @@ import type { PlanPoint, Vec3 } from '../../core/math';
 import type { Project, Side } from '../../core/project/schema';
 import { barrierPath } from '../../core/scene/barriers';
 import { outsideScenery } from '../../core/project/scenery';
+import { hillAt } from '../../core/project/terrain';
+import { earthworkAt } from '../../core/track/earthworks';
 import type { Sample } from '../../core/track/centerline';
 import { widestHalf } from '../../core/track/layout';
 import type { PlanProjection, ScreenPoint } from './projection';
@@ -129,6 +131,10 @@ export function sceneryAt(project: Project, at: PlanPoint, reach: number): Id | 
   return best;
 }
 
+/** The hill under the cursor, or null. */
+export const findHill = (view: PlanProjection, project: Project, at: ScreenPoint) =>
+  hillAt(project.hills, view.toWorld(at))?.id ?? null;
+
 /** The scenery item under the cursor, or null. */
 export const findScenery = (view: PlanProjection, project: Project, at: ScreenPoint) =>
   sceneryAt(project, view.toWorld(at), PICK.scenery / view.camera.scale);
@@ -142,7 +148,15 @@ export interface TrackHit {
   pointId: Id | null;
   barrierId: Id | null;
   sceneryId: Id | null;
+  earthworkId: Id | null;
+  hillId: Id | null;
 }
+
+/** The earthwork and the hill at a place on the ground, whatever the view. */
+const terrainAt = (project: Project, samples: readonly Sample[], at: PlanPoint) => ({
+  earthworkId: earthworkAt(project, samples, at)?.id ?? null,
+  hillId: hillAt(project.hills, at)?.id ?? null,
+});
 
 /** Everything under the cursor that a click could pick. */
 export function trackHitAt(
@@ -157,6 +171,7 @@ export function trackHitAt(
     pointId: findPoint(view, project, at),
     barrierId: findBarrier(view, project, samples, at),
     sceneryId: findScenery(view, project, at),
+    ...terrainAt(project, samples, view.toWorld(at)),
   };
 }
 
@@ -212,5 +227,6 @@ export function trackHitNear(
     pointId: point,
     barrierId,
     sceneryId: sceneryAt(project, at, REACH.scenery),
+    ...terrainAt(project, samples, at),
   };
 }

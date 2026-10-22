@@ -43,6 +43,8 @@ export const COLORS = {
   pits: { lane: '#596264', wall: '#ddd9c9', box: '#d3f47d99', grid: '#e4e9d6aa' },
   profile: { grid: '#39504355', line: '#bddb86', fillTop: '#a7cb5e40', fillBottom: '#a7cb5e03' },
   preview: { sky: '#17251f' },
+  earthwork: { embankment: '#b59a6acc', ditch: '#6f9fb0cc', runoff: '#c9cfa9cc' },
+  hill: { rise: '#b59a6a', hollow: '#6f9fb0', fill: '#b59a6a1c', hollowFill: '#6f9fb01c' },
   scenery: {
     leafy: '#5d8a46cc',
     conifer: '#3e6b4ecc',

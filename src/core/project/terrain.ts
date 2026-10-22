@@ -72,6 +72,18 @@ export function hillLift(hill: Hill, p: PlanPoint): number {
 /** How far a hill reaches from its centre, in metres. */
 export const hillReach = (hill: Hill) => Math.max(hill.width, hill.depth) / 2;
 
+/** The hill covering a place on the plan, or null: the smallest wins, so a hill on a larger one can be picked. */
+export function hillAt(hills: readonly Hill[], at: PlanPoint): Hill | null {
+  let found: Hill | null = null;
+  for (const hill of hills)
+    if (
+      hillRadius(hill, at) <= 1 &&
+      (!found || hill.width * hill.depth < found.width * found.depth)
+    )
+      found = hill;
+  return found;
+}
+
 /** What a new hill looks like: an oval rise, longer across its heading. */
 export const HILL_DEFAULTS: Pick<Hill, 'width' | 'depth' | 'height'> = {
   width: 120,

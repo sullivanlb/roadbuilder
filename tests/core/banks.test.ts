@@ -268,6 +268,8 @@ describe('road layer picking', () => {
       pointId: null,
       barrierId: null,
       sceneryId: null,
+      earthworkId: null,
+      hillId: null,
     };
     const pick = (current: Parameters<typeof pickInLayer>[4]) =>
       pickInLayer('road', hit, project, samples, current);

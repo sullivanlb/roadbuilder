@@ -23,6 +23,10 @@ import { pitLaneLayout, sideEdge } from '../../src/core/track/pitLane';
 import { pointDistance, positionAt } from '../../src/core/track/positions';
 import { positionRange } from '../../src/core/track/ranges';
 import { issueLayer } from '../../src/editor/layers';
+import { bandBlocks } from '../../src/rendering/band';
+import type { BandLabels } from '../../src/rendering/band';
+import { buildOverlay } from '../../src/rendering/preview/overlay';
+import type { OverlayState } from '../../src/rendering/preview/overlay';
 import { asJson, template } from '../helpers';
 
 /** A project with an earthwork of a type from track distance `from` to `to`. */
@@ -339,5 +343,28 @@ describe('hills', () => {
     const floor = buildScene(project).sceneryFloors[project.scenery[0].id];
     expect(floor).toBeCloseTo(groundHeight(project, sampleTrack(project))(top), 0);
     expect(floor).toBeGreaterThan(groundHeight(club, sampleTrack(club))(top) + 10);
+  });
+});
+
+describe('earthworks and hills in the views', () => {
+  it('shows earthworks as blocks of the terrain band and outlines the selection in 3D', () => {
+    const base = withEarthwork(template('club'), 'ditch', 100, 300, 'left');
+    const project = produce(base, (draft) => {
+      addHill(draft, { x: -100, z: 60 });
+    });
+    const samples = sampleTrack(project);
+    const labels = { earthwork: { embankment: 'E', ditch: 'D', runoff: 'R' } };
+    const blocks = bandBlocks(project, samples, 'terrain', labels as unknown as BandLabels);
+    expect(blocks).toMatchObject([{ kind: 'earthwork', row: 'left', label: 'D' }]);
+    expect(blocks[0].range.length).toBeCloseTo(200, 0);
+    const state = { layer: 'terrain', range: null, draft: null, sceneryFloors: {}, hoverS: null };
+    for (const selection of [
+      { kind: 'earthwork', id: project.earthworks[0].id },
+      { kind: 'hill', id: project.hills[0].id },
+    ] as const) {
+      const { outlines } = buildOverlay(project, samples, { ...state, selection } as OverlayState);
+      expect(outlines.length).toBeGreaterThan(24);
+      expect(outlines.every(Number.isFinite)).toBe(true);
+    }
   });
 });

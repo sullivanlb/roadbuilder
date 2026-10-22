@@ -1,7 +1,7 @@
 import { sampleAt } from '../core/track/centerline';
 import type { TrackHit } from '../rendering/plan/hitTest';
 import { t } from '../i18n';
-import { isSceneryTool } from '../stores/editor';
+import { isEarthworkTool, isSceneryTool } from '../stores/editor';
 import type { useUiStore } from '../stores/ui';
 import { pickInLayer } from './layers';
 import type { ToolContext } from './tools';
@@ -20,6 +20,13 @@ export function previewClick(
 ) {
   const road = hit.road;
   if (isSceneryTool(editor.tool)) return editor.placeScenery(editor.tool, hit.ground);
+  if (editor.tool === 'hill') return editor.placeHill(hit.ground);
+  if (isEarthworkTool(editor.tool)) {
+    if (!road) return;
+    if (editor.earthworkDraft) editor.completeEarthwork(road.s);
+    else editor.beginEarthwork(road);
+    return;
+  }
   switch (editor.tool) {
     case 'barrier':
       if (!road) return;
@@ -78,4 +85,5 @@ export function previewHover(
   if (editor.widthDraft !== null) editor.widthTarget = road?.s ?? null;
   if (editor.bankDraft !== null) editor.bankTarget = road?.s ?? null;
   if (editor.pitDraft) editor.pitTarget = road;
+  if (editor.earthworkDraft) editor.earthworkTarget = road?.s ?? null;
 }

@@ -6,17 +6,23 @@ import {
   addArc,
   addBankZone,
   addBarrier,
+  addEarthwork,
+  addHill,
   addScenery,
   arcRejection,
   addWidthZone,
   bankZoneRejection,
   barrierRejection,
   duplicateScenery,
+  earthworkRejection,
+  hillRejection,
   insertPoint,
   opposite,
   pointRejection,
   removeBankZone,
   removeBarrier,
+  removeEarthwork,
+  removeHill,
   removePoint,
   removePoints,
   removeScenery,
@@ -27,13 +33,22 @@ import {
   setPitLane,
   setStraight,
   updateBarrier,
+  updateEarthwork,
   updateScenery,
   widthZoneRejection,
 } from '../core/project/edits';
 import { RULES } from '../core/project/rules';
 import { facingTrack, newScenery } from '../core/project/scenery';
-import { isCircuit, SCENERY_KINDS } from '../core/project/schema';
-import type { BarrierType, SceneryItem, SceneryKind, Side } from '../core/project/schema';
+import { EARTHWORK_TYPES, isCircuit, SCENERY_KINDS } from '../core/project/schema';
+import type {
+  BarrierType,
+  EarthworkType,
+  Hill,
+  SceneryItem,
+  SceneryKind,
+  Side,
+} from '../core/project/schema';
+import { HILL_DEFAULTS } from '../core/project/terrain';
 import { outsideOf } from '../core/track/bank';
 import { trackLength } from '../core/track/centerline';
 import { LAYOUT } from '../core/track/layout';
@@ -61,11 +76,17 @@ export type ToolId =
   | 'width'
   | 'bank'
   | SceneryKind
+  | 'hill'
+  | EarthworkType
   | 'pan';
 
 /** Whether a tool places scenery: each kind of scenery is placed by its own tool. */
 export const isSceneryTool = (tool: ToolId): tool is SceneryKind =>
   (SCENERY_KINDS as readonly ToolId[]).includes(tool);
+
+/** Whether a tool lays an earthwork: each type is laid by its own tool. */
+export const isEarthworkTool = (tool: ToolId): tool is EarthworkType =>
+  (EARTHWORK_TYPES as readonly ToolId[]).includes(tool);
 
 /** How far the turn shortcuts turn scenery, in degrees: three steps of the heading. */
 export const TURN_STEP = 3 * RULES.heading.step;
@@ -116,6 +137,12 @@ export const useEditorStore = defineStore('editor', () => {
   /** Where the next scenery item would be placed, under the pointer. */
   const sceneryPointer = ref<PlanPoint | null>(null);
   const hoveredSceneryId = ref<Id | null>(null);
+  /** First click of the earthwork being laid: where it starts, on which side. */
+  const earthworkDraft = ref<RoadSpot | null>(null);
+  /** Track distance where the next earthwork click would land. */
+  const earthworkTarget = ref<number | null>(null);
+  /** Where the next hill would be raised, under the pointer. */
+  const hillPointer = ref<PlanPoint | null>(null);
 
   const selected = <K extends NonNullable<Selection>['kind']>(kind: K) =>
     computed(() => {
@@ -132,6 +159,14 @@ export const useEditorStore = defineStore('editor', () => {
   const selectedWidthZoneId = computed(() => selected('widthZone').value?.id ?? null);
   const selectedBankZoneId = computed(() => selected('bankZone').value?.id ?? null);
   const selectedSceneryIds = computed(() => selected('scenery').value?.ids ?? []);
+  const selectedEarthworkId = computed(() => selected('earthwork').value?.id ?? null);
+  const selectedHillId = computed(() => selected('hill').value?.id ?? null);
+  const selectedEarthwork = computed(() =>
+    store.project.earthworks.find((earthwork) => earthwork.id === selectedEarthworkId.value),
+  );
+  const selectedHill = computed(() =>
+    store.project.hills.find((hill) => hill.id === selectedHillId.value),
+  );
   const selectedScenery = computed(() =>
     store.project.scenery.filter((item) => selectedSceneryIds.value.includes(item.id)),
   );
@@ -173,6 +208,13 @@ export const useEditorStore = defineStore('editor', () => {
     if (!isSceneryTool(kind) || !at) return null;
     return newScenery('ghost', kind, at, facingTrack(store.samples, at));
   });
+  /** The hill the hill tool would raise under the pointer, to show it beforehand. */
+  const hillGhost = computed<Hill | null>(() => {
+    const at = hillPointer.value;
+    return tool.value === 'hill' && at
+      ? { id: 'ghost', x: at.x, z: at.z, heading: 0, ...HILL_DEFAULTS }
+      : null;
+  });
   /** Located issues around the selected control point. */
   const selectedIssues = computed(() =>
     store.issues.locations.filter(
@@ -201,6 +243,10 @@ export const useEditorStore = defineStore('editor', () => {
         return project.bankZones.some((z) => z.id === current.id) ? current : null;
       case 'pitLane':
         return project.pitLane ? current : null;
+      case 'earthwork':
+        return project.earthworks.some((e) => e.id === current.id) ? current : null;
+      case 'hill':
+        return project.hills.some((h) => h.id === current.id) ? current : null;
       case 'scenery': {
         const ids = current.ids.filter((id) => project.scenery.some((item) => item.id === id));
         return ids.length === current.ids.length
@@ -238,6 +284,9 @@ export const useEditorStore = defineStore('editor', () => {
     bankTarget.value = null;
     drawPointer.value = null;
     sceneryPointer.value = null;
+    earthworkDraft.value = null;
+    earthworkTarget.value = null;
+    hillPointer.value = null;
   }
 
   /** Works on another layer: its tools, its elements, and what was selected in it before. */
@@ -280,8 +329,14 @@ export const useEditorStore = defineStore('editor', () => {
       bankDraft.value = null;
       bankTarget.value = null;
     }
+    // A draft carries on from one earthwork type to another: its type is the tool's.
+    if (!isEarthworkTool(next)) {
+      earthworkDraft.value = null;
+      earthworkTarget.value = null;
+    }
     drawPointer.value = null;
     sceneryPointer.value = null;
+    hillPointer.value = null;
   }
 
   function setView(next: ViewMode) {
@@ -368,6 +423,20 @@ export const useEditorStore = defineStore('editor', () => {
     return true;
   }
 
+  /** Lays an earthwork of a type over a stretch, on a side, and selects it; false when it is refused. */
+  function layEarthwork(stretch: TrackRange, side: Side, type: EarthworkType): boolean {
+    const rejection = earthworkRejection(store.project, stretch);
+    if (rejection === 'too-short')
+      return refuse(t('toast.earthworkTooShort', { min: RULES.rangeLength }));
+    if (rejection === 'earthworks-limit')
+      return refuse(t('toast.earthworksLimit', { max: RULES.earthworks.max }));
+    const id = store.edit((project) =>
+      addEarthwork(project, { type, side, ...rangeEnds(stretch) }),
+    );
+    selection.value = { kind: 'earthwork', id };
+    return true;
+  }
+
   /** Lays the pit lane over a stretch, entry first; false when it is refused. */
   function layPitLane(stretch: TrackRange, side: Side): boolean {
     if (!isCircuit(store.project)) return refuse(t('pits.roadOnly'));
@@ -408,6 +477,14 @@ export const useEditorStore = defineStore('editor', () => {
     if (stretch && sides.every((side) => layBarrier(stretch, side))) {
       range.value = null;
       ui.notify(t('toast.barrierAdded'));
+    }
+  }
+
+  function earthworksOnRange(type: EarthworkType, sides: Side[]) {
+    const stretch = range.value;
+    if (stretch && sides.every((side) => layEarthwork(stretch, side, type))) {
+      range.value = null;
+      ui.notify(t('toast.earthworkAdded'));
     }
   }
 
@@ -667,10 +744,71 @@ export const useEditorStore = defineStore('editor', () => {
     selection.value = { kind: 'scenery', ids: copies };
   }
 
-  /** Deletes what is selected, when it can be deleted from the keyboard: points or scenery. */
+  /** Deletes what is selected, when it can be deleted from the keyboard: points, scenery, earthworks or hills. */
   function deleteSelection() {
-    if (selection.value?.kind === 'scenery') deleteSelectedScenery();
+    const kind = selection.value?.kind;
+    if (kind === 'scenery') deleteSelectedScenery();
+    else if (kind === 'earthwork') deleteSelectedEarthwork();
+    else if (kind === 'hill') deleteSelectedHill();
     else deleteSelectedPoint();
+  }
+
+  function beginEarthwork(spot: RoadSpot) {
+    earthworkDraft.value = spot;
+  }
+
+  function cancelEarthwork() {
+    earthworkDraft.value = null;
+  }
+
+  /**
+   * Second click: the other end. The earthwork, of the type of the active tool,
+   * covers the stretch between the two clicks.
+   */
+  function completeEarthwork(s: number) {
+    const draft = earthworkDraft.value;
+    if (!draft) return;
+    const type = isEarthworkTool(tool.value) ? tool.value : 'embankment';
+    const stretch = rangeBetween(store.project, store.samples, draft.s, s);
+    if (!layEarthwork(stretch, draft.side, type)) return;
+    earthworkDraft.value = null;
+    earthworkTarget.value = null;
+    ui.notify(t('toast.earthworkAdded'));
+  }
+
+  const selectEarthwork = (id: Id | null) => select(id ? { kind: 'earthwork', id } : null);
+  const selectHill = (id: Id | null) => select(id ? { kind: 'hill', id } : null);
+
+  function swapSelectedEarthworkSide() {
+    const earthwork = selectedEarthwork.value;
+    if (earthwork)
+      store.edit((draft) =>
+        updateEarthwork(draft, earthwork.id, { side: opposite(earthwork.side) }),
+      );
+  }
+
+  function deleteSelectedEarthwork() {
+    const earthwork = selectedEarthwork.value;
+    if (!earthwork) return;
+    const earthworks = store.project.earthworks;
+    const index = earthworks.indexOf(earthwork);
+    store.edit((draft) => removeEarthwork(draft, earthwork.id));
+    selectEarthwork(store.project.earthworks[Math.min(index, earthworks.length - 2)]?.id ?? null);
+  }
+
+  /** Raises a hill of the default size at `at` and selects it. */
+  function placeHill(at: PlanPoint) {
+    if (hillRejection(store.project))
+      return void refuse(t('toast.hillsLimit', { max: RULES.hills.max }));
+    const id = store.edit((draft) => addHill(draft, at));
+    selection.value = { kind: 'hill', id };
+  }
+
+  function deleteSelectedHill() {
+    const hill = selectedHill.value;
+    if (!hill) return;
+    store.edit((draft) => removeHill(draft, hill.id));
+    selection.value = null;
   }
 
   /** Chooses the type of the next barrier, and of the selected one if any. */
@@ -726,6 +864,14 @@ export const useEditorStore = defineStore('editor', () => {
     sceneryPointer,
     hoveredSceneryId,
     sceneryGhost,
+    earthworkDraft,
+    earthworkTarget,
+    hillPointer,
+    hillGhost,
+    selectedEarthworkId,
+    selectedEarthwork,
+    selectedHillId,
+    selectedHill,
     selectedSceneryIds,
     selectedScenery,
     drawFrom,
@@ -748,6 +894,7 @@ export const useEditorStore = defineStore('editor', () => {
     bankZoneOnRange,
     barriersOnRange,
     pitLaneOnRange,
+    earthworksOnRange,
     selectPoint,
     togglePoint,
     shiftSelectedAltitude,
@@ -784,5 +931,14 @@ export const useEditorStore = defineStore('editor', () => {
     turnSelectedScenery,
     duplicateSelectedScenery,
     deleteSelection,
+    beginEarthwork,
+    cancelEarthwork,
+    completeEarthwork,
+    selectEarthwork,
+    selectHill,
+    swapSelectedEarthworkSide,
+    deleteSelectedEarthwork,
+    placeHill,
+    deleteSelectedHill,
   };
 });

@@ -1,13 +1,16 @@
 import type { Id } from '../../core/ids';
+import type { PlanPoint } from '../../core/math';
 import type { Project, SceneryItem } from '../../core/project/schema';
 import type { MeshKind } from '../../core/scene/mesh';
 import { barrierLateral, barrierSamples } from '../../core/scene/barriers';
 import { offsetPoint } from '../../core/scene/mesh';
-import { sceneryFootprint } from '../../core/project/scenery';
+import { headingVector, sceneryFootprint } from '../../core/project/scenery';
+import { groundHeight } from '../../core/scene/ground';
 import { sampleAt } from '../../core/track/centerline';
 import type { Sample } from '../../core/track/centerline';
 import { kerbWidth } from '../../core/track/layout';
-import { pitLaneLayout } from '../../core/track/pitLane';
+import { earthworkRanges } from '../../core/track/earthworks';
+import { pitLaneLayout, shoulderEdge } from '../../core/track/pitLane';
 import { positionRange, rangeSamples } from '../../core/track/ranges';
 import type { TrackRange } from '../../core/track/ranges';
 import type { LayerId } from '../layers';
@@ -60,7 +63,10 @@ export interface OverlayPost {
 /** Everything drawn over the scene to show what is being edited. */
 export interface PreviewOverlay {
   strips: OverlayStrip[];
-  /** Line segments drawn over everything, two points each: the boxes around selected scenery. */
+  /**
+   * Line segments drawn over everything, two points each: the boxes around
+   * selected scenery, the outline of a selected earthwork or hill.
+   */
   outlines: number[];
   posts: OverlayPost[];
   /** Where the pointer is along the track: a bar across the road, tilted with its bank. */
@@ -85,6 +91,8 @@ export interface OverlayState {
     | { kind: 'bankZone'; id: Id }
     | { kind: 'pitLane' }
     | { kind: 'scenery'; ids: readonly Id[] }
+    | { kind: 'earthwork'; id: Id }
+    | { kind: 'hill'; id: Id }
     | null;
   range: TrackRange | null;
   /** The stretch being laid with a two-click tool. */
@@ -95,6 +103,18 @@ export interface OverlayState {
 }
 
 const LIFT = 0.12;
+/** Height of the outlines of terrain shapes above the ground, clear of its coarse mesh. */
+const OUTLINE_LIFT = 0.4;
+
+/** A closed ring of places on the ground, as line segments just above it. */
+function groundRing(ring: readonly PlanPoint[], height: (p: PlanPoint) => number): number[] {
+  const lines: number[] = [];
+  ring.forEach((p, i) => {
+    const q = ring[(i + 1) % ring.length];
+    lines.push(p.x, height(p) + OUTLINE_LIFT, p.z, q.x, height(q) + OUTLINE_LIFT, q.z);
+  });
+  return lines;
+}
 
 /** A strip between two signed lateral offsets along samples. */
 function strip(
@@ -116,6 +136,40 @@ function strip(
     positions.push(...a0, ...a1, ...b1, ...a0, ...b1, ...b0);
   }
   return { positions, color, opacity };
+}
+
+/** The outline on the plan of the selected earthwork or hill, or nothing when it is gone. */
+function terrainOutline(
+  project: Project,
+  samples: readonly Sample[],
+  selection: { kind: 'earthwork' | 'hill'; id: Id },
+): PlanPoint[] {
+  if (selection.kind === 'hill') {
+    const hill = project.hills.find((candidate) => candidate.id === selection.id);
+    if (!hill) return [];
+    const front = headingVector(hill.heading);
+    return Array.from({ length: 48 }, (_, k) => {
+      const u = (Math.cos((k * Math.PI) / 24) * hill.width) / 2,
+        v = (Math.sin((k * Math.PI) / 24) * hill.depth) / 2;
+      return { x: hill.x + front.x * v - front.z * u, z: hill.z + front.z * v + front.x * u };
+    });
+  }
+  const found = earthworkRanges(project, samples).find(
+    (range) => range.earthwork.id === selection.id,
+  );
+  if (!found) return [];
+  const { earthwork, ...range } = found;
+  const lane = pitLaneLayout(project, samples);
+  const sign = earthwork.side === 'right' ? 1 : -1;
+  const beside = (sample: Sample, beyond: number) => {
+    const lateral = sign * (shoulderEdge(project, lane, sample, earthwork.side) + beyond);
+    return { x: sample.x + sample.nx * lateral, z: sample.z + sample.nz * lateral };
+  };
+  const path = rangeSamples(samples, range);
+  return [
+    ...path.map((sample) => beside(sample, 0)),
+    ...[...path].reverse().map((sample) => beside(sample, earthwork.offset + earthwork.width)),
+  ];
 }
 
 export function buildOverlay(
@@ -176,6 +230,10 @@ export function buildOverlay(
         ),
       );
     }
+  }
+  if (selection?.kind === 'earthwork' || selection?.kind === 'hill') {
+    const height = groundHeight(project, samples);
+    overlay.outlines.push(...groundRing(terrainOutline(project, samples, selection), height));
   }
   if (selection?.kind === 'scenery')
     for (const item of project.scenery)

@@ -750,6 +750,89 @@ describe('editor interface', () => {
     expect(project.project.bankZones).toEqual([]);
   });
 
+  it('lays earthworks in two clicks beside the track, and edits them', async () => {
+    await mountApp();
+    await click('layer-terrain');
+    expect($('soon-sculpt')).toBeNull();
+    expect($('tool-hill')).not.toBeNull();
+    expect($('earthwork-empty')).not.toBeNull();
+    await click('terrain-ditch');
+    expect($('tool-ditch').getAttribute('aria-pressed')).toBe('true');
+    await clickPlan(roadSide(1, 'right'));
+    strokes = [];
+    pointer('pointermove', roadSide(4, 'right'));
+    await settle();
+    expect(strokes).toContain('#d3f47d');
+    await clickPlan(roadSide(4, 'right'));
+    const [ditch] = (await saved()).earthworks;
+    expect(ditch).toMatchObject({ type: 'ditch', side: 'right', offset: 1, width: 3 });
+    expect($('earthwork-row-0').classList.contains('active')).toBe(true);
+    expect($('earthwork-offset')).not.toBeNull();
+    expect($('earthwork-height-value').textContent).toBe('0,8 m');
+    await type('earthwork-height', '2');
+    expect((await saved()).earthworks[0].height).toBe(2);
+    // Another type starts from its own defaults; a run-off has only a width.
+    await click('earthwork-type-runoff');
+    expect($('earthwork-offset')).toBeNull();
+    expect((await saved()).earthworks[0]).toMatchObject({ type: 'runoff', width: 25 });
+    await click('earthwork-swap');
+    expect((await saved()).earthworks[0].side).toBe('left');
+    press('Delete');
+    await settle();
+    expect($('earthwork-empty')).not.toBeNull();
+    // Escape drops a first click, then leaves the tool.
+    await click('tool-embankment');
+    await clickPlan(roadSide(1, 'left'));
+    expect(stores().editor.earthworkDraft).not.toBeNull();
+    press('Escape');
+    await settle();
+    expect(stores().editor.earthworkDraft).toBeNull();
+  });
+
+  it('lays an earthwork on a stretch picked in the band', async () => {
+    await mountApp();
+    await click('layer-terrain');
+    const band = $('band-canvas');
+    const at = (type: string, x: number, y: number) =>
+      band.dispatchEvent(
+        new MouseEvent(type, { clientX: x, clientY: y, button: 0, bubbles: true }),
+      );
+    const row = bandRows('terrain', { width: SIZE.width, height: SIZE.band })[0];
+    const y = row.y + row.height / 2;
+    at('pointerdown', 300, y);
+    at('pointermove', 420, y);
+    at('pointerup', 420, y);
+    await settle();
+    await click('range-embankment-left');
+    expect($('range-inspector')).toBeNull();
+    expect(stores().project.project.earthworks).toMatchObject([
+      { type: 'embankment', side: 'left', height: 3 },
+    ]);
+    expect($('earthwork-row-0').classList.contains('active')).toBe(true);
+  });
+
+  it('raises a hill on the plan, digs it into a hollow and drags it', async () => {
+    await mountApp();
+    await click('layer-terrain');
+    await click('terrain-hill');
+    const { project } = stores();
+    // Inside the club circuit, away from the track.
+    const centre = { x: -100, z: 60 };
+    await clickPlan(screen(centre));
+    expect(project.project.hills).toHaveLength(1);
+    expect($('hill-editor')).not.toBeNull();
+    await type('hill-height', '-5');
+    expect($('hill-editor').querySelector('h2')!.textContent).toBe('Cuvette');
+    await click('tool-select');
+    pointer('pointerdown', screen(centre));
+    pointer('pointermove', screen({ x: centre.x + 20, z: centre.z }));
+    pointer('pointerup', screen({ x: centre.x + 20, z: centre.z }));
+    await settle();
+    expect(project.project.hills[0].x).toBeCloseTo(centre.x + 20, 0);
+    await click('hill-delete');
+    expect($('hill-empty')).not.toBeNull();
+  });
+
   it('switches the whole interface to English and remembers it', async () => {
     await mountApp();
     expect($('locale-fr').getAttribute('aria-pressed')).toBe('true');

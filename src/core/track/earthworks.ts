@@ -1,9 +1,11 @@
-import { clamp } from '../math';
+import { clamp, planDistance } from '../math';
+import type { PlanPoint } from '../math';
 import { SIDES } from '../project/schema';
 import type { Earthwork, Project, Side } from '../project/schema';
 import { trackLength } from './centerline';
 import type { Sample } from './centerline';
 import { LAYOUT } from './layout';
+import { pitLaneLayout, shoulderEdge } from './pitLane';
 import { positionRange, rangeContains, rangeEase } from './ranges';
 import type { TrackRange } from './ranges';
 
@@ -134,4 +136,40 @@ export function sideProfiles(
     acting: at,
     widestHold: Math.max(flat, ...project.earthworks.map(earthworkHold)),
   };
+}
+
+/**
+ * The earthwork covering a place on the plan, between the shoulders and its far
+ * edge, or null: the later one where several cover it, as drawn on top.
+ */
+export function earthworkAt(
+  project: Project,
+  samples: readonly Sample[],
+  at: PlanPoint,
+): Earthwork | null {
+  const ranges = earthworkRanges(project, samples);
+  if (!ranges.length) return null;
+  let nearest = -1,
+    best = Infinity;
+  samples.forEach((sample, i) => {
+    const d = planDistance(sample, at);
+    if (d < best) {
+      best = d;
+      nearest = i;
+    }
+  });
+  const sample = samples[nearest];
+  const lateral = (at.x - sample.x) * sample.nx + (at.z - sample.z) * sample.nz;
+  const side: Side = lateral < 0 ? 'left' : 'right';
+  const beyond =
+    Math.abs(lateral) - shoulderEdge(project, pitLaneLayout(project, samples), sample, side);
+  const total = trackLength(samples);
+  const found = ranges.filter(
+    ({ earthwork, ...range }) =>
+      earthwork.side === side &&
+      beyond >= 0 &&
+      beyond <= earthwork.offset + earthwork.width &&
+      rangeContains(range, total, sample.s),
+  );
+  return found.at(-1)?.earthwork ?? null;
 }

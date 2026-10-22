@@ -31,9 +31,19 @@ const scene = computed(() => buildScene(store.project, store.samples));
 /** The stretch being laid with a two-click tool, from its first click to the pointer. */
 const draft = computed<TrackRange | null>(() => {
   const from =
-    editor.barrierDraft?.s ?? editor.widthDraft ?? editor.bankDraft ?? editor.pitDraft?.s ?? null;
+    editor.barrierDraft?.s ??
+    editor.earthworkDraft?.s ??
+    editor.widthDraft ??
+    editor.bankDraft ??
+    editor.pitDraft?.s ??
+    null;
   const to =
-    editor.barrierTarget ?? editor.widthTarget ?? editor.bankTarget ?? editor.pitTarget?.s ?? null;
+    editor.barrierTarget ??
+    editor.earthworkTarget ??
+    editor.widthTarget ??
+    editor.bankTarget ??
+    editor.pitTarget?.s ??
+    null;
   return from !== null && to !== null ? rangeBetween(store.project, store.samples, from, to) : null;
 });
 const overlay = computed(() =>

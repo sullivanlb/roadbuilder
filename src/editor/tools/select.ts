@@ -1,5 +1,5 @@
 import type { Id } from '../../core/ids';
-import { updatePoint, updateScenery } from '../../core/project/edits';
+import { updateHill, updatePoint, updateScenery } from '../../core/project/edits';
 import { findPoint, findRoad, findScenery, trackHitAt } from '../../rendering/plan/hitTest';
 import { pickInLayer } from '../layers';
 import { onGrid } from './tool';
@@ -75,6 +75,27 @@ function dragScenery(
   };
 }
 
+/** Drags a hill, snapping its centre to the grid with Shift. */
+function dragHill({ project, viewport }: ToolContext, id: Id, at: ScreenPoint): Gesture {
+  const view = viewport.projection;
+  const hill = project.project.hills.find((candidate) => candidate.id === id)!;
+  const origin = { x: hill.x, z: hill.z };
+  const grab = view.toWorld(at);
+  return {
+    move({ at: now, shiftKey }) {
+      const pointer = view.toWorld(now);
+      let x = origin.x + pointer.x - grab.x,
+        z = origin.z + pointer.z - grab.z;
+      if (shiftKey) {
+        x = onGrid(x);
+        z = onGrid(z);
+      }
+      project.edit((draft) => updateHill(draft, id, { x, z }), { commit: false });
+    },
+    end: () => project.commit(),
+  };
+}
+
 /**
  * Drags a rectangle over the plan; the control points inside it get selected,
  * or on the scenery layer, the scenery items whose centre it holds.
@@ -115,7 +136,7 @@ function marquee(
  * control points are dragged (the whole selection together), Shift + click adds
  * or removes one, and dragging over empty space selects the points in a
  * rectangle; a double click on the road inserts a point there. Scenery items
- * are selected and dragged the same way on their layer.
+ * are selected and dragged the same way on their layer, and hills on the terrain layer.
  */
 export const selectTool: Tool = {
   cursor: ({ editor }) => (editor.hoveredPointId || editor.hoveredSceneryId ? 'grab' : 'default'),
@@ -146,9 +167,15 @@ export const selectTool: Tool = {
       if (!editor.selectedSceneryIds.includes(id)) editor.selectScenery(id);
       return dragScenery(context, id, at);
     }
-    editor.select(
-      pickInLayer(editor.layer, hit, project.project, project.samples, editor.selection),
+    const picked = pickInLayer(
+      editor.layer,
+      hit,
+      project.project,
+      project.samples,
+      editor.selection,
     );
+    editor.select(picked);
+    if (picked?.kind === 'hill') return dragHill(context, picked.id, at);
   },
   hover({ project, editor, viewport }, { at }) {
     editor.hoveredPointId =

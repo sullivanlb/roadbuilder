@@ -5,6 +5,7 @@ import {
   setStartLine,
   updateBankZone,
   updateBarrier,
+  updateEarthwork,
   updatePitLane,
   updateWidthZone,
 } from '../../core/project/edits';
@@ -50,13 +51,17 @@ const labels = computed<BandLabels>(() => ({
     right: t('band.right'),
     lane: t('band.lane'),
     start: t('band.start'),
-    empty: '',
   },
   barrier: {
     guardrail: t('barriers.guardrail'),
     tires: t('barriers.tires'),
     tecpro: t('barriers.tecpro'),
     wall: t('barriers.wall'),
+  },
+  earthwork: {
+    embankment: t('earthworks.embankment'),
+    ditch: t('earthworks.ditch'),
+    runoff: t('earthworks.runoff'),
   },
   width: (metres) => `${formatNumber(metres, metres % 1 ? 1 : 0)} m`,
   bank: (zone) =>
@@ -66,7 +71,6 @@ const labels = computed<BandLabels>(() => ({
     }),
   lane: t('band.laneBlock'),
   start: t('band.startBlock'),
-  empty: t('band.empty'),
   corner: (corner) => t('corner.short', { number: corner.number }),
   distance: (metres) =>
     metres >= 1000 ? `${formatNumber(metres / 1000, metres % 1000 ? 1 : 0)} km` : `${metres} m`,
@@ -79,6 +83,7 @@ const selectedBlockId = computed(() => {
   const selection = editor.selection;
   if (
     selection?.kind === 'barrier' ||
+    selection?.kind === 'earthwork' ||
     selection?.kind === 'widthZone' ||
     selection?.kind === 'bankZone'
   )
@@ -159,6 +164,7 @@ function moveEdge(block: BandBlock, edge: 'start' | 'end', s: number) {
       if (block.kind === 'widthZone') updateWidthZone(draft, block.id, { [end]: at });
       else if (block.kind === 'bankZone') updateBankZone(draft, block.id, { [end]: at });
       else if (block.kind === 'barrier') updateBarrier(draft, block.id, { [end]: at });
+      else if (block.kind === 'earthwork') updateEarthwork(draft, block.id, { [end]: at });
       else if (block.kind === 'pitLane')
         updatePitLane(draft, edge === 'start' ? { entry: at } : { exit: at });
       else setStartLine(draft, at);
@@ -186,6 +192,7 @@ function onPointerDown(event: PointerEvent) {
     if (block.kind === 'widthZone') editor.selectWidthZone(block.id);
     else if (block.kind === 'bankZone') editor.selectBankZone(block.id);
     else if (block.kind === 'barrier') editor.selectBarrier(block.id);
+    else if (block.kind === 'earthwork') editor.selectEarthwork(block.id);
     else if (block.kind === 'pitLane') editor.select({ kind: 'pitLane' });
     if (hit.edge) drag.value = { kind: 'edge', block, edge: hit.edge };
     return;

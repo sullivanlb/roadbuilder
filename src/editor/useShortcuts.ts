@@ -53,6 +53,7 @@ export function useShortcuts() {
       key: 'escape',
       run: () => {
         if (editor.barrierDraft) editor.cancelBarrier();
+        else if (editor.earthworkDraft) editor.cancelEarthwork();
         else if (editor.pitDraft) editor.cancelPitLane();
         else if (editor.widthDraft !== null) editor.cancelWidthZone();
         else if (editor.bankDraft !== null) editor.cancelBankZone();

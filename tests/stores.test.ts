@@ -186,6 +186,8 @@ describe('editor', () => {
       pointId: project.project.points[1].id,
       barrierId: barrier.id,
       sceneryId: 'tree',
+      earthworkId: 'ditch',
+      hillId: 'hill',
     };
     const pick = (layer: LayerId, at = hit) =>
       pickInLayer(layer, at, project.project, project.samples);
@@ -195,7 +197,9 @@ describe('editor', () => {
     expect(pick('pits')).toBeNull();
     const onLane = { ...hit, road: { s: lane.entry + lane.length / 2, side: lane.side } };
     expect(pick('pits', onLane)).toEqual({ kind: 'pitLane' });
-    expect(pick('terrain')).toBeNull();
+    expect(pick('terrain')).toEqual({ kind: 'earthwork', id: 'ditch' });
+    expect(pick('terrain', { ...hit, earthworkId: null })).toEqual({ kind: 'hill', id: 'hill' });
+    expect(pick('terrain', { ...hit, earthworkId: null, hillId: null })).toBeNull();
     expect(pick('scenery')).toEqual({ kind: 'scenery', ids: ['tree'] });
   });
 

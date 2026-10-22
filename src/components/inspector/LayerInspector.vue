@@ -3,6 +3,8 @@ import { t } from '../../i18n';
 import { useEditorStore } from '../../stores/editor';
 import BankSection from '../sidebar/BankSection.vue';
 import BarrierSection from '../sidebar/BarrierSection.vue';
+import EarthworkSection from '../sidebar/EarthworkSection.vue';
+import HillSection from '../sidebar/HillSection.vue';
 import PitSection from '../sidebar/PitSection.vue';
 import PointSection from '../sidebar/PointSection.vue';
 import PointsSection from '../sidebar/PointsSection.vue';
@@ -41,7 +43,11 @@ const editor = useEditorStore();
       <StartSection />
       <PitSection />
     </template>
-    <TerrainSection v-else-if="editor.layer === 'terrain'" />
+    <template v-else-if="editor.layer === 'terrain'">
+      <TerrainSection />
+      <EarthworkSection />
+      <HillSection />
+    </template>
     <ScenerySection v-else />
   </aside>
 </template>

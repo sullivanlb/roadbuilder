@@ -5,7 +5,7 @@ import { usePlanInteraction } from '../../editor/usePlanInteraction';
 import { formatNumber, t } from '../../i18n';
 import { drawPlan } from '../../rendering/plan/draw';
 import type { PlanScene } from '../../rendering/plan/draw';
-import { useEditorStore } from '../../stores/editor';
+import { isEarthworkTool, useEditorStore } from '../../stores/editor';
 import { useProjectStore } from '../../stores/project';
 import { useViewportStore } from '../../stores/viewport';
 
@@ -45,6 +45,14 @@ const scene = computed<PlanScene>(() => ({
   selectedSceneryIds: editor.selectedSceneryIds,
   hoveredSceneryId: editor.hoveredSceneryId,
   sceneryGhost: editor.sceneryGhost,
+  selectedEarthworkId: editor.selectedEarthworkId,
+  earthworkDraft:
+    editor.earthworkDraft && isEarthworkTool(editor.tool)
+      ? { ...editor.earthworkDraft, type: editor.tool }
+      : null,
+  earthworkTarget: editor.earthworkDraft ? editor.earthworkTarget : null,
+  selectedHillId: editor.selectedHillId,
+  hillGhost: editor.hillGhost,
   range: editor.range,
   hoverS: editor.hoverS,
   labels: {

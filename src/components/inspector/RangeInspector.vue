@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed } from 'vue';
+import { EARTHWORK_TYPES } from '../../core/project/schema';
 import { trackLength } from '../../core/track/centerline';
 import { pointDistance } from '../../core/track/positions';
 import { rangeContains } from '../../core/track/ranges';
@@ -22,6 +23,10 @@ const pointCount = computed(
     ).length,
 );
 const barrierName = computed(() => t(`barriers.${editor.barrierType}`));
+const sides = [
+  ['left', 'range.earthworkLeft'],
+  ['right', 'range.earthworkRight'],
+] as const;
 </script>
 
 <template>
@@ -82,7 +87,19 @@ const barrierName = computed(() => t(`barriers.${editor.barrierType}`));
         @click="editor.pitLaneOnRange()"
         >{{ t('range.pitLane') }}</AppButton
       >
-      <p v-else class="note">{{ t('range.planned') }}</p>
+      <template v-else-if="editor.layer === 'terrain'">
+        <template v-for="type in EARTHWORK_TYPES" :key="type">
+          <AppButton
+            v-for="[side, label] in sides"
+            :id="`range-${type}-${side}`"
+            :key="side"
+            variant="primary"
+            small
+            @click="editor.earthworksOnRange(type, [side])"
+            >{{ t(label, { type: t(`earthworks.${type}`) }) }}</AppButton
+          >
+        </template>
+      </template>
       <AppButton id="range-cancel" small @click="editor.setRange(null)">{{
         t('range.cancel')
       }}</AppButton>
