@@ -71,6 +71,9 @@ export function previewClick(
       return;
     case 'pan':
       return;
+    // The brush paints while held, from the preview itself.
+    case 'sculpt':
+      return;
   }
 }
 

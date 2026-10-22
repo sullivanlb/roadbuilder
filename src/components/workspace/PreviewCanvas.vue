@@ -54,6 +54,10 @@ const overlay = computed(() =>
     draft: draft.value,
     hoverS: editor.hoverS,
     sceneryFloors: scene.value.sceneryFloors,
+    brush:
+      editor.tool === 'sculpt' && editor.brushPointer?.y !== undefined
+        ? { ...editor.brushPointer, y: editor.brushPointer.y, radius: editor.brushRadius }
+        : null,
   }),
 );
 
@@ -65,12 +69,37 @@ function hitAt(event: PointerEvent) {
   return trackHitNear(store.project, store.samples, picked.world, picked.pointId);
 }
 
+/** The place on the ground under the pointer, as the brush paints it. */
+function groundAt(event: PointerEvent) {
+  const rect = canvas.value!.getBoundingClientRect();
+  return renderer!.pick(event.clientX - rect.left, event.clientY - rect.top).world;
+}
+
+// With the brush, the left button paints for as long as it is held (docs/adr/0016).
+let painting = false;
+function paintFrom(event: PointerEvent) {
+  const at = groundAt(event);
+  if (!at) return false;
+  canvas.value!.setPointerCapture(event.pointerId);
+  painting = true;
+  editor.brushPointer = at;
+  editor.beginStroke(at, event.shiftKey);
+  return true;
+}
+function stopPainting() {
+  if (!painting) return;
+  painting = false;
+  editor.endStroke();
+}
+
 // A press that barely moves is a click; a longer one turns the camera.
 let press: { x: number; y: number } | null = null;
 function onPointerDown(event: PointerEvent) {
+  if (renderer && editor.tool === 'sculpt' && event.button === 0 && paintFrom(event)) return;
   press = event.button === 0 ? { x: event.clientX, y: event.clientY } : null;
 }
 function onPointerUp(event: PointerEvent) {
+  if (painting) return stopPainting();
   const start = press;
   press = null;
   if (!renderer || !start || Math.hypot(event.clientX - start.x, event.clientY - start.y) > 4)
@@ -79,7 +108,14 @@ function onPointerUp(event: PointerEvent) {
   if (hit) previewClick({ project: store, editor, ui }, hit, event.shiftKey);
 }
 function onPointerMove(event: PointerEvent) {
-  if (!renderer || press) return;
+  if (!renderer) return;
+  if (editor.tool === 'sculpt') {
+    const at = groundAt(event);
+    editor.brushPointer = at;
+    if (painting && at) editor.strokeTo(at);
+    if (painting) return;
+  }
+  if (press) return;
   const hit = hitAt(event);
   previewHover({ editor }, hit ?? { road: null });
 }
@@ -102,6 +138,24 @@ onMounted(() => {
   );
   watch(overlay, (next) => renderer?.setOverlay(next), { immediate: true });
   watch(
+    () => editor.tool === 'sculpt',
+    (on) => renderer?.setBrush(on),
+    { immediate: true },
+  );
+  // The terrain shown bends as the stroke paints; the scene is rebuilt when it ends.
+  watch(
+    () => editor.strokeVersion,
+    () => {
+      const stroke = editor.stroke;
+      if (stroke)
+        renderer?.bendTerrain(
+          (p) => stroke.field.at(p) - stroke.before.at(p),
+          stroke.ground.clearance,
+          stroke.covered,
+        );
+    },
+  );
+  watch(
     [width, height, pixelRatio],
     ([w, h, ratio]) => {
       if (w && h) renderer?.resize({ width: w, height: h }, Math.min(ratio || 1, 2));
@@ -116,6 +170,7 @@ const { off } = viewport.onPreviewCommand((command) => {
   else renderer?.centerOn(command.at);
 });
 onBeforeUnmount(() => {
+  stopPainting();
   off();
   renderer?.dispose();
   renderer = null;
@@ -131,10 +186,16 @@ onBeforeUnmount(() => {
       @pointerdown="onPointerDown"
       @pointerup="onPointerUp"
       @pointermove="onPointerMove"
-      @pointerleave="editor.hoverS = null"
+      @pointercancel="stopPainting"
+      @pointerleave="
+        editor.hoverS = null;
+        if (!painting) editor.brushPointer = null;
+      "
     ></canvas>
     <p v-if="failed" id="preview-unavailable" class="unavailable">{{ t('preview.unavailable') }}</p>
-    <div class="hint">{{ t('canvas.hint3d') }}</div>
+    <div class="hint">
+      {{ editor.tool === 'sculpt' ? t('canvas.hint3dSculpt') : t('canvas.hint3d') }}
+    </div>
   </div>
 </template>
 

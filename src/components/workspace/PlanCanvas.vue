@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { useDevicePixelRatio, useElementSize } from '@vueuse/core';
 import { computed, onBeforeUnmount, onMounted, useTemplateRef, watch } from 'vue';
+import { SculptField } from '../../core/project/sculpt';
 import { usePlanInteraction } from '../../editor/usePlanInteraction';
 import { formatNumber, t } from '../../i18n';
 import { drawPlan } from '../../rendering/plan/draw';
@@ -19,6 +20,8 @@ const { width, height } = useElementSize(host);
 const { pixelRatio } = useDevicePixelRatio();
 const dpr = computed(() => Math.min(pixelRatio.value || 1, 2));
 const { cursor, hint, listeners, end } = usePlanInteraction(canvas);
+/** The relief painted in the project, decoded once each time it changes. */
+const painted = computed(() => new SculptField(store.project.sculpt));
 
 const scene = computed<PlanScene>(() => ({
   project: store.project,
@@ -53,6 +56,12 @@ const scene = computed<PlanScene>(() => ({
   earthworkTarget: editor.earthworkDraft ? editor.earthworkTarget : null,
   selectedHillId: editor.selectedHillId,
   hillGhost: editor.hillGhost,
+  // The stroke under way paints in place: its count tells the plan to draw again.
+  sculpt: editor.stroke && editor.strokeVersion ? editor.stroke.field : painted.value,
+  brush:
+    editor.tool === 'sculpt' && editor.brushPointer
+      ? { ...editor.brushPointer, radius: editor.brushRadius }
+      : null,
   range: editor.range,
   hoverS: editor.hoverS,
   labels: {

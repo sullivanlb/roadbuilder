@@ -1,8 +1,10 @@
 <script setup lang="ts">
 import { t } from '../../i18n';
 import { useEditorStore } from '../../stores/editor';
+import { useProjectStore } from '../../stores/project';
 import BankSection from '../sidebar/BankSection.vue';
 import BarrierSection from '../sidebar/BarrierSection.vue';
+import BrushSection from '../sidebar/BrushSection.vue';
 import EarthworkSection from '../sidebar/EarthworkSection.vue';
 import HillSection from '../sidebar/HillSection.vue';
 import PitSection from '../sidebar/PitSection.vue';
@@ -19,6 +21,7 @@ import RangeInspector from './RangeInspector.vue';
 
 /** The settings of the active layer and of what is selected in it. */
 const editor = useEditorStore();
+const store = useProjectStore();
 </script>
 
 <template>
@@ -45,6 +48,7 @@ const editor = useEditorStore();
     </template>
     <template v-else-if="editor.layer === 'terrain'">
       <TerrainSection />
+      <BrushSection v-if="editor.tool === 'sculpt' || store.project.sculpt.length" />
       <EarthworkSection />
       <HillSection />
     </template>

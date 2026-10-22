@@ -10,6 +10,8 @@ import type {
   Side,
 } from '../../core/project/schema';
 import { EARTHWORK_DEFAULTS } from '../../core/project/terrain';
+import { SCULPT } from '../../core/project/sculpt';
+import type { SculptField } from '../../core/project/sculpt';
 import { barrierLine, barrierPath } from '../../core/scene/barriers';
 import { gridPlaces, pitBoxPlaces } from '../../core/scene/markers';
 import type { Place } from '../../core/scene/markers';
@@ -34,7 +36,7 @@ import type { DrawDraft } from '../../core/track/drawing';
 import { INACTIVE_LAYER_ALPHA } from '../layers';
 import type { LayerId } from '../layers';
 import { BARRIER_STYLE, COLORS } from '../theme';
-import type { PlanProjection } from './projection';
+import type { PlanProjection, ScreenPoint } from './projection';
 
 /** Everything the plan shows, read from the stores by the plan canvas. */
 export interface PlanScene {
@@ -86,6 +88,10 @@ export interface PlanScene {
   selectedHillId: Id | null;
   /** The hill the hill tool would raise under the pointer. */
   hillGhost: Hill | null;
+  /** The painted relief, as the stroke under way leaves it. */
+  sculpt: SculptField;
+  /** The brush under the pointer, while the brush tool is on. */
+  brush: { x: number; z: number; radius: number } | null;
   labels: {
     start: string;
     finish: string;
@@ -358,9 +364,54 @@ function drawEarthwork(
   }
 }
 
-/** Hills and earthworks, the selected ones outlined, and what the active tool would lay. */
+/** Heights of painted relief shaded in steps, each step a little darker. */
+const RELIEF_STEP = 2.5;
+
+/** The painted relief as shaded squares, one per node: raised ground and hollows in their colours. */
+function drawRelief(ctx: Context, view: PlanProjection, field: SculptField) {
+  if (!field.size) return;
+  const half = (SCULPT.cell / 2) * view.camera.scale;
+  // Squares of one shade are filled together.
+  const shades = new Map<string, { hollow: boolean; level: number; squares: ScreenPoint[] }>();
+  for (const node of field.nodes()) {
+    const depth = Math.abs(node.height);
+    if (depth < 0.05) continue;
+    const hollow = node.height < 0,
+      level = Math.min(4, Math.floor(depth / RELIEF_STEP));
+    const key = `${hollow}${level}`;
+    if (!shades.has(key)) shades.set(key, { hollow, level, squares: [] });
+    shades.get(key)!.squares.push(view.toScreen(node));
+  }
+  ctx.save();
+  for (const { hollow, level, squares } of shades.values()) {
+    ctx.beginPath();
+    for (const p of squares) ctx.rect(p.x - half, p.y - half, half * 2, half * 2);
+    ctx.globalAlpha = 0.12 + level * 0.1;
+    ctx.fillStyle = hollow ? COLORS.hill.hollow : COLORS.hill.rise;
+    ctx.fill();
+  }
+  ctx.restore();
+}
+
+/** The reach of the brush around the pointer. */
+function drawBrush(ctx: Context, view: PlanProjection, brush: NonNullable<PlanScene['brush']>) {
+  const p = view.toScreen(brush),
+    radius = brush.radius * view.camera.scale;
+  ctx.strokeStyle = COLORS.accent;
+  ctx.lineWidth = 1.5;
+  ctx.beginPath();
+  ctx.arc(p.x, p.y, radius, 0, Math.PI * 2);
+  ctx.stroke();
+  ctx.beginPath();
+  ctx.arc(p.x, p.y, radius / 2, 0, Math.PI * 2);
+  dashed(ctx, [4, 4], () => ctx.stroke());
+}
+
+/** Painted relief, hills and earthworks, the selected ones outlined, and what the active tool would lay. */
 function drawTerrainShapes(ctx: Context, view: PlanProjection, scene: PlanScene) {
   const { project, samples } = scene;
+  drawRelief(ctx, view, scene.sculpt);
+  if (scene.brush) drawBrush(ctx, view, scene.brush);
   for (const hill of project.hills) {
     drawHill(ctx, view, hill);
     if (hill.id !== scene.selectedHillId) continue;

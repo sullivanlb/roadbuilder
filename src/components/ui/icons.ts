@@ -30,6 +30,7 @@ export const ICONS = {
   gravel: 'M3 20c4-8 14-8 18 0M8 17v.5M12 15v.5M16 17v.5',
   sectors: 'M5 3v18M5 4h11l-3 3.5 3 3.5H5',
   hill: 'm2 20 6-9 4 5 3-4 7 8z',
+  brush: 'M3 21c3 0 5-1.5 5-4a2.5 2.5 0 0 0-5 0c0 1.5-.5 3-2 4zM7.5 14.5 19 3l2 2L9.5 16.5',
   embankment: 'M2 18h6l7-9h7M2 21h20M10 15.5l1.5 1M12.5 12.5l1.5 1',
   ditch: 'M2 8h6l2.5 8h3L16 8h6M2 21h20',
   runoff: 'M2 13h20M2 18h20M5 9v4m7-4v4m7-4v4',

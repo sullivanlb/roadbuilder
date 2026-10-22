@@ -3,6 +3,7 @@ import { nextTick } from 'vue';
 import { setRoad, updatePoint } from '../src/core/project/edits';
 import { parseProjectFile, serializeProject } from '../src/core/project/schema';
 import { headingVector } from '../src/core/project/scenery';
+import { SculptField } from '../src/core/project/sculpt';
 import { pitLaneLayout } from '../src/core/track/pitLane';
 import { positionDistance } from '../src/core/track/positions';
 import { pickInLayer } from '../src/editor/layers';
@@ -201,6 +202,42 @@ describe('editor', () => {
     expect(pick('terrain', { ...hit, earthworkId: null })).toEqual({ kind: 'hill', id: 'hill' });
     expect(pick('terrain', { ...hit, earthworkId: null, hillId: null })).toBeNull();
     expect(pick('scenery')).toEqual({ kind: 'scenery', ids: ['tree'] });
+  });
+
+  it('paints relief while the brush is held, in one undo step', () => {
+    const { project, editor } = stores();
+    project.replace(template('club'));
+    editor.setTool('sculpt');
+    expect(editor.layer).toBe('terrain');
+    const at = { x: -100, z: 60 };
+    editor.beginStroke(at);
+    vi.advanceTimersByTime(500);
+    const half = editor.stroke!.field.at(at);
+    // Held still, matter keeps piling up; nothing is saved before the end.
+    vi.advanceTimersByTime(500);
+    expect(editor.stroke!.field.at(at)).toBeGreaterThan(half * 1.5);
+    expect(project.project.sculpt).toEqual([]);
+    editor.strokeTo({ x: -60, z: 60 });
+    vi.advanceTimersByTime(300);
+    editor.endStroke();
+    expect(editor.stroke).toBeNull();
+    const field = new SculptField(project.project.sculpt);
+    expect(field.at(at)).toBeCloseTo(editor.brushStrength, 0);
+    expect(field.at({ x: -60, z: 60 })).toBeGreaterThan(0.5);
+    // The timer stopped with the stroke.
+    vi.advanceTimersByTime(1000);
+    expect(new SculptField(project.project.sculpt).at(at)).toBe(field.at(at));
+    project.undo();
+    expect(project.project.sculpt).toEqual([]);
+    project.redo();
+    // Shift lowers instead; leaving the tool ends a stroke.
+    editor.beginStroke(at, true);
+    vi.advanceTimersByTime(2000);
+    editor.setTool('select');
+    expect(editor.stroke).toBeNull();
+    expect(new SculptField(project.project.sculpt).at(at)).toBeLessThan(field.at(at) - 1);
+    editor.clearPaintedRelief();
+    expect(project.project.sculpt).toEqual([]);
   });
 
   it('places scenery facing the track, then turns, copies and deletes the selection', async () => {

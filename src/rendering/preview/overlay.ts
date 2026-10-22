@@ -100,6 +100,8 @@ export interface OverlayState {
   /** Height of each scenery item's floor in the scene, by ID. */
   sceneryFloors: Readonly<Record<Id, number>>;
   hoverS: number | null;
+  /** The brush on the ground under the pointer, while the brush tool is on. */
+  brush?: { x: number; y: number; z: number; radius: number } | null;
 }
 
 const LIFT = 0.12;
@@ -239,6 +241,23 @@ export function buildOverlay(
     for (const item of project.scenery)
       if (selection.ids.includes(item.id))
         overlay.outlines.push(...sceneryBox(item, state.sceneryFloors[item.id] ?? 0));
+  if (state.brush) {
+    // A ring level with the place under the pointer, drawn over the ground.
+    const { x, y, z, radius } = state.brush;
+    for (const reach of [radius, radius / 2])
+      for (let k = 0; k < 48; k++) {
+        const a = (k * Math.PI) / 24,
+          b = ((k + 1) * Math.PI) / 24;
+        overlay.outlines.push(
+          x + Math.cos(a) * reach,
+          y + OUTLINE_LIFT,
+          z + Math.sin(a) * reach,
+          x + Math.cos(b) * reach,
+          y + OUTLINE_LIFT,
+          z + Math.sin(b) * reach,
+        );
+      }
+  }
   if (state.range) across(rangeSamples(samples, state.range), COLORS.accent, 0.3);
   if (state.draft) across(rangeSamples(samples, state.draft), COLORS.accent, 0.45);
   if (state.layer === 'track') {

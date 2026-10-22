@@ -14,8 +14,13 @@ const store = useProjectStore();
 const editor = useEditorStore();
 
 const shapes = [
-  { tool: 'hill', label: 'hills.hill' },
-  ...EARTHWORK_TYPES.map((type) => ({ tool: type, label: `earthworks.${type}` as const })),
+  { tool: 'sculpt', icon: 'brush', label: 'sculpt.brush' },
+  { tool: 'hill', icon: 'hill', label: 'hills.hill' },
+  ...EARTHWORK_TYPES.map((type) => ({
+    tool: type,
+    icon: type,
+    label: `earthworks.${type}` as const,
+  })),
 ] as const;
 </script>
 
@@ -32,7 +37,7 @@ const shapes = [
         :aria-pressed="editor.tool === shape.tool"
         @click="editor.setTool(shape.tool)"
       >
-        <AppIcon :name="shape.tool" />{{ t(shape.label) }}
+        <AppIcon :name="shape.icon" />{{ t(shape.label) }}
       </button>
     </div>
     <RangeField

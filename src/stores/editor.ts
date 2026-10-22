@@ -1,5 +1,5 @@
 import { defineStore } from 'pinia';
-import { computed, ref, watch } from 'vue';
+import { computed, ref, shallowRef, watch } from 'vue';
 import type { Id } from '../core/ids';
 import type { PlanPoint, Vec3 } from '../core/math';
 import {
@@ -36,6 +36,8 @@ import {
   updateEarthwork,
   updateScenery,
   widthZoneRejection,
+  clearSculpt,
+  setSculpt,
 } from '../core/project/edits';
 import { RULES } from '../core/project/rules';
 import { facingTrack, newScenery } from '../core/project/scenery';
@@ -49,6 +51,10 @@ import type {
   Side,
 } from '../core/project/schema';
 import { HILL_DEFAULTS } from '../core/project/terrain';
+import { SculptField } from '../core/project/sculpt';
+import type { BrushMode } from '../core/project/sculpt';
+import { groundModel } from '../core/scene/ground';
+import type { GroundModel } from '../core/scene/ground';
 import { outsideOf } from '../core/track/bank';
 import { trackLength } from '../core/track/centerline';
 import { LAYOUT } from '../core/track/layout';
@@ -77,6 +83,7 @@ export type ToolId =
   | 'bank'
   | SceneryKind
   | 'hill'
+  | 'sculpt'
   | EarthworkType
   | 'pan';
 
@@ -87,6 +94,20 @@ export const isSceneryTool = (tool: ToolId): tool is SceneryKind =>
 /** Whether a tool lays an earthwork: each type is laid by its own tool. */
 export const isEarthworkTool = (tool: ToolId): tool is EarthworkType =>
   (EARTHWORK_TYPES as readonly ToolId[]).includes(tool);
+
+/** How often a held brush paints, in seconds. */
+export const BRUSH_STEP = 1 / 30;
+
+/**
+ * A brush stroke under way: the relief it paints, the relief before it and the
+ * ground it paints on, with the extent it has covered so far.
+ */
+export interface SculptStroke {
+  field: SculptField;
+  before: SculptField;
+  ground: GroundModel;
+  covered: { minX: number; maxX: number; minZ: number; maxZ: number };
+}
 
 /** How far the turn shortcuts turn scenery, in degrees: three steps of the heading. */
 export const TURN_STEP = 3 * RULES.heading.step;
@@ -143,6 +164,18 @@ export const useEditorStore = defineStore('editor', () => {
   const earthworkTarget = ref<number | null>(null);
   /** Where the next hill would be raised, under the pointer. */
   const hillPointer = ref<PlanPoint | null>(null);
+  /** How the brush paints, how far it reaches and how fast. */
+  const brushMode = ref<BrushMode>('raise');
+  const brushRadius = ref(20);
+  const brushStrength = ref(3);
+  /** Where the brush is on the ground, under the pointer; `y` is known in 3D. */
+  const brushPointer = ref<(PlanPoint & { y?: number }) | null>(null);
+  /** The stroke being painted, and a count that moves on each time it paints. */
+  const stroke = shallowRef<SculptStroke | null>(null);
+  const strokeVersion = ref(0);
+  let strokeTimer: ReturnType<typeof setInterval> | null = null;
+  /** Moves where the next steps of the stroke paint. */
+  let strokeTarget: ((at: PlanPoint) => void) | null = null;
 
   const selected = <K extends NonNullable<Selection>['kind']>(kind: K) =>
     computed(() => {
@@ -274,6 +307,8 @@ export const useEditorStore = defineStore('editor', () => {
   const remembered = new Map<LayerId, Selection>();
 
   function clearDrafts() {
+    endStroke();
+    brushPointer.value = null;
     barrierDraft.value = null;
     barrierTarget.value = null;
     pitDraft.value = null;
@@ -337,6 +372,10 @@ export const useEditorStore = defineStore('editor', () => {
     drawPointer.value = null;
     sceneryPointer.value = null;
     hillPointer.value = null;
+    if (next !== 'sculpt') {
+      endStroke();
+      brushPointer.value = null;
+    }
   }
 
   function setView(next: ViewMode) {
@@ -796,6 +835,66 @@ export const useEditorStore = defineStore('editor', () => {
     selectEarthwork(store.project.earthworks[Math.min(index, earthworks.length - 2)]?.id ?? null);
   }
 
+  /**
+   * Starts painting with the brush at `at`, and keeps painting there as long as
+   * it is held, even still. `invert` swaps raising and lowering. Flattening
+   * levels the ground to its height under the pointer when the stroke starts.
+   */
+  function beginStroke(at: PlanPoint, invert = false) {
+    endStroke();
+    store.commit();
+    const swap: Partial<Record<BrushMode, BrushMode>> = { raise: 'lower', lower: 'raise' };
+    const mode = (invert && swap[brushMode.value]) || brushMode.value;
+    const ground = groundModel(store.project, store.samples);
+    const target = mode === 'flatten' ? ground.height(at) : 0;
+    const current: SculptStroke = {
+      field: new SculptField(store.project.sculpt),
+      before: new SculptField(store.project.sculpt),
+      ground,
+      covered: { minX: Infinity, maxX: -Infinity, minZ: Infinity, maxZ: -Infinity },
+    };
+    let point = { x: at.x, z: at.z },
+      warned = false;
+    const paint = () => {
+      const brush = { mode, radius: brushRadius.value, strength: brushStrength.value };
+      if (!current.field.paint(brush, point, BRUSH_STEP, ground, target) && !warned) {
+        warned = true;
+        refuse(t('toast.sculptLimit', { max: RULES.sculptTiles.max }));
+      }
+      const box = current.covered,
+        reach = brush.radius;
+      box.minX = Math.min(box.minX, point.x - reach);
+      box.maxX = Math.max(box.maxX, point.x + reach);
+      box.minZ = Math.min(box.minZ, point.z - reach);
+      box.maxZ = Math.max(box.maxZ, point.z + reach);
+      strokeVersion.value++;
+    };
+    stroke.value = current;
+    strokeTarget = (next) => (point = { x: next.x, z: next.z });
+    paint();
+    strokeTimer = setInterval(paint, BRUSH_STEP * 1000);
+  }
+
+  function strokeTo(at: PlanPoint) {
+    strokeTarget?.(at);
+  }
+
+  /** Ends the stroke: what it painted becomes one step of the history. */
+  function endStroke() {
+    if (strokeTimer !== null) clearInterval(strokeTimer);
+    strokeTimer = null;
+    strokeTarget = null;
+    const done = stroke.value;
+    if (!done) return;
+    stroke.value = null;
+    store.edit((draft) => setSculpt(draft, done.field));
+  }
+
+  /** Removes all the relief painted with the brush. */
+  function clearPaintedRelief() {
+    store.edit(clearSculpt);
+  }
+
   /** Raises a hill of the default size at `at` and selects it. */
   function placeHill(at: PlanPoint) {
     if (hillRejection(store.project))
@@ -868,6 +967,12 @@ export const useEditorStore = defineStore('editor', () => {
     earthworkTarget,
     hillPointer,
     hillGhost,
+    brushMode,
+    brushRadius,
+    brushStrength,
+    brushPointer,
+    stroke,
+    strokeVersion,
     selectedEarthworkId,
     selectedEarthwork,
     selectedHillId,
@@ -940,5 +1045,9 @@ export const useEditorStore = defineStore('editor', () => {
     deleteSelectedEarthwork,
     placeHill,
     deleteSelectedHill,
+    beginStroke,
+    strokeTo,
+    endStroke,
+    clearPaintedRelief,
   };
 });

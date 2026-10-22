@@ -37,6 +37,7 @@ export const frMessages = {
   'editor.grandstandTitle': 'Poser une tribune',
   'editor.signTitle': 'Poser un panneau',
   'editor.lightTitle': 'Poser un éclairage',
+  'editor.sculptTitle': 'Sculpter au pinceau',
   'editor.hillTitle': 'Élever une colline',
   'editor.embankmentTitle': 'Tracer un talus',
   'editor.ditchTitle': 'Creuser un fossé',
@@ -81,6 +82,10 @@ export const frMessages = {
     'Cliquez un élément de la couche pour le régler · Molette pour zoomer · Espace + glisser pour naviguer',
   'canvas.hintScenery':
     'Cliquez pour poser l’objet, face à la piste · Maj : grille de 5 m · Échap quitte l’outil',
+  'canvas.hintSculpt':
+    'Maintenez le clic pour sculpter sous le pinceau · Maj inverse monter et creuser · Échap quitte l’outil',
+  'canvas.hint3dSculpt':
+    'Clic gauche maintenu : sculpter · Maj : inverser · Clic droit : tourner la vue · Molette : zoom',
   'canvas.hintHill': 'Cliquez pour élever une colline · Maj : grille de 5 m · Échap quitte l’outil',
   'canvas.hintEmbankment':
     'Cliquez le début du talus, du côté voulu de la piste · Échap quitte l’outil',
@@ -255,6 +260,20 @@ export const frMessages = {
   'earthworks.onTrack': 'Ce terrassement atteint une autre partie de la piste.',
   'earthworks.empty':
     'Aucun terrassement. Choisissez un talus, un fossé ou un dégagement, puis cliquez son début et sa fin le long de la piste.',
+  'sculpt.title': 'Pinceau',
+  'sculpt.brush': 'Pinceau',
+  'sculpt.modeAria': 'Effet du pinceau',
+  'sculpt.raise': 'Monter',
+  'sculpt.lower': 'Creuser',
+  'sculpt.smooth': 'Lisser',
+  'sculpt.flatten': 'Aplanir',
+  'sculpt.radius': 'Rayon',
+  'sculpt.strength': 'Force',
+  'sculpt.note':
+    'Maintenez le clic : la matière s’accumule sous le pinceau, surtout au centre. Maj inverse monter et creuser ; aplanir nivelle à la hauteur du premier point. Près de la piste, le relief s’efface.',
+  'sculpt.painted':
+    'Relief sculpté sur {count} tuile de 64 m.|Relief sculpté sur {count} tuiles de 64 m.',
+  'sculpt.clear': 'Effacer le relief sculpté',
   'hills.title': 'Collines',
   'hills.count': '{count} colline|{count} collines',
   'hills.hill': 'Colline',
@@ -487,6 +506,7 @@ export const frMessages = {
   'toast.earthworksLimit': 'Maximum {max} terrassements.',
   'toast.earthworkAdded': 'Terrassement ajouté. Échap pour terminer le tracé.',
   'toast.hillsLimit': 'Maximum {max} collines.',
+  'toast.sculptLimit': 'Le relief sculpté atteint sa limite de {max} tuiles de 64 m.',
   'toast.pointTooClose': 'Placez ce point à au moins {min} mètres des autres.',
   'toast.arcNeedsTrack': 'Posez au moins deux points avant de tracer un arc.',
   'toast.arcStraight': 'Ce point est dans le prolongement du tracé : utilisez une ligne droite.',

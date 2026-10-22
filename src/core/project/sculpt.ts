@@ -115,6 +115,20 @@ export class SculptField {
     );
   }
 
+  /** Every painted node, with its place on the plan and its height; flat ones are left out. */
+  *nodes(): Generator<{ x: number; z: number; height: number }> {
+    for (const [key, values] of this.tiles) {
+      const [i, j] = key.split(',').map(Number);
+      for (let k = 0; k < NODES; k++)
+        if (values[k])
+          yield {
+            x: (i * SCULPT.tile + (k % SCULPT.tile)) * SCULPT.cell,
+            z: (j * SCULPT.tile + Math.floor(k / SCULPT.tile)) * SCULPT.cell,
+            height: values[k],
+          };
+    }
+  }
+
   /** The tiles holding relief, flat ones left out, in a stable order. */
   toTiles(): SculptTile[] {
     return [...this.tiles]

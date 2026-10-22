@@ -7,6 +7,7 @@ import { bankTool } from './bank';
 import { barrierTool } from './barrier';
 import { earthworkTool } from './earthwork';
 import { hillTool } from './hill';
+import { sculptTool } from './sculpt';
 import { panTool } from './pan';
 import { pitsTool } from './pits';
 import { placeTool } from './scenery';
@@ -29,6 +30,7 @@ export const TOOLS: Record<ToolId, Tool> = {
     Tool
   >),
   hill: hillTool,
+  sculpt: sculptTool,
   ...(Object.fromEntries(EARTHWORK_TYPES.map((type) => [type, earthworkTool(type)])) as Record<
     EarthworkType,
     Tool

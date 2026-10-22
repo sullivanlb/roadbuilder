@@ -7,6 +7,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import App from '../src/App.vue';
 import type { PlanPoint } from '../src/core/math';
 import { serializeProject } from '../src/core/project/schema';
+import { SculptField } from '../src/core/project/sculpt';
 import { barrierPath } from '../src/core/scene/barriers';
 import { controlPointSample, sampleAt, trackLength } from '../src/core/track/centerline';
 import { widthZoneRanges } from '../src/core/track/width';
@@ -831,6 +832,38 @@ describe('editor interface', () => {
     expect(project.project.hills[0].x).toBeCloseTo(centre.x + 20, 0);
     await click('hill-delete');
     expect($('hill-empty')).not.toBeNull();
+  });
+
+  it('sculpts the terrain with the brush held on the plan', async () => {
+    await mountApp();
+    await click('layer-terrain');
+    await click('terrain-sculpt');
+    expect($('tool-sculpt').getAttribute('aria-pressed')).toBe('true');
+    await click('brush-lower');
+    expect(stores().editor.brushMode).toBe('lower');
+    await click('brush-raise');
+    await type('brush-radius', '30');
+    const centre = { x: -100, z: 60 };
+    pointer('pointermove', screen(centre));
+    await settle();
+    strokes = [];
+    pointer('pointerdown', screen(centre));
+    await settle(600);
+    pointer('pointermove', screen({ x: centre.x + 30, z: centre.z }));
+    await settle(300);
+    pointer('pointerup', screen({ x: centre.x + 30, z: centre.z }));
+    await settle();
+    expect(strokes).toContain('#d3f47d');
+    const { project } = stores();
+    const field = new SculptField(project.project.sculpt);
+    expect(field.at(centre)).toBeGreaterThan(1);
+    expect(field.at({ x: centre.x + 30, z: centre.z })).toBeGreaterThan(0.5);
+    expect($('sculpt-painted')).not.toBeNull();
+    await click('undo');
+    expect(project.project.sculpt).toEqual([]);
+    await click('redo');
+    await click('sculpt-clear');
+    expect(project.project.sculpt).toEqual([]);
   });
 
   it('switches the whole interface to English and remembers it', async () => {

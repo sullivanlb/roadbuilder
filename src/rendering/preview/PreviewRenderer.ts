@@ -12,6 +12,7 @@ import {
   LineBasicMaterial,
   LineSegments,
   Mesh,
+  MOUSE,
   MeshBasicMaterial,
   MeshLambertMaterial,
   PerspectiveCamera,
@@ -137,6 +138,51 @@ export class PreviewRenderer {
     this.requestRender();
   }
 
+  /**
+   * With the brush on, the left button paints (docs/adr/0016): the right one
+   * turns the view and the middle one pans it.
+   */
+  setBrush(on: boolean) {
+    this.controls.mouseButtons = on
+      ? { LEFT: null, MIDDLE: MOUSE.PAN, RIGHT: MOUSE.ROTATE }
+      : { LEFT: MOUSE.ROTATE, MIDDLE: MOUSE.DOLLY, RIGHT: MOUSE.PAN };
+  }
+
+  /**
+   * Bends the terrain shown by what a brush stroke painted, without waiting for
+   * the scene to be rebuilt: each vertex within `covered` rises from its height
+   * in the scene by `painted` there, as much as the relief shows there. How much
+   * shows is worked out once per vertex.
+   */
+  bendTerrain(
+    painted: (p: PlanPoint) => number,
+    shown: (p: PlanPoint) => number,
+    covered: { minX: number; maxX: number; minZ: number; maxZ: number },
+  ) {
+    for (const child of this.content.children) {
+      const base = child.userData.baseY as Float32Array | undefined;
+      if (!base || !(child instanceof Mesh)) continue;
+      const cache = child.userData.shown as Float32Array;
+      const geometry = child.geometry as BufferGeometry;
+      const positions = geometry.getAttribute('position');
+      let moved = false;
+      for (let k = 0; k < positions.count; k++) {
+        const x = positions.getX(k),
+          z = positions.getZ(k);
+        if (x < covered.minX || x > covered.maxX || z < covered.minZ || z > covered.maxZ) continue;
+        if (Number.isNaN(cache[k])) cache[k] = shown({ x, z });
+        positions.setY(k, base[k] + painted({ x, z }) * cache[k]);
+        moved = true;
+      }
+      if (!moved) continue;
+      positions.needsUpdate = true;
+      geometry.computeVertexNormals();
+      geometry.computeBoundingSphere();
+      geometry.computeBoundingBox();
+    }
+    this.requestRender();
+  }
+
   /** Replaces what is drawn over the scene: highlighted stretches, point posts, the pointer. */
   setOverlay(overlay: PreviewOverlay) {
     for (const child of this.overlay.children) {
@@ -257,6 +303,15 @@ export class PreviewRenderer {
         this.material(mesh.material, layer !== null && layer !== this.layers.active),
       );
       shown.userData = { layer, material: mesh.material };
+      // The ground keeps its heights, for a brush stroke to bend it from them.
+      if (mesh.kind === 'terrain')
+        Object.assign(shown.userData, {
+          baseY: Float32Array.from(
+            { length: mesh.positions.length / 3 },
+            (_, k) => mesh.positions[k * 3 + 1],
+          ),
+          shown: new Float32Array(mesh.positions.length / 3).fill(NaN),
+        });
       shown.visible = !layer || !this.layers.hidden.includes(layer);
       this.content.add(shown);
     }

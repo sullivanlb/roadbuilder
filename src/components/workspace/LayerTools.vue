@@ -33,6 +33,7 @@ const TOOL_LOOK: Record<ToolId, { icon: IconName; label: MessageKey }> = {
       { icon: SCENERY_ICON[kind], label: `editor.${kind}Title` as MessageKey },
     ]),
   ) as Record<SceneryKind, { icon: IconName; label: MessageKey }>),
+  sculpt: { icon: 'brush', label: 'editor.sculptTitle' },
   hill: { icon: 'hill', label: 'editor.hillTitle' },
   embankment: { icon: 'embankment', label: 'editor.embankmentTitle' },
   ditch: { icon: 'ditch', label: 'editor.ditchTitle' },

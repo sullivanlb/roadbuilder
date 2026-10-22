@@ -10,6 +10,7 @@ import { groundModel } from '../../src/core/scene/ground';
 import { buildScene, findFoldedSurface } from '../../src/core/scene/scene';
 import { sampleAt, sampleTrack } from '../../src/core/track/centerline';
 import { terrainBounds } from '../../src/core/track/layout';
+import { buildOverlay } from '../../src/rendering/preview/overlay';
 import { asJson, template } from '../helpers';
 
 const flat: SculptGround = { base: () => 0, clearance: () => 1 };
@@ -162,5 +163,29 @@ describe('the painted relief', () => {
       .filter(([x, , z]) => Math.hypot(x - top.x, z - top.z) < 4);
     expect(near.length).toBeGreaterThan(0);
     for (const [x, y, z] of near) expect(y).toBeCloseTo(height({ x, z }), 3);
+  });
+});
+
+describe('the brush in 3D', () => {
+  it('rings the ground under the pointer with its reach', () => {
+    const project = template('club');
+    const samples = sampleTrack(project);
+    const brush = { x: 10, y: 3, z: -5, radius: 12 };
+    const { outlines } = buildOverlay(project, samples, {
+      layer: 'terrain',
+      selection: null,
+      range: null,
+      draft: null,
+      sceneryFloors: {},
+      hoverS: null,
+      brush,
+    });
+    expect(outlines.length).toBe(2 * 48 * 6);
+    const reach = Math.max(
+      ...Array.from({ length: outlines.length / 3 }, (_, k) =>
+        Math.hypot(outlines[k * 3] - brush.x, outlines[k * 3 + 2] - brush.z),
+      ),
+    );
+    expect(reach).toBeCloseTo(12, 3);
   });
 });

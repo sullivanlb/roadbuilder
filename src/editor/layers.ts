@@ -51,7 +51,7 @@ export const LAYERS: readonly Layer[] = [
   { id: 'road', key: '2', tools: ['width', 'bank'], soon: [soon('surface')] },
   { id: 'edges', key: '3', tools: ['barrier'], soon: [soon('gravel')] },
   { id: 'pits', key: '4', tools: ['pits'], soon: [soon('sectors')] },
-  { id: 'terrain', key: '5', tools: ['hill', ...EARTHWORK_TYPES], soon: [] },
+  { id: 'terrain', key: '5', tools: ['sculpt', 'hill', ...EARTHWORK_TYPES], soon: [] },
   {
     id: 'scenery',
     key: '6',

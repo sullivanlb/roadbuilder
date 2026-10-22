@@ -32,6 +32,7 @@ export const enMessages: Record<MessageKey, string> = {
   'editor.grandstandTitle': 'Place a grandstand',
   'editor.signTitle': 'Place a sign',
   'editor.lightTitle': 'Place a light',
+  'editor.sculptTitle': 'Sculpt with the brush',
   'editor.hillTitle': 'Raise a hill',
   'editor.embankmentTitle': 'Lay an embankment',
   'editor.ditchTitle': 'Dig a ditch',
@@ -74,6 +75,10 @@ export const enMessages: Record<MessageKey, string> = {
     'Click an item of the layer to adjust it · Scroll to zoom · Space + drag to pan',
   'canvas.hintScenery':
     'Click to place the item, facing the track · Shift: 5 m grid · Esc leaves the tool',
+  'canvas.hintSculpt':
+    'Hold the button to sculpt under the brush · Shift swaps raise and lower · Esc leaves the tool',
+  'canvas.hint3dSculpt':
+    'Hold left button: sculpt · Shift: swap · Right button: turn the view · Wheel: zoom',
   'canvas.hintHill': 'Click to raise a hill · Shift: 5 m grid · Esc leaves the tool',
   'canvas.hintEmbankment':
     'Click where the embankment starts, on the side of the track you want · Esc leaves the tool',
@@ -247,6 +252,20 @@ export const enMessages: Record<MessageKey, string> = {
   'earthworks.onTrack': 'This earthwork reaches another part of the track.',
   'earthworks.empty':
     'No earthwork yet. Pick an embankment, a ditch or a run-off, then click where it starts and ends along the track.',
+  'sculpt.title': 'Brush',
+  'sculpt.brush': 'Brush',
+  'sculpt.modeAria': 'What the brush does',
+  'sculpt.raise': 'Raise',
+  'sculpt.lower': 'Lower',
+  'sculpt.smooth': 'Smooth',
+  'sculpt.flatten': 'Flatten',
+  'sculpt.radius': 'Radius',
+  'sculpt.strength': 'Strength',
+  'sculpt.note':
+    'Hold the button: matter piles up under the brush, most at its centre. Shift swaps raise and lower; flatten levels to the height of the first spot. Near the track the relief fades out.',
+  'sculpt.painted':
+    'Relief sculpted over {count} tile of 64 m.|Relief sculpted over {count} tiles of 64 m.',
+  'sculpt.clear': 'Clear the sculpted relief',
   'hills.title': 'Hills',
   'hills.count': '{count} hill|{count} hills',
   'hills.hill': 'Hill',
@@ -470,6 +489,7 @@ export const enMessages: Record<MessageKey, string> = {
   'toast.earthworksLimit': 'At most {max} earthworks.',
   'toast.earthworkAdded': 'Earthwork added. Esc to stop laying.',
   'toast.hillsLimit': 'At most {max} hills.',
+  'toast.sculptLimit': 'The sculpted relief reached its limit of {max} tiles of 64 m.',
   'toast.pointTooClose': 'Place this point at least {min} meters from the others.',
   'toast.arcNeedsTrack': 'Place at least two points before drawing an arc.',
   'toast.arcStraight': 'This point is straight ahead of the track: draw a straight instead.',
