@@ -8,6 +8,8 @@ export type ProjectErrorDetail =
   | { code: 'width-zones-limit'; max: number }
   | { code: 'bank-zones-limit'; max: number }
   | { code: 'scenery-limit'; max: number }
+  | { code: 'earthworks-limit'; max: number }
+  | { code: 'hills-limit'; max: number }
   | { code: 'duplicate-id' }
   | { code: 'barrier-endpoint' }
   | { code: 'barrier-span' }

@@ -4,6 +4,7 @@ import { DEFAULTS, RULES } from './rules';
 import type { NumericRule } from './rules';
 import { ProjectError } from './errors';
 import { SCENERY_SIZE_NAMES, SCENERY_SIZES, SCENERY_VARIANTS } from './scenery';
+import { EARTHWORK_REACH, EARTHWORK_RULES, EARTHWORK_SETTING_NAMES } from './terrain';
 import type { ProjectErrorDetail } from './errors';
 
 export const PROJECT_FORMAT = 'roadbuilder';
@@ -12,6 +13,7 @@ export const PROJECT_VERSION = 2;
 export const BARRIER_TYPES = ['guardrail', 'tires', 'tecpro', 'wall'] as const;
 export const SIDES = ['left', 'right'] as const;
 export const SCENERY_KINDS = ['tree', 'building', 'grandstand', 'sign', 'light'] as const;
+export const EARTHWORK_TYPES = ['embankment', 'ditch', 'runoff'] as const;
 /** Every variant a scenery item may take; each kind accepts its own (SCENERY_VARIANTS in scenery.ts). */
 export const VARIANT_NAMES = [
   'leafy',
@@ -103,6 +105,38 @@ const sceneryItem = z.object({
   count: z.number().int().min(RULES.groveCount.min).max(RULES.groveCount.max).optional(),
 });
 
+/**
+ * A shape given to the ground beside the track, on one side between two track
+ * positions (docs/adr/0015). Each type accepts its own settings (EARTHWORK_RULES in terrain.ts).
+ */
+const earthwork = z.object({
+  id,
+  type: z.enum(EARTHWORK_TYPES),
+  side: z.enum(SIDES),
+  /** Where the earthwork starts, in track direction. */
+  from: trackPosition,
+  /** Where the earthwork ends, in track direction. */
+  to: trackPosition,
+  /** Distance from the outer edge of the shoulders to where the ground starts changing. */
+  offset: ranged(RULES.earthworkOffset),
+  /** Across the track: the slope of an embankment, a ditch, the flat of a run-off. */
+  width: ranged(RULES.earthworkWidth),
+  /** Rise of an embankment, negative when it falls; depth of a ditch. */
+  height: ranged(RULES.earthworkHeight),
+});
+
+/** A free-standing rise of the ground, oval and oriented, or a hollow when its height is negative. */
+const hill = z.object({
+  id,
+  x: ranged(RULES.coordinate),
+  z: ranged(RULES.coordinate),
+  /** Where its width runs across, in degrees clockwise from -Z on the plan, like a scenery item. */
+  heading: ranged(RULES.heading),
+  width: ranged(RULES.hillSize),
+  depth: ranged(RULES.hillSize),
+  height: ranged(RULES.hillHeight),
+});
+
 const pitLane = z.object({
   side: z.enum(SIDES),
   entry: trackPosition,
@@ -128,6 +162,8 @@ const projectShape = z.object({
   widthZones: z.array(widthZone).max(RULES.widthZones.max).default([]),
   bankZones: z.array(bankZone).max(RULES.bankZones.max).default([]),
   scenery: z.array(sceneryItem).max(RULES.scenery.max).default([]),
+  earthworks: z.array(earthwork).max(RULES.earthworks.max).default([]),
+  hills: z.array(hill).max(RULES.hills.max).default([]),
   /** Absent until set: the start line then sits a little after the first control point. */
   startLine: trackPosition.optional(),
   pitLane: pitLane.nullable().default(null),
@@ -148,6 +184,8 @@ function checkReferences(project: ProjectShape, ctx: z.RefinementCtx<ProjectShap
     ...project.widthZones,
     ...project.bankZones,
     ...project.scenery,
+    ...project.earthworks,
+    ...project.hills,
   ]) {
     if (ids.has(item.id)) return fail('duplicate-id', []);
     ids.add(item.id);
@@ -177,6 +215,10 @@ function checkReferences(project: ProjectShape, ctx: z.RefinementCtx<ProjectShap
       ['bankZones', zone.from] as const,
       ['bankZones', zone.to] as const,
     ]),
+    ...project.earthworks.flatMap((earthwork) => [
+      ['earthworks', earthwork.from] as const,
+      ['earthworks', earthwork.to] as const,
+    ]),
   ] as const;
   for (const [field, position] of positions)
     if (position && !order.has(position.point)) return fail('position-point', [field]);
@@ -187,6 +229,15 @@ function checkReferences(project: ProjectShape, ctx: z.RefinementCtx<ProjectShap
       const { min, max } = SCENERY_SIZES[item.kind][size];
       if (item[size] < min || item[size] > max) fail('invalid-value', ['scenery', index, size]);
     }
+  });
+  project.earthworks.forEach((earthwork, index) => {
+    for (const setting of EARTHWORK_SETTING_NAMES) {
+      const { min, max } = EARTHWORK_RULES[earthwork.type][setting];
+      if (earthwork[setting] < min || earthwork[setting] > max)
+        fail('invalid-value', ['earthworks', index, setting]);
+    }
+    if (earthwork.offset + earthwork.width > EARTHWORK_REACH)
+      fail('invalid-value', ['earthworks', index, 'width']);
   });
   if (project.pitLane && !circuit) return fail('pit-lane-on-road', ['pitLane']);
   if (project.cars > 1 && !project.pitLane) fail('cars-without-pit-lane', ['cars']);
@@ -208,6 +259,9 @@ export type PitLane = NonNullable<Project['pitLane']>;
 export type SceneryItem = Project['scenery'][number];
 export type SceneryKind = SceneryItem['kind'];
 export type SceneryVariant = NonNullable<SceneryItem['variant']>;
+export type Earthwork = Project['earthworks'][number];
+export type EarthworkType = Earthwork['type'];
+export type Hill = Project['hills'][number];
 
 /** A circuit needs three control points to close; with fewer it is driven as a road. */
 export const isCircuit = (project: Pick<Project, 'road' | 'points'>) =>
@@ -228,6 +282,8 @@ function toDetail(error: z.ZodError): ProjectErrorDetail {
     if (head === 'widthZones') return { code: 'width-zones-limit', max: RULES.widthZones.max };
     if (head === 'bankZones') return { code: 'bank-zones-limit', max: RULES.bankZones.max };
     if (head === 'scenery') return { code: 'scenery-limit', max: RULES.scenery.max };
+    if (head === 'earthworks') return { code: 'earthworks-limit', max: RULES.earthworks.max };
+    if (head === 'hills') return { code: 'hills-limit', max: RULES.hills.max };
   }
   return { code: 'invalid-value', path: issue.path.join('.') };
 }

@@ -17,7 +17,9 @@ export const RULES = {
   widthZones: { max: 40 },
   bankZones: { max: 40 },
   scenery: { max: 400 },
-  /** Shortest width zone, bank zone or barrier accepted, along the track. */
+  earthworks: { max: 120 },
+  hills: { max: 60 },
+  /** Shortest width zone, bank zone, barrier or earthwork accepted, along the track. */
   rangeLength: 5,
   /** Two control points closer than this on the ground plane are rejected. */
   pointSpacing: 2,
@@ -45,6 +47,14 @@ export const RULES = {
   scenerySize: { min: 0.2, max: 200, step: 0.5 },
   /** Number of trees in a grove. */
   groveCount: { min: 1, max: 40, step: 1 },
+  /** Settings of an earthwork, in metres; each type narrows them in EARTHWORK_RULES. */
+  earthworkOffset: { min: 0, max: 30, step: 0.5 },
+  earthworkWidth: { min: 1, max: 50, step: 0.5 },
+  earthworkHeight: { min: -20, max: 20, step: 0.1 },
+  /** Width and depth of a hill on the plan. */
+  hillSize: { min: 10, max: 800, step: 5 },
+  /** Height of a hill above the ground around it; a hollow below it when negative. */
+  hillHeight: { min: -40, max: 80, step: 0.5 },
 } as const satisfies Record<string, NumericRule | { max: number } | number>;
 
 /** Values given to the settings a new project does not choose itself. */

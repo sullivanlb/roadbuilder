@@ -16,11 +16,16 @@ import { bankZoneRanges } from '../track/bank';
 import { widthZoneRanges } from '../track/width';
 import type { TrackRange } from '../track/ranges';
 import { newScenery, SCENERY_SIZES, SCENERY_VARIANTS } from './scenery';
+import { EARTHWORK_DEFAULTS, EARTHWORK_REACH, EARTHWORK_RULES, HILL_DEFAULTS } from './terrain';
+import type { EarthworkSettings } from './terrain';
 import { isCircuit } from './schema';
 import type {
   BankZone,
   Barrier,
   ControlPoint,
+  Earthwork,
+  EarthworkType,
+  Hill,
   PitLane,
   Project,
   RoadSettings,
@@ -191,7 +196,12 @@ function mapPositions(draft: ProjectDraft, map: (position: TrackPosition) => Tra
     draft.pitLane.entry = map(draft.pitLane.entry);
     draft.pitLane.exit = map(draft.pitLane.exit);
   }
-  for (const item of [...draft.barriers, ...draft.widthZones, ...draft.bankZones]) {
+  for (const item of [
+    ...draft.barriers,
+    ...draft.widthZones,
+    ...draft.bankZones,
+    ...draft.earthworks,
+  ]) {
     item.from = map(item.from);
     item.to = map(item.to);
   }
@@ -242,9 +252,9 @@ export function setAltitude(draft: ProjectDraft, ids: readonly Id[], y: number) 
 
 /**
  * Drives the track the other way. A circuit keeps its first control point so the
- * start stays in place. Barriers, width and bank zones keep covering the same
- * ground: their start becomes their end, and barriers and the raised edge of bank
- * zones change side, since left and right follow the direction.
+ * start stays in place. Barriers, zones and earthworks keep covering the same
+ * ground: their start becomes their end, and barriers, earthworks and the raised
+ * edge of bank zones change side, since left and right follow the direction.
  */
 export function reverseTrack(draft: ProjectDraft) {
   const before = measured(draft);
@@ -254,10 +264,13 @@ export function reverseTrack(draft: ProjectDraft) {
     positionDistance(before.track, before.samples, position) ?? 0;
   const startLine = draft.startLine && distance(draft.startLine);
   const pits = draft.pitLane && [distance(draft.pitLane.entry), distance(draft.pitLane.exit)];
-  const ranges = [...draft.barriers, ...draft.widthZones, ...draft.bankZones].map((item) => [
-    distance(item.from),
-    distance(item.to),
-  ]);
+  const laid = () => [
+    ...draft.barriers,
+    ...draft.widthZones,
+    ...draft.bankZones,
+    ...draft.earthworks,
+  ];
+  const ranges = laid().map((item) => [distance(item.from), distance(item.to)]);
   // A straight is marked on the point it leaves from, which becomes the one it arrives at.
   const n = draft.points.length,
     circuit = isCircuit(draft);
@@ -267,7 +280,7 @@ export function reverseTrack(draft: ProjectDraft) {
   draft.points.forEach((point, i) => setStraight(draft, point.id, straights[i] === true));
   if (circuit) draft.points = [draft.points[0], ...draft.points.slice(1).reverse()];
   else draft.points.reverse();
-  for (const barrier of draft.barriers) barrier.side = opposite(barrier.side);
+  for (const item of [...draft.barriers, ...draft.earthworks]) item.side = opposite(item.side);
   for (const zone of draft.bankZones) zone.high = opposite(zone.high);
   const after = measured(draft);
   const mirrored = (s: number) => positionAt(after.track, after.samples, length - s);
@@ -278,7 +291,7 @@ export function reverseTrack(draft: ProjectDraft) {
     draft.pitLane.exit = mirrored(pits[0]);
     draft.pitLane.side = opposite(draft.pitLane.side);
   }
-  [...draft.barriers, ...draft.widthZones, ...draft.bankZones].forEach((item, index) => {
+  laid().forEach((item, index) => {
     const [from, to] = ranges[index];
     item.from = mirrored(to);
     item.to = mirrored(from);
@@ -286,7 +299,7 @@ export function reverseTrack(draft: ProjectDraft) {
 }
 
 /**
- * Turns the track into a circuit or a road. A barrier or a zone running
+ * Turns the track into a circuit or a road. A barrier, a zone or an earthwork running
  * through the start of a circuit is split at the start, since a road has no way
  * through it.
  */
@@ -300,6 +313,7 @@ export function setClosed(draft: ProjectDraft, closed: boolean) {
   draft.barriers = split(draft.barriers);
   draft.widthZones = split(draft.widthZones);
   draft.bankZones = split(draft.bankZones);
+  draft.earthworks = split(draft.earthworks);
 }
 
 /**
@@ -311,7 +325,7 @@ function splitAtStart(draft: ProjectDraft, before: { track: Project; samples: Sa
     last = draft.points.at(-1)!.id;
   const distance = (position: TrackPosition) =>
     positionDistance(before.track, before.samples, position) ?? 0;
-  return <T extends Barrier | WidthZone | BankZone>(items: T[]): T[] =>
+  return <T extends Barrier | WidthZone | BankZone | Earthwork>(items: T[]): T[] =>
     items.flatMap((item) => {
       if (distance(item.from) <= distance(item.to)) return [item];
       const parts: T[] = [];
@@ -589,4 +603,108 @@ export function duplicateScenery(draft: ProjectDraft, ids: readonly Id[], offset
     }));
   draft.scenery.push(...copies);
   return copies.map((item) => item.id);
+}
+
+/** Why an earthwork cannot be laid over a stretch of track, or null when it can. */
+export function earthworkRejection(
+  project: Project,
+  range: TrackRange,
+): 'too-short' | 'earthworks-limit' | null {
+  if (range.length < RULES.rangeLength) return 'too-short';
+  if (project.earthworks.length >= RULES.earthworks.max) return 'earthworks-limit';
+  return null;
+}
+
+/** Settings brought within the rules of a type, offset and width within the earthwork reach. */
+function earthworkSettings(type: EarthworkType, settings: EarthworkSettings): EarthworkSettings {
+  const rules = EARTHWORK_RULES[type];
+  const offset = within(rules.offset, settings.offset);
+  return {
+    offset,
+    width: Math.min(within(rules.width, settings.width), EARTHWORK_REACH - offset),
+    height: within(rules.height, settings.height),
+  };
+}
+
+/**
+ * Lays an earthwork of a type between two track positions, in track direction,
+ * with the defaults of its type, and returns its ID. Check earthworkRejection() first.
+ */
+export function addEarthwork(
+  draft: ProjectDraft,
+  earthwork: Pick<Earthwork, 'type' | 'side' | 'from' | 'to'>,
+): Id {
+  const id = createId();
+  draft.earthworks.push({
+    ...earthwork,
+    id,
+    from: clampPosition(earthwork.from),
+    to: clampPosition(earthwork.to),
+    ...EARTHWORK_DEFAULTS[earthwork.type],
+  });
+  return id;
+}
+
+export type EarthworkPatch = Partial<
+  Pick<Earthwork, 'type' | 'side' | 'from' | 'to' | 'offset' | 'width' | 'height'>
+>;
+
+/** Changes an earthwork. A new type starts from the defaults of that type. */
+export function updateEarthwork(draft: ProjectDraft, id: Id, patch: EarthworkPatch) {
+  const earthwork = draft.earthworks.find((candidate) => candidate.id === id);
+  if (!earthwork) return;
+  if (patch.type !== undefined && patch.type !== earthwork.type) {
+    earthwork.type = patch.type;
+    Object.assign(earthwork, EARTHWORK_DEFAULTS[patch.type]);
+  }
+  if (patch.side !== undefined) earthwork.side = patch.side;
+  if (patch.from !== undefined) earthwork.from = clampPosition(patch.from);
+  if (patch.to !== undefined) earthwork.to = clampPosition(patch.to);
+  Object.assign(
+    earthwork,
+    earthworkSettings(earthwork.type, {
+      offset: patch.offset ?? earthwork.offset,
+      width: patch.width ?? earthwork.width,
+      height: patch.height ?? earthwork.height,
+    }),
+  );
+}
+
+export function removeEarthwork(draft: ProjectDraft, id: Id) {
+  draft.earthworks = draft.earthworks.filter((earthwork) => earthwork.id !== id);
+}
+
+/** Why a hill cannot be raised, or null when it can. */
+export function hillRejection(project: Project): 'hills-limit' | null {
+  return project.hills.length >= RULES.hills.max ? 'hills-limit' : null;
+}
+
+/** Raises a hill of the default size at a place on the plan and returns its ID. */
+export function addHill(draft: ProjectDraft, at: PlanPoint, heading = 0): Id {
+  const id = createId();
+  draft.hills.push({
+    id,
+    x: within(RULES.coordinate, at.x),
+    z: within(RULES.coordinate, at.z),
+    heading: turn(heading),
+    ...HILL_DEFAULTS,
+  });
+  return id;
+}
+
+export type HillPatch = Partial<Pick<Hill, 'x' | 'z' | 'heading' | 'width' | 'depth' | 'height'>>;
+
+export function updateHill(draft: ProjectDraft, id: Id, patch: HillPatch) {
+  const hill = draft.hills.find((candidate) => candidate.id === id);
+  if (!hill) return;
+  if (patch.x !== undefined) hill.x = within(RULES.coordinate, patch.x);
+  if (patch.z !== undefined) hill.z = within(RULES.coordinate, patch.z);
+  if (patch.heading !== undefined) hill.heading = turn(patch.heading);
+  if (patch.width !== undefined) hill.width = within(RULES.hillSize, patch.width);
+  if (patch.depth !== undefined) hill.depth = within(RULES.hillSize, patch.depth);
+  if (patch.height !== undefined) hill.height = within(RULES.hillHeight, patch.height);
+}
+
+export function removeHill(draft: ProjectDraft, id: Id) {
+  draft.hills = draft.hills.filter((hill) => hill.id !== id);
 }

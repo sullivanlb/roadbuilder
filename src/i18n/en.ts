@@ -447,6 +447,8 @@ export const enMessages: Record<MessageKey, string> = {
   'projectError.widthZonesLimit': 'The project exceeds {max} width zones.',
   'projectError.bankZonesLimit': 'The project exceeds {max} bank zones.',
   'projectError.sceneryLimit': 'The project exceeds {max} scenery items.',
+  'projectError.earthworksLimit': 'The project exceeds {max} earthworks.',
+  'projectError.hillsLimit': 'The project exceeds {max} hills.',
   'projectError.duplicateId': 'The project contains two items with the same identifier.',
   'projectError.barrierEndpoint': 'A barrier rests on a point that does not exist.',
   'projectError.barrierSpan': 'A barrier must join two different points.',

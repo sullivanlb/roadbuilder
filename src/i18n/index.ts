@@ -103,6 +103,10 @@ export function formatProjectError(detail: ProjectErrorDetail, target?: Locale):
       return tr('projectError.bankZonesLimit', { max: detail.max });
     case 'scenery-limit':
       return tr('projectError.sceneryLimit', { max: detail.max });
+    case 'earthworks-limit':
+      return tr('projectError.earthworksLimit', { max: detail.max });
+    case 'hills-limit':
+      return tr('projectError.hillsLimit', { max: detail.max });
     case 'duplicate-id':
       return tr('projectError.duplicateId');
     case 'barrier-endpoint':

@@ -466,6 +466,8 @@ export const frMessages = {
   'projectError.widthZonesLimit': 'Le projet dépasse {max} portions de largeur.',
   'projectError.bankZonesLimit': 'Le projet dépasse {max} portions de dévers.',
   'projectError.sceneryLimit': 'Le projet dépasse {max} objets de décor.',
+  'projectError.earthworksLimit': 'Le projet dépasse {max} terrassements.',
+  'projectError.hillsLimit': 'Le projet dépasse {max} collines.',
   'projectError.duplicateId': 'Le projet contient deux éléments avec le même identifiant.',
   'projectError.barrierEndpoint': 'Une barrière s’appuie sur un point qui n’existe pas.',
   'projectError.barrierSpan': 'Une barrière doit relier deux points différents.',
