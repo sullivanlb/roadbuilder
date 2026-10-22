@@ -1,11 +1,15 @@
 import { bounds, clamp } from '../math';
 import type { Bounds, PlanPoint, Vec3 } from '../math';
 import type { Project } from '../project/schema';
+import { hillReach } from '../project/terrain';
 import type { Sample } from '../track/centerline';
 import { terrainBounds } from '../track/layout';
 import { groundHeight } from './ground';
 import { addVertex, createMesh, MAX_MESH_VERTICES, vertexCount, vertexPosition } from './mesh';
 import type { Mesh } from './mesh';
+
+/** Size of the terrain cells under a hill: a share of its size, within bounds, in metres. */
+const HILL_STEP = { min: 2, perSize: 10, maxDivision: 8 };
 
 // Terrain is a tiled height field with the actual road/verge/pit footprint cut out.
 // Clipping the footprint (instead of hiding a plane under the road) keeps elevated
@@ -108,19 +112,42 @@ export function buildTerrain(
         }
     }
   }
+  // Cells under a hill are divided to show its shape (docs/adr/0015); the
+  // alignment below stitches them to their undivided neighbours.
+  const hills = project.hills.map((hill) => ({
+    hill,
+    reach: hillReach(hill),
+    step: Math.max(HILL_STEP.min, Math.min(hill.width, hill.depth) / HILL_STEP.perSize),
+  }));
+  const division = (x: number, z: number) =>
+    hills.reduce(
+      (n, { hill, reach, step }) =>
+        x > hill.x + reach ||
+        x + dx < hill.x - reach ||
+        z > hill.z + reach ||
+        z + dz < hill.z - reach
+          ? n
+          : Math.max(n, Math.min(HILL_STEP.maxDivision, Math.ceil(Math.max(dx, dz) / step))),
+      1,
+    );
   const polygons = [];
   for (let row = 0; row < rows; row++)
     for (let column = 0; column < columns; column++) {
       const x = extent.minX + column * dx,
         z = extent.minZ + row * dz;
-      let parts = [
-        [
-          { x, z },
-          { x: x + dx, z },
-          { x: x + dx, z: z + dz },
-          { x, z: z + dz },
-        ],
-      ];
+      const n = division(x, z);
+      let parts = Array.from({ length: n * n }, (_, k) => {
+        const x0 = x + (dx * (k % n)) / n,
+          x1 = x + (dx * ((k % n) + 1)) / n,
+          z0 = z + (dz * Math.floor(k / n)) / n,
+          z1 = z + (dz * (Math.floor(k / n) + 1)) / n;
+        return [
+          { x: x0, z: z0 },
+          { x: x1, z: z0 },
+          { x: x1, z: z1 },
+          { x: x0, z: z1 },
+        ];
+      });
       for (const index of cells.get(row * columns + column) || []) {
         const triangle = triangles[index],
           bb = triangle.bounds;

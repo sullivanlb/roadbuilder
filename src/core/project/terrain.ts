@@ -1,4 +1,6 @@
+import type { PlanPoint } from '../math';
 import type { NumericRule } from './rules';
+import { headingVector } from './scenery';
 import type { Earthwork, EarthworkType, Hill } from './schema';
 
 /** The settings of an earthwork that can change with its type. */
@@ -47,6 +49,28 @@ export const EARTHWORK_DEFAULTS: Record<EarthworkType, EarthworkSettings> = {
 /** Whether a setting of a type can be changed: a fixed one cannot. */
 export const editableEarthwork = (type: EarthworkType, setting: keyof EarthworkSettings) =>
   EARTHWORK_RULES[type][setting].min < EARTHWORK_RULES[type][setting].max;
+
+/**
+ * Where a place lies in a hill, as a share of its size: 0 at its top, 1 on its
+ * outline. Its width runs across its heading, its depth along it, like a scenery item.
+ */
+export function hillRadius(hill: Hill, p: PlanPoint): number {
+  const front = headingVector(hill.heading);
+  const dx = p.x - hill.x,
+    dz = p.z - hill.z;
+  const u = dx * -front.z + dz * front.x,
+    v = dx * front.x + dz * front.z;
+  return Math.hypot(u / (hill.width / 2), v / (hill.depth / 2));
+}
+
+/** Height a hill adds to the ground at a place: its full height on top, easing to nothing at its outline. */
+export function hillLift(hill: Hill, p: PlanPoint): number {
+  const r = hillRadius(hill, p);
+  return r < 1 ? (hill.height * (1 + Math.cos(Math.PI * r))) / 2 : 0;
+}
+
+/** How far a hill reaches from its centre, in metres. */
+export const hillReach = (hill: Hill) => Math.max(hill.width, hill.depth) / 2;
 
 /** What a new hill looks like: an oval rise, longer across its heading. */
 export const HILL_DEFAULTS: Pick<Hill, 'width' | 'depth' | 'height'> = {

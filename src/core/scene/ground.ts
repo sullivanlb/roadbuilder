@@ -1,6 +1,7 @@
 import { clamp } from '../math';
 import type { PlanPoint } from '../math';
 import { SIDES } from '../project/schema';
+import { hillLift, hillReach } from '../project/terrain';
 import type { Project } from '../project/schema';
 import type { Sample } from '../track/centerline';
 import { sideProfiles } from '../track/earthworks';
@@ -28,6 +29,8 @@ interface Beside {
   hold: number;
   /** Height the earthworks there add to the ground (SideProfiles.lift). */
   lift: number;
+  /** How far beyond the shoulders the ground stays flat there (SideProfiles.keep). */
+  keep: number;
 }
 
 const smoothstep = (t: number) => t * t * (3 - 2 * t);
@@ -39,13 +42,14 @@ const smoothstep = (t: number) => t * t * (3 - 2 * t);
  * the track nearby pulls the ground to its own edge height, the nearer the
  * stronger, so the ground slopes between two passes of the track without a step.
  * Earthworks reshape the ground beside their segments and keep it near the track
- * farther out (docs/adr/0015).
+ * farther out; hills rise from the ground beyond the flat strip (docs/adr/0015).
  */
 export function groundHeight(
   project: Project,
   samples: readonly Sample[],
 ): (p: PlanPoint) => number {
-  const { blend } = LAYOUT.terrain;
+  const { blend } = LAYOUT.terrain,
+    { hillEase } = LAYOUT;
   const lane = pitLaneLayout(project, samples);
   const profiles = sideProfiles(project, samples);
   // Outer edge of the shoulders on each side, from the centerline.
@@ -100,6 +104,7 @@ export function groundHeight(
       beyond,
       hold: mix(profiles.hold(i, name), profiles.hold(i + 1, name)),
       lift: mix(profiles.lift(i, name, beyond), profiles.lift(i + 1, name, beyond)),
+      keep: mix(profiles.keep(i, name), profiles.keep(i + 1, name)),
     };
   };
 
@@ -118,6 +123,17 @@ export function groundHeight(
     return weighted / total;
   };
 
+  /** Height the hills add at a place, `clear` metres beyond the flat strip of the track. */
+  const hills = project.hills.map((hill) => ({ hill, reach: hillReach(hill) }));
+  const hillsAt = (p: PlanPoint, clear: number) => {
+    if (!hills.length || clear <= 0) return 0;
+    let sum = 0;
+    for (const { hill, reach } of hills)
+      if (Math.abs(p.x - hill.x) < reach && Math.abs(p.z - hill.z) < reach)
+        sum += hillLift(hill, p);
+    return sum * smoothstep(clamp(clear / hillEase, 0, 1));
+  };
+
   // What each segment near a place adds, kept between calls to spare allocations.
   const lifts: number[] = [],
     distances: number[] = [];
@@ -127,10 +143,11 @@ export function groundHeight(
       nearest = Infinity,
       lifted = false,
       // Distance beyond what the nearest segment keeps, where the far terrain takes over.
-      closest = Infinity;
+      closest = Infinity,
+      clear = Infinity;
     lifts.length = distances.length = 0;
     for (const i of cells.get(key(p.x, p.z)) ?? []) {
-      const { height, beyond, hold, lift } = besideAt(p, i);
+      const { height, beyond, hold, lift, keep } = besideAt(p, i);
       const limit = hold + blend;
       if (beyond >= limit) continue;
       // Fades out towards the limit, so a segment leaves the sum without a step.
@@ -138,12 +155,13 @@ export function groundHeight(
       weighted += weight * height;
       total += weight;
       closest = Math.min(closest, beyond - hold);
+      clear = Math.min(clear, beyond - keep);
       nearest = Math.min(nearest, beyond);
       lifted ||= lift !== 0;
       lifts.push(lift);
       distances.push(beyond);
     }
-    if (!total) return farHeight(p);
+    if (!total) return farHeight(p) + hillsAt(p, Infinity);
     let along = weighted / total;
     if (lifted) {
       // Segments farther than the nearest one fade out of the lift, which still
@@ -158,6 +176,6 @@ export function groundHeight(
       along += sum / share;
     }
     const far = smoothstep(clamp(closest / blend, 0, 1));
-    return far ? along + (farHeight(p) - along) * far : along;
+    return (far ? along + (farHeight(p) - along) * far : along) + hillsAt(p, clear);
   };
 }

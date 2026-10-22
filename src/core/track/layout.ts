@@ -1,6 +1,7 @@
 import { bounds } from '../math';
 import type { Bounds } from '../math';
 import type { Project, RoadSettings } from '../project/schema';
+import { hillReach } from '../project/terrain';
 import type { Sample } from './centerline';
 
 /** Fixed dimensions of the generated track, in metres. */
@@ -31,6 +32,8 @@ export const LAYOUT = {
   widthTaper: 20,
   /** Ground beyond the shoulders: kept flat over `flat`, then eased into the far terrain over `blend`. */
   terrain: { flat: 8, blend: 40 },
+  /** Length beyond the flat strip over which a hill rises from nothing to its full height. */
+  hillEase: 15,
   /** Length over which an earthwork takes shape at each end. */
   earthworkTaper: 15,
 } as const;
@@ -64,19 +67,27 @@ export function clampToBend(
   );
 }
 
-/** Extent of the terrain around the track. */
+/** Extent of the terrain around the track, grown to cover every hill. */
 export function terrainBounds(
-  project: Pick<Project, 'road' | 'terrain' | 'pitLane'>,
+  project: Pick<Project, 'road' | 'terrain' | 'pitLane' | 'hills'>,
   samples: readonly Sample[],
 ): Bounds {
   const pitLane = project.pitLane
     ? LAYOUT.pitLane.wallGap + project.pitLane.width + project.road.shoulder
     : 0;
-  return bounds(
+  const extent = bounds(
     samples,
     widestHalf(project.road, samples) +
       kerbWidth(project.road) +
       Math.max(project.road.shoulder, LAYOUT.spawnPad.depth, pitLane) +
       project.terrain.margin,
   );
+  for (const hill of project.hills) {
+    const reach = hillReach(hill);
+    extent.minX = Math.min(extent.minX, hill.x - reach);
+    extent.maxX = Math.max(extent.maxX, hill.x + reach);
+    extent.minZ = Math.min(extent.minZ, hill.z - reach);
+    extent.maxZ = Math.max(extent.maxZ, hill.z + reach);
+  }
+  return extent;
 }

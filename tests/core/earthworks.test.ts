@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import {
   addEarthwork,
   addHill,
+  addScenery,
   removePoint,
   reverseTrack,
   setClosed,
@@ -17,7 +18,7 @@ import { bankLift } from '../../src/core/scene/mesh';
 import { buildScene, findFoldedSurface } from '../../src/core/scene/scene';
 import { sampleAt, sampleTrack, trackLength } from '../../src/core/track/centerline';
 import { trackIssues } from '../../src/core/track/issues';
-import { LAYOUT } from '../../src/core/track/layout';
+import { LAYOUT, terrainBounds } from '../../src/core/track/layout';
 import { pitLaneLayout, sideEdge } from '../../src/core/track/pitLane';
 import { pointDistance, positionAt } from '../../src/core/track/positions';
 import { positionRange } from '../../src/core/track/ranges';
@@ -265,5 +266,78 @@ describe('earthworks reaching the track', () => {
     for (const side of ['left', 'right'] as const)
       project = withEarthwork(project, 'embankment', 50, 600, side, { offset: 4, width: 10 });
     expect(warning(project)).toBeUndefined();
+  });
+});
+
+describe('hills', () => {
+  const club = template('club');
+  /** A place of the club terrain at least 120 m from the track. */
+  const away = () => {
+    const samples = sampleTrack(club);
+    const extent = terrainBounds(club, samples);
+    for (let x = extent.minX + 40; x < extent.maxX; x += 10)
+      for (let z = extent.minZ + 40; z < extent.maxZ; z += 10)
+        if (samples.every((sample) => Math.hypot(sample.x - x, sample.z - z) > 120))
+          return { x, z };
+    throw new Error('no room');
+  };
+  const withHill = (project: Project, at: { x: number; z: number }, patch = {}) =>
+    produce(project, (draft) => {
+      updateHill(draft, addHill(draft, at), { width: 80, depth: 60, ...patch });
+    });
+  const rise = (project: Project, p: { x: number; z: number }) =>
+    groundHeight(project, sampleTrack(project))(p) - groundHeight(club, sampleTrack(club))(p);
+
+  it('rises to its height on top and eases out to its outline', () => {
+    const top = away();
+    const project = withHill(club, top, { height: 10, heading: 90 });
+    expect(rise(project, top)).toBeCloseTo(10, 3);
+    // Heading 90 faces +X: the width runs along Z, the depth along X.
+    expect(rise(project, { x: top.x, z: top.z + 20 })).toBeCloseTo(5, 3);
+    expect(rise(project, { x: top.x + 15, z: top.z })).toBeCloseTo(5, 3);
+    expect(rise(project, { x: top.x + 31, z: top.z })).toBe(0);
+    expect(rise(withHill(club, top, { height: -6 }), top)).toBeCloseTo(-6, 3);
+  });
+
+  it('fades out near the track, whose shoulders keep their heights', () => {
+    const at = sampleAt(sampleTrack(club), 200)!;
+    const project = withHill(club, at, { width: 200, depth: 200, height: 20 });
+    expect(groundBeside(project, 200, 'right', 0)).toBeCloseTo(0, 1);
+    expect(groundBeside(project, 200, 'right', 4)).toBeCloseTo(0, 1);
+    expect(
+      groundBeside(project, 200, 'right', LAYOUT.terrain.flat + LAYOUT.hillEase + 5),
+    ).toBeGreaterThan(10);
+  });
+
+  it('grows the terrain over it and meshes its shape finely', () => {
+    const samples = sampleTrack(club);
+    const extent = terrainBounds(club, samples);
+    const top = { x: extent.maxX + 150, z: (extent.minZ + extent.maxZ) / 2 };
+    const project = withHill(club, top, { height: 15 });
+    expect(terrainBounds(project, samples).maxX).toBeGreaterThanOrEqual(top.x + 40);
+    const scene = buildScene(project);
+    expect(findFoldedSurface(scene)).toBeUndefined();
+    const height = groundHeight(project, samples);
+    const near = scene.meshes
+      .filter((mesh) => mesh.kind === 'terrain')
+      .flatMap((mesh) =>
+        Array.from({ length: mesh.positions.length / 3 }, (_, i) =>
+          mesh.positions.slice(i * 3, i * 3 + 3),
+        ),
+      )
+      .filter(([x, , z]) => Math.hypot(x - top.x, z - top.z) < 6);
+    expect(near.length).toBeGreaterThan(0);
+    for (const [x, y, z] of near) expect(y).toBeCloseTo(height({ x, z }), 3);
+    expect(Math.max(...near.map(([, y]) => y))).toBeGreaterThan(height(top) - 1.5);
+  });
+
+  it('carries scenery standing on it', () => {
+    const top = away();
+    const project = produce(withHill(club, top, { height: 12 }), (draft) => {
+      addScenery(draft, 'tree', top);
+    });
+    const floor = buildScene(project).sceneryFloors[project.scenery[0].id];
+    expect(floor).toBeCloseTo(groundHeight(project, sampleTrack(project))(top), 0);
+    expect(floor).toBeGreaterThan(groundHeight(club, sampleTrack(club))(top) + 10);
   });
 });
