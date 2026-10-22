@@ -18,6 +18,8 @@ Add to this file every time a test in game teaches something, and update the sta
 
 **`IS_PITLANE=1` on the `PIT` surface marks the pit lane** (`1PIT_lane`, or `1PIT_spawn` without a lane): the pit limiter works along `1PIT_lane`. _Confirmed in game._
 
+**Earthwork strips are driven on like the terrain**: `1GRASS_earthwork_N` meshes, grass beside the shoulders shaped into embankments, ditches and run-offs, with steeper slopes than the terrain had so far (docs/adr/0015). _Assumed_ from the `GRASS` surface key; to be confirmed in game, cars driving into a ditch and up an embankment.
+
 **A banked roadway is driveable**, the roadway pivoting about its low edge, with grid places and pit boxes tilted with the bank (local X along the slope). _Confirmed in game._
 
 ## Colliders
