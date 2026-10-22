@@ -110,7 +110,7 @@ The grass strip beyond the kerbs on each side.
 _Avoid_: verge, run-off
 
 **Terrain** (terrain):
-The ground that fills the area around and inside the track, out to the terrain margin and over every hill. Its relief follows the track, shaped by earthworks and hills.
+The ground that fills the area around and inside the track, out to the terrain margin and over every hill and painted relief. Its relief follows the track, shaped by earthworks, hills and the brush.
 _Avoid_: ground plane, floor
 
 **Terrain margin** (marge du terrain):
@@ -137,6 +137,14 @@ _Avoid_: gravel trap (a surface laid on it, planned in the edges layer), escape 
 **Hill** (colline):
 A rise of the ground placed freely on the plan, oval and oriented, or a hollow when its height is negative. It fades out near the track, whose shoulders keep their heights.
 _Avoid_: mound, bump, sculpt
+
+**Painted relief** (relief sculpté):
+Height added to the terrain or taken from it with the brush, on a 4 m grid. It stands where it was painted and fades out near the track.
+_Avoid_: heightmap, displacement
+
+**Brush** (pinceau):
+The tool that paints relief while it is held: it raises, lowers, smooths or flattens the ground under the pointer, the most at its centre.
+_Avoid_: sculpt tool, stamp
 
 **Gravel trap** (bac à graviers):
 A gravel surface beside the track, planned in the edges layer.

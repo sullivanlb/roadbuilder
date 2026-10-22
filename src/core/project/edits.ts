@@ -18,6 +18,7 @@ import type { TrackRange } from '../track/ranges';
 import { newScenery, SCENERY_SIZES, SCENERY_VARIANTS } from './scenery';
 import { EARTHWORK_DEFAULTS, EARTHWORK_REACH, EARTHWORK_RULES, HILL_DEFAULTS } from './terrain';
 import type { EarthworkSettings } from './terrain';
+import type { SculptField } from './sculpt';
 import { isCircuit } from './schema';
 import type {
   BankZone,
@@ -707,4 +708,14 @@ export function updateHill(draft: ProjectDraft, id: Id, patch: HillPatch) {
 
 export function removeHill(draft: ProjectDraft, id: Id) {
   draft.hills = draft.hills.filter((hill) => hill.id !== id);
+}
+
+/** Replaces the relief painted with the brush, as a brush stroke leaves it. */
+export function setSculpt(draft: ProjectDraft, field: SculptField) {
+  draft.sculpt = field.toTiles().slice(0, RULES.sculptTiles.max);
+}
+
+/** Removes all the relief painted with the brush. */
+export function clearSculpt(draft: ProjectDraft) {
+  draft.sculpt = [];
 }

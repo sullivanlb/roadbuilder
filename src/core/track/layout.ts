@@ -1,6 +1,7 @@
 import { bounds } from '../math';
 import type { Bounds } from '../math';
 import type { Project, RoadSettings } from '../project/schema';
+import { sculptBounds } from '../project/sculpt';
 import { hillReach } from '../project/terrain';
 import type { Sample } from './centerline';
 
@@ -67,9 +68,9 @@ export function clampToBend(
   );
 }
 
-/** Extent of the terrain around the track, grown to cover every hill. */
+/** Extent of the terrain around the track, grown to cover every hill and the painted relief. */
 export function terrainBounds(
-  project: Pick<Project, 'road' | 'terrain' | 'pitLane' | 'hills'>,
+  project: Pick<Project, 'road' | 'terrain' | 'pitLane' | 'hills' | 'sculpt'>,
   samples: readonly Sample[],
 ): Bounds {
   const pitLane = project.pitLane
@@ -88,6 +89,13 @@ export function terrainBounds(
     extent.maxX = Math.max(extent.maxX, hill.x + reach);
     extent.minZ = Math.min(extent.minZ, hill.z - reach);
     extent.maxZ = Math.max(extent.maxZ, hill.z + reach);
+  }
+  const painted = sculptBounds(project.sculpt);
+  if (painted) {
+    extent.minX = Math.min(extent.minX, painted.minX);
+    extent.maxX = Math.max(extent.maxX, painted.maxX);
+    extent.minZ = Math.min(extent.minZ, painted.minZ);
+    extent.maxZ = Math.max(extent.maxZ, painted.maxZ);
   }
   return extent;
 }

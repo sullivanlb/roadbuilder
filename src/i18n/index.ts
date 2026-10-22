@@ -107,6 +107,8 @@ export function formatProjectError(detail: ProjectErrorDetail, target?: Locale):
       return tr('projectError.earthworksLimit', { max: detail.max });
     case 'hills-limit':
       return tr('projectError.hillsLimit', { max: detail.max });
+    case 'sculpt-limit':
+      return tr('projectError.sculptLimit', { max: detail.max });
     case 'duplicate-id':
       return tr('projectError.duplicateId');
     case 'barrier-endpoint':

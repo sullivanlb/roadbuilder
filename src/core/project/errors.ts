@@ -10,6 +10,7 @@ export type ProjectErrorDetail =
   | { code: 'scenery-limit'; max: number }
   | { code: 'earthworks-limit'; max: number }
   | { code: 'hills-limit'; max: number }
+  | { code: 'sculpt-limit'; max: number }
   | { code: 'duplicate-id' }
   | { code: 'barrier-endpoint' }
   | { code: 'barrier-span' }

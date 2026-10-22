@@ -5,6 +5,7 @@ import type { NumericRule } from './rules';
 import { ProjectError } from './errors';
 import { SCENERY_SIZE_NAMES, SCENERY_SIZES, SCENERY_VARIANTS } from './scenery';
 import { EARTHWORK_REACH, EARTHWORK_RULES, EARTHWORK_SETTING_NAMES } from './terrain';
+import { decodeTile, SCULPT_TILE_LENGTH } from './sculpt';
 import type { ProjectErrorDetail } from './errors';
 
 export const PROJECT_FORMAT = 'roadbuilder';
@@ -137,6 +138,18 @@ const hill = z.object({
   height: ranged(RULES.hillHeight),
 });
 
+/** A tile of relief painted with the brush, 64 m a side (docs/adr/0016). */
+const sculptTile = z.object({
+  /** Position of the tile in the grid of tiles, along X and Z. */
+  i: z.number().int().min(-1000).max(1000),
+  j: z.number().int().min(-1000).max(1000),
+  /** Heights of its nodes in centimetres, row by row, as little-endian 16-bit integers in base64. */
+  heights: z
+    .string()
+    .length(SCULPT_TILE_LENGTH)
+    .regex(/^[A-Za-z0-9+/]+=*$/),
+});
+
 const pitLane = z.object({
   side: z.enum(SIDES),
   entry: trackPosition,
@@ -164,6 +177,7 @@ const projectShape = z.object({
   scenery: z.array(sceneryItem).max(RULES.scenery.max).default([]),
   earthworks: z.array(earthwork).max(RULES.earthworks.max).default([]),
   hills: z.array(hill).max(RULES.hills.max).default([]),
+  sculpt: z.array(sculptTile).max(RULES.sculptTiles.max).default([]),
   /** Absent until set: the start line then sits a little after the first control point. */
   startLine: trackPosition.optional(),
   pitLane: pitLane.nullable().default(null),
@@ -239,6 +253,15 @@ function checkReferences(project: ProjectShape, ctx: z.RefinementCtx<ProjectShap
     if (earthwork.offset + earthwork.width > EARTHWORK_REACH)
       fail('invalid-value', ['earthworks', index, 'width']);
   });
+  const tiles = new Set<string>();
+  project.sculpt.forEach((tile, index) => {
+    const key = `${tile.i},${tile.j}`;
+    if (tiles.has(key)) fail('invalid-value', ['sculpt', index]);
+    tiles.add(key);
+    const { min, max } = RULES.sculptHeight;
+    if (decodeTile(tile.heights).some((height) => height < min || height > max))
+      fail('invalid-value', ['sculpt', index, 'heights']);
+  });
   if (project.pitLane && !circuit) return fail('pit-lane-on-road', ['pitLane']);
   if (project.cars > 1 && !project.pitLane) fail('cars-without-pit-lane', ['cars']);
 }
@@ -262,6 +285,7 @@ export type SceneryVariant = NonNullable<SceneryItem['variant']>;
 export type Earthwork = Project['earthworks'][number];
 export type EarthworkType = Earthwork['type'];
 export type Hill = Project['hills'][number];
+export type SculptTile = Project['sculpt'][number];
 
 /** A circuit needs three control points to close; with fewer it is driven as a road. */
 export const isCircuit = (project: Pick<Project, 'road' | 'points'>) =>
@@ -284,6 +308,7 @@ function toDetail(error: z.ZodError): ProjectErrorDetail {
     if (head === 'scenery') return { code: 'scenery-limit', max: RULES.scenery.max };
     if (head === 'earthworks') return { code: 'earthworks-limit', max: RULES.earthworks.max };
     if (head === 'hills') return { code: 'hills-limit', max: RULES.hills.max };
+    if (head === 'sculpt') return { code: 'sculpt-limit', max: RULES.sculptTiles.max };
   }
   return { code: 'invalid-value', path: issue.path.join('.') };
 }

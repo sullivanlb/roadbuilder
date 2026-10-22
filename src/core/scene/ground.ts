@@ -1,6 +1,7 @@
 import { clamp } from '../math';
 import type { PlanPoint } from '../math';
 import { SIDES } from '../project/schema';
+import { SculptField } from '../project/sculpt';
 import { hillLift, hillReach } from '../project/terrain';
 import type { Project } from '../project/schema';
 import type { Sample } from '../track/centerline';
@@ -42,12 +43,23 @@ const smoothstep = (t: number) => t * t * (3 - 2 * t);
  * the track nearby pulls the ground to its own edge height, the nearer the
  * stronger, so the ground slopes between two passes of the track without a step.
  * Earthworks reshape the ground beside their segments and keep it near the track
- * farther out; hills rise from the ground beyond the flat strip (docs/adr/0015).
+ * farther out; hills (docs/adr/0015) and the relief painted with the brush
+ * (docs/adr/0016) rise from the ground beyond the flat strip.
  */
-export function groundHeight(
-  project: Project,
-  samples: readonly Sample[],
-): (p: PlanPoint) => number {
+export const groundHeight = (project: Project, samples: readonly Sample[]) =>
+  groundModel(project, samples).height;
+
+/** The ground around the track, with what the brush needs to paint on it. */
+export interface GroundModel {
+  height: (p: PlanPoint) => number;
+  /** Height of the ground without the relief painted with the brush. */
+  base: (p: PlanPoint) => number;
+  /** How much of the hills and painted relief shows at a place: 0 beside the track, 1 away from it. */
+  clearance: (p: PlanPoint) => number;
+}
+
+/** The ground around the track (see groundHeight). */
+export function groundModel(project: Project, samples: readonly Sample[]): GroundModel {
   const { blend } = LAYOUT.terrain,
     { hillEase } = LAYOUT;
   const lane = pitLaneLayout(project, samples);
@@ -123,21 +135,24 @@ export function groundHeight(
     return weighted / total;
   };
 
-  /** Height the hills add at a place, `clear` metres beyond the flat strip of the track. */
+  /** Height the hills add at a place, before they fade near the track. */
   const hills = project.hills.map((hill) => ({ hill, reach: hillReach(hill) }));
-  const hillsAt = (p: PlanPoint, clear: number) => {
-    if (!hills.length || clear <= 0) return 0;
+  const hillsAt = (p: PlanPoint) => {
     let sum = 0;
     for (const { hill, reach } of hills)
       if (Math.abs(p.x - hill.x) < reach && Math.abs(p.z - hill.z) < reach)
         sum += hillLift(hill, p);
-    return sum * smoothstep(clamp(clear / hillEase, 0, 1));
+    return sum;
   };
+  const sculpt = new SculptField(project.sculpt);
+  /** How much hills and painted relief show, `clear` metres beyond the flat strip of the track. */
+  const shown = (clear: number) => (clear <= 0 ? 0 : smoothstep(clamp(clear / hillEase, 0, 1)));
 
   // What each segment near a place adds, kept between calls to spare allocations.
   const lifts: number[] = [],
     distances: number[] = [];
-  return (p) => {
+  /** The ground shaped by the track and its earthworks, and how far it lies beyond the flat strip. */
+  const shaped = (p: PlanPoint): { height: number; clear: number } => {
     let weighted = 0,
       total = 0,
       nearest = Infinity,
@@ -161,7 +176,7 @@ export function groundHeight(
       lifts.push(lift);
       distances.push(beyond);
     }
-    if (!total) return farHeight(p) + hillsAt(p, Infinity);
+    if (!total) return { height: farHeight(p), clear: Infinity };
     let along = weighted / total;
     if (lifted) {
       // Segments farther than the nearest one fade out of the lift, which still
@@ -176,6 +191,19 @@ export function groundHeight(
       along += sum / share;
     }
     const far = smoothstep(clamp(closest / blend, 0, 1));
-    return (far ? along + (farHeight(p) - along) * far : along) + hillsAt(p, clear);
+    return { height: far ? along + (farHeight(p) - along) * far : along, clear };
+  };
+  const base = (p: PlanPoint) => {
+    const { height, clear } = shaped(p);
+    return hills.length ? height + hillsAt(p) * shown(clear) : height;
+  };
+  return {
+    height: (p) => {
+      const { height, clear } = shaped(p);
+      const raised = (hills.length ? hillsAt(p) : 0) + sculpt.at(p);
+      return raised ? height + raised * shown(clear) : height;
+    },
+    base,
+    clearance: (p) => shown(shaped(p).clear),
   };
 }

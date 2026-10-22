@@ -19,6 +19,8 @@ export const RULES = {
   scenery: { max: 400 },
   earthworks: { max: 120 },
   hills: { max: 60 },
+  /** Tiles of painted relief, 64 m a side: a few square kilometres. */
+  sculptTiles: { max: 600 },
   /** Shortest width zone, bank zone, barrier or earthwork accepted, along the track. */
   rangeLength: 5,
   /** Two control points closer than this on the ground plane are rejected. */
@@ -55,6 +57,12 @@ export const RULES = {
   hillSize: { min: 10, max: 800, step: 5 },
   /** Height of a hill above the ground around it; a hollow below it when negative. */
   hillHeight: { min: -40, max: 80, step: 0.5 },
+  /** Height the brush may add to the terrain at a place, or take from it. */
+  sculptHeight: { min: -60, max: 120, step: 0.5 },
+  /** Reach of the brush on the ground. */
+  brushRadius: { min: 4, max: 80, step: 1 },
+  /** Height the brush adds in a second at its centre. */
+  brushStrength: { min: 0.5, max: 10, step: 0.5 },
 } as const satisfies Record<string, NumericRule | { max: number } | number>;
 
 /** Values given to the settings a new project does not choose itself. */

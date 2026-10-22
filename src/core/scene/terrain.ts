@@ -1,6 +1,7 @@
 import { bounds, clamp } from '../math';
 import type { Bounds, PlanPoint, Vec3 } from '../math';
 import type { Project } from '../project/schema';
+import { SCULPT } from '../project/sculpt';
 import { hillReach } from '../project/terrain';
 import type { Sample } from '../track/centerline';
 import { terrainBounds } from '../track/layout';
@@ -10,6 +11,8 @@ import type { Mesh } from './mesh';
 
 /** Size of the terrain cells under a hill: a share of its size, within bounds, in metres. */
 const HILL_STEP = { min: 2, perSize: 10, maxDivision: 8 };
+/** Cells under painted relief are divided down to its grid, at most this many times a side. */
+const SCULPT_DIVISION = 10;
 
 // Terrain is a tiled height field with the actual road/verge/pit footprint cut out.
 // Clipping the footprint (instead of hiding a plane under the road) keeps elevated
@@ -112,13 +115,25 @@ export function buildTerrain(
         }
     }
   }
-  // Cells under a hill are divided to show its shape (docs/adr/0015); the
-  // alignment below stitches them to their undivided neighbours.
+  // Cells under a hill or painted relief are divided to show its shape
+  // (docs/adr/0015, 0016); the alignment below stitches them to their
+  // undivided neighbours.
   const hills = project.hills.map((hill) => ({
     hill,
     reach: hillReach(hill),
     step: Math.max(HILL_STEP.min, Math.min(hill.width, hill.depth) / HILL_STEP.perSize),
   }));
+  const tile = SCULPT.cell * SCULPT.tile;
+  const painted = new Set(project.sculpt.map((t) => `${t.i},${t.j}`));
+  /** Whether painted relief reaches into the cell at (x, z), a tile's edge blending one cell further. */
+  const underSculpt = (x: number, z: number) => {
+    if (!painted.size) return false;
+    for (let j = Math.floor((z - SCULPT.cell) / tile); j <= Math.floor((z + dz) / tile); j++)
+      for (let i = Math.floor((x - SCULPT.cell) / tile); i <= Math.floor((x + dx) / tile); i++)
+        if (painted.has(`${i},${j}`)) return true;
+    return false;
+  };
+  const sculptDivision = Math.min(SCULPT_DIVISION, Math.ceil(Math.max(dx, dz) / SCULPT.cell));
   const division = (x: number, z: number) =>
     hills.reduce(
       (n, { hill, reach, step }) =>
@@ -128,7 +143,7 @@ export function buildTerrain(
         z + dz < hill.z - reach
           ? n
           : Math.max(n, Math.min(HILL_STEP.maxDivision, Math.ceil(Math.max(dx, dz) / step))),
-      1,
+      underSculpt(x, z) ? sculptDivision : 1,
     );
   const polygons = [];
   for (let row = 0; row < rows; row++)
