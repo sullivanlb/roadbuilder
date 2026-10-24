@@ -297,7 +297,7 @@ export class PreviewRenderer {
       geometry.setAttribute('normal', new Float32BufferAttribute(mesh.normals, 3));
       geometry.setAttribute('uv', new Float32BufferAttribute(mesh.uvs, 2));
       geometry.setIndex(mesh.indices);
-      const layer = meshLayer(mesh.name, mesh.kind);
+      const layer = meshLayer(mesh);
       const shown = new Mesh(
         geometry,
         this.material(mesh.material, layer !== null && layer !== this.layers.active),

@@ -1,7 +1,7 @@
 import type { Id } from '../../core/ids';
 import type { PlanPoint } from '../../core/math';
 import type { Project, SceneryItem } from '../../core/project/schema';
-import type { MeshKind } from '../../core/scene/mesh';
+import type { Mesh } from '../../core/scene/mesh';
 import { barrierLateral, barrierSamples } from '../../core/scene/barriers';
 import { offsetPoint } from '../../core/scene/mesh';
 import { sceneryFootprint } from '../../core/project/scenery';
@@ -18,13 +18,8 @@ import type { LayerId } from '../layers';
 import { COLORS } from '../theme';
 
 /** The layer a mesh of the scene belongs to, or null for the roadway, shown on every layer. */
-export function meshLayer(name: string, kind: MeshKind): LayerId | null {
-  if (name.startsWith('1PIT') || name.startsWith('divider')) return 'pits';
-  if (kind === 'scenery') return 'scenery';
-  if (kind === 'terrain') return 'terrain';
-  if (kind === 'barrier') return 'edges';
-  return null;
-}
+export const meshLayer = ({ part }: Pick<Mesh, 'part'>): LayerId | null =>
+  part === 'roadway' ? null : part;
 
 /** The edges of a box around a scenery item standing at height `y`, as line segments. */
 function sceneryBox(item: SceneryItem, y: number): number[] {

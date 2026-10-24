@@ -73,7 +73,7 @@ export function buildRoad(project: Project, samples: readonly Sample[]): RoadMes
     kerbRed: createMesh('1KERB_red', 'kerbRed', 'surface'),
     kerbWhite: createMesh('1KERB_white', 'paint', 'surface'),
     markings: createMesh('road_markings', 'paint', 'surface'),
-    pit: createMesh(lane ? '1PIT_lane' : '1PIT_spawn', 'pit', 'surface'),
+    pit: createMesh(lane ? '1PIT_lane' : '1PIT_spawn', 'pit', 'surface', true, 'pits'),
   };
   const road = project.road,
     kerb = kerbWidth(road);

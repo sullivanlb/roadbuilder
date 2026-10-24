@@ -10,6 +10,21 @@ import type { MaterialId } from './materials';
 export type MeshKind = 'surface' | 'terrain' | 'barrier' | 'scenery';
 
 /**
+ * What of the track a mesh shows: the editor dims or hides it with that layer,
+ * and shows the roadway on every one. Names stay what the game reads
+ * (docs/adr/0005): the part is told beside them, not read from them.
+ */
+export type MeshPart = 'roadway' | 'pits' | 'edges' | 'terrain' | 'scenery';
+
+/** The part a mesh of a kind shows, unless it is told otherwise. */
+const KIND_PART: Record<MeshKind, MeshPart> = {
+  surface: 'roadway',
+  terrain: 'terrain',
+  barrier: 'edges',
+  scenery: 'scenery',
+};
+
+/**
  * Triangle mesh with flat attribute arrays: 3 numbers per position and normal,
  * 2 per UV, 3 indices per triangle. The layout feeds WebGL buffers and the
  * exporters without conversion.
@@ -18,6 +33,7 @@ export interface Mesh {
   name: string;
   material: MaterialId;
   kind: MeshKind;
+  part: MeshPart;
   /** False for colliders: kept for collisions, never drawn. */
   visible: boolean;
   positions: number[];
@@ -34,8 +50,9 @@ export function createMesh(
   material: MaterialId,
   kind: MeshKind,
   visible = true,
+  part = KIND_PART[kind],
 ): Mesh {
-  return { name, material, kind, visible, positions: [], normals: [], uvs: [], indices: [] };
+  return { name, material, kind, part, visible, positions: [], normals: [], uvs: [], indices: [] };
 }
 
 export const vertexCount = (mesh: Mesh) => mesh.positions.length / 3;

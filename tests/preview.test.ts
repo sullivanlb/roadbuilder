@@ -1,6 +1,6 @@
 import { produce } from 'immer';
 import { describe, expect, it } from 'vitest';
-import { addScenery, addWidthZone } from '../src/core/project/edits';
+import { addBarrier, addScenery, addWidthZone } from '../src/core/project/edits';
 import { buildScene } from '../src/core/scene/scene';
 import { sampleTrack } from '../src/core/track/centerline';
 import { positionAt } from '../src/core/track/positions';
@@ -9,15 +9,22 @@ import { template } from './helpers';
 
 describe('3D preview by layers', () => {
   it('sorts the scene meshes into layers, the roadway on none', () => {
-    const project = template('club');
-    const layers = new Map(
-      buildScene(project).meshes.map((mesh) => [mesh.name, meshLayer(mesh.name, mesh.kind)]),
-    );
+    const base = template('club');
+    const samples = sampleTrack(base);
+    const project = produce(base, (draft) => {
+      addBarrier(draft, {
+        type: 'guardrail',
+        side: 'left',
+        from: positionAt(base, samples, 100),
+        to: positionAt(base, samples, 300),
+      });
+    });
+    const layers = new Map(buildScene(project).meshes.map((mesh) => [mesh.name, meshLayer(mesh)]));
     expect([...layers].find(([name]) => name.startsWith('1ROAD_main'))?.[1]).toBeNull();
     expect([...layers].find(([name]) => name.startsWith('1PIT_lane'))?.[1]).toBe('pits');
     expect([...layers].find(([name]) => name.startsWith('divider_decor'))?.[1]).toBe('pits');
     expect([...layers].find(([name]) => name.startsWith('1GRASS_terrain'))?.[1]).toBe('terrain');
-    expect(meshLayer('guardrail_decor_0', 'barrier')).toBe('edges');
+    expect([...layers].find(([name]) => name.startsWith('guardrail'))?.[1]).toBe('edges');
   });
 
   it('highlights the selection and the picked stretch, with posts on the track layer only', () => {
@@ -72,6 +79,8 @@ describe('3D preview by layers', () => {
     const floor = scene.sceneryFloors[id];
     expect(Math.min(...heights)).toBeCloseTo(floor);
     expect(Math.max(...heights)).toBeCloseTo(floor + project.scenery[0].height);
-    expect(meshLayer('scenery_facade_0', 'scenery')).toBe('scenery');
+    expect(scene.meshes.filter((mesh) => mesh.kind === 'scenery').map(meshLayer)).toContain(
+      'scenery',
+    );
   });
 });
