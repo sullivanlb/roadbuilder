@@ -1,4 +1,3 @@
-import type { Id } from '../core/ids';
 import { EARTHWORK_TYPES, SCENERY_KINDS } from '../core/project/schema';
 import type { Project } from '../core/project/schema';
 import type { Sample } from '../core/track/centerline';
@@ -10,8 +9,9 @@ import type { MessageKey } from '../i18n';
 import type { LayerId } from '../rendering/layers';
 import type { TrackHit } from '../rendering/plan/hitTest';
 import type { ToolId } from '../stores/editor';
+import type { Selection } from './selection';
 
-export type { LayerId, TrackHit };
+export type { LayerId, Selection, TrackHit };
 
 // The editor works on one layer at a time (docs/adr/0009). The active layer
 // decides what a click picks and which tools are offered; the others stay
@@ -63,33 +63,6 @@ export const LAYERS: readonly Layer[] = [
 /** The layer a tool belongs to, or null for the tools offered on every layer. */
 export const layerOfTool = (tool: ToolId): LayerId | null =>
   LAYERS.find((layer) => layer.tools.includes(tool))?.id ?? null;
-
-/** What one editor selection holds; a single kind at a time. */
-export type Selection =
-  | { kind: 'points'; ids: readonly Id[] }
-  | { kind: 'barrier'; id: Id }
-  | { kind: 'widthZone'; id: Id }
-  | { kind: 'bankZone'; id: Id }
-  | { kind: 'pitLane' }
-  | { kind: 'scenery'; ids: readonly Id[] }
-  | { kind: 'earthwork'; id: Id }
-  | { kind: 'hill'; id: Id }
-  | null;
-
-const SELECTION_LAYER: Record<NonNullable<Selection>['kind'], LayerId> = {
-  points: 'track',
-  widthZone: 'road',
-  bankZone: 'road',
-  barrier: 'edges',
-  pitLane: 'pits',
-  scenery: 'scenery',
-  earthwork: 'terrain',
-  hill: 'terrain',
-};
-
-/** The layer whose elements a selection holds. */
-export const layerOfSelection = (selection: Selection): LayerId | null =>
-  selection ? SELECTION_LAYER[selection.kind] : null;
 
 /**
  * What a click on `hit` selects in a layer: only that layer's elements answer.

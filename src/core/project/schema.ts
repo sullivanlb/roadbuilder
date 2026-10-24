@@ -194,11 +194,8 @@ function checkReferences(project: ProjectShape, ctx: z.RefinementCtx<ProjectShap
   const ids = new Set<string>();
   for (const item of [
     ...project.points,
-    ...project.barriers,
-    ...project.widthZones,
-    ...project.bankZones,
+    ...LAID_LISTS.flatMap((list): readonly ProjectShape[LaidList][number][] => project[list]),
     ...project.scenery,
-    ...project.earthworks,
     ...project.hills,
   ]) {
     if (ids.has(item.id)) return fail('duplicate-id', []);
@@ -221,18 +218,13 @@ function checkReferences(project: ProjectShape, ctx: z.RefinementCtx<ProjectShap
     ['startLine', project.startLine],
     ['pitLane', project.pitLane?.entry],
     ['pitLane', project.pitLane?.exit],
-    ...project.widthZones.flatMap((zone) => [
-      ['widthZones', zone.from] as const,
-      ['widthZones', zone.to] as const,
-    ]),
-    ...project.bankZones.flatMap((zone) => [
-      ['bankZones', zone.from] as const,
-      ['bankZones', zone.to] as const,
-    ]),
-    ...project.earthworks.flatMap((earthwork) => [
-      ['earthworks', earthwork.from] as const,
-      ['earthworks', earthwork.to] as const,
-    ]),
+    // Barriers are checked above, with errors of their own.
+    ...LAID_LISTS.filter((list) => list !== 'barriers').flatMap((list) =>
+      (project[list] as readonly ProjectShape[LaidList][number][]).flatMap((item) => [
+        [list, item.from] as const,
+        [list, item.to] as const,
+      ]),
+    ),
   ] as const;
   for (const [field, position] of positions)
     if (position && !order.has(position.point)) return fail('position-point', [field]);
@@ -286,6 +278,15 @@ export type Earthwork = Project['earthworks'][number];
 export type EarthworkType = Earthwork['type'];
 export type Hill = Project['hills'][number];
 export type SculptTile = Project['sculpt'][number];
+
+/**
+ * The lists of the project laid between two track positions (docs/adr/0008);
+ * the pit lane runs from its own entry to its exit.
+ */
+export const LAID_LISTS = ['barriers', 'widthZones', 'bankZones', 'earthworks'] as const;
+type LaidList = (typeof LAID_LISTS)[number];
+/** Something laid between two track positions: a barrier, a zone or an earthwork. */
+export type Laid = Project[LaidList][number];
 
 /** A circuit needs three control points to close; with fewer it is driven as a road. */
 export const isCircuit = (project: Pick<Project, 'road' | 'points'>) =>

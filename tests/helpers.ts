@@ -7,6 +7,7 @@ import { createProject } from '../src/core/project/factory';
 import { parseProject } from '../src/core/project/schema';
 import type { Project } from '../src/core/project/schema';
 import type { Template } from '../src/core/project/templates';
+import type { Editing } from '../src/rendering/editing';
 import { installPlatform } from '../src/platform/platform';
 import type { KeyValueStorage, OutgoingFile, PickedFile, Platform } from '../src/platform/platform';
 import tightTurn from './fixtures/tight-turn.roadbuilder.json';
@@ -18,6 +19,18 @@ export const sceneryImages = () =>
   Object.fromEntries(
     readdirSync(TEXTURES).map((file) => [file, new Uint8Array(readFileSync(join(TEXTURES, file)))]),
   );
+
+/** The editing under way as the views show it: nothing selected or laid, unless given. */
+export const editingOf = (editing: Partial<Editing> = {}): Editing => ({
+  layer: 'track',
+  hiddenLayers: [],
+  selection: null,
+  laying: null,
+  range: null,
+  hoverS: null,
+  brush: null,
+  ...editing,
+});
 
 /** A template project with a fixed name. */
 export const template = (name: Template = 'club'): Project => createProject(name, `Test ${name}`);

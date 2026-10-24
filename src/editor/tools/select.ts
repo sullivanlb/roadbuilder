@@ -1,62 +1,54 @@
+import type { Draft } from 'immer';
 import type { Id } from '../../core/ids';
+import type { PlanPoint } from '../../core/math';
 import { updateHill, updatePoint, updateScenery } from '../../core/project/edits';
-import { findPoint, findRoad, findScenery, trackHitAt } from '../../rendering/plan/hitTest';
+import type { Project } from '../../core/project/schema';
+import { sampleAt } from '../../core/track/centerline';
+import { selectedIds } from '../../rendering/editing';
+import type { ScreenPoint } from '../../rendering/plan/projection';
 import { pickInLayer } from '../layers';
 import { onGrid } from './tool';
 import type { Gesture, Tool, ToolContext } from './tool';
-import type { ScreenPoint } from '../../rendering/plan/projection';
 
-/** Drags the selected control points together, the grabbed one snapping to the grid with Shift. */
-function dragPoints(
-  { project, editor, viewport }: ToolContext,
-  grabbed: Id,
-  at: ScreenPoint,
-): Gesture {
-  const view = viewport.projection;
-  const ids = editor.selectedPointIds;
-  const origins = project.project.points
-    .filter((point) => ids.includes(point.id))
-    .map((point) => ({ id: point.id, x: point.x, z: point.z }));
-  const origin = origins.find((point) => point.id === grabbed)!;
-  const grab = view.toWorld(at);
-  return {
-    move({ at: now, shiftKey }) {
-      const pointer = view.toWorld(now);
-      let x = origin.x + pointer.x - grab.x,
-        z = origin.z + pointer.z - grab.z;
-      if (shiftKey) {
-        x = onGrid(x);
-        z = onGrid(z);
-      }
-      const dx = x - origin.x,
-        dz = z - origin.z;
-      project.edit(
-        (draft) => {
-          for (const point of origins)
-            updatePoint(draft, point.id, { x: point.x + dx, z: point.z + dz });
-        },
-        { commit: false },
-      );
-    },
-    end: () => project.commit(),
-  };
-}
+/** What can be dragged on the plan, and how one of them moves. */
+const MOVE: Record<
+  'points' | 'scenery' | 'hill',
+  {
+    items: (project: Project) => readonly { id: Id; x: number; z: number }[];
+    move: (draft: Draft<Project>, id: Id, at: PlanPoint) => void;
+  }
+> = {
+  points: {
+    items: (project) => project.points,
+    move: (draft, id, at) => updatePoint(draft, id, at),
+  },
+  scenery: {
+    items: (project) => project.scenery,
+    move: (draft, id, at) => updateScenery(draft, id, at),
+  },
+  hill: { items: (project) => project.hills, move: (draft, id, at) => updateHill(draft, id, at) },
+};
 
-/** Drags the selected scenery items together, the grabbed one snapping to the grid with Shift. */
-function dragScenery(
-  { project, editor, viewport }: ToolContext,
+/**
+ * Drags the items `ids` of a kind together, from where the pointer grabbed one
+ * of them; with Shift, the grabbed one snaps to the grid and the others follow.
+ */
+function drag(
+  { project }: ToolContext,
+  kind: keyof typeof MOVE,
+  ids: readonly Id[],
   grabbed: Id,
-  at: ScreenPoint,
+  grab: PlanPoint,
 ): Gesture {
-  const view = viewport.projection;
-  const origins = editor.selectedScenery.map((item) => ({ id: item.id, x: item.x, z: item.z }));
+  const { items, move } = MOVE[kind];
+  const origins = items(project.project)
+    .filter((item) => ids.includes(item.id))
+    .map((item) => ({ id: item.id, x: item.x, z: item.z }));
   const origin = origins.find((item) => item.id === grabbed)!;
-  const grab = view.toWorld(at);
   return {
-    move({ at: now, shiftKey }) {
-      const pointer = view.toWorld(now);
-      let x = origin.x + pointer.x - grab.x,
-        z = origin.z + pointer.z - grab.z;
+    move({ hit, shiftKey }) {
+      let x = origin.x + hit.ground.x - grab.x,
+        z = origin.z + hit.ground.z - grab.z;
       if (shiftKey) {
         x = onGrid(x);
         z = onGrid(z);
@@ -65,32 +57,10 @@ function dragScenery(
         dz = z - origin.z;
       project.edit(
         (draft) => {
-          for (const item of origins)
-            updateScenery(draft, item.id, { x: item.x + dx, z: item.z + dz });
+          for (const item of origins) move(draft, item.id, { x: item.x + dx, z: item.z + dz });
         },
         { commit: false },
       );
-    },
-    end: () => project.commit(),
-  };
-}
-
-/** Drags a hill, snapping its centre to the grid with Shift. */
-function dragHill({ project, viewport }: ToolContext, id: Id, at: ScreenPoint): Gesture {
-  const view = viewport.projection;
-  const hill = project.project.hills.find((candidate) => candidate.id === id)!;
-  const origin = { x: hill.x, z: hill.z };
-  const grab = view.toWorld(at);
-  return {
-    move({ at: now, shiftKey }) {
-      const pointer = view.toWorld(now);
-      let x = origin.x + pointer.x - grab.x,
-        z = origin.z + pointer.z - grab.z;
-      if (shiftKey) {
-        x = onGrid(x);
-        z = onGrid(z);
-      }
-      project.edit((draft) => updateHill(draft, id, { x, z }), { commit: false });
     },
     end: () => project.commit(),
   };
@@ -109,8 +79,8 @@ function marquee(
   const before = add ? (onScenery ? editor.selectedSceneryIds : editor.selectedPointIds) : [];
   editor.marquee = { x0: at.x, y0: at.y, x1: at.x, y1: at.y };
   return {
-    move({ at: now }) {
-      editor.marquee = { x0: at.x, y0: at.y, x1: now.x, y1: now.y };
+    move({ screen: now }) {
+      if (now) editor.marquee = { x0: at.x, y0: at.y, x1: now.x, y1: now.y };
     },
     end() {
       const box = editor.marquee!;
@@ -132,11 +102,11 @@ function marquee(
 }
 
 /**
- * Selects what the active layer offers under the cursor. On the track layer,
- * control points are dragged (the whole selection together), Shift + click adds
- * or removes one, and dragging over empty space selects the points in a
- * rectangle; a double click on the road inserts a point there. Scenery items
- * are selected and dragged the same way on their layer, and hills on the terrain layer.
+ * Selects what the active layer offers under the pointer (docs/adr/0009). On the
+ * track and scenery layers, Shift + click adds or removes one, a press drags the
+ * whole selection on the plan, and dragging over empty space selects what a
+ * rectangle holds; hills are dragged on the terrain layer. A double click on the
+ * road inserts a control point there.
  */
 export const selectTool: Tool = {
   cursor: ({ editor }) => (editor.hoveredPointId || editor.hoveredSceneryId ? 'grab' : 'default'),
@@ -146,27 +116,11 @@ export const selectTool: Tool = {
       : editor.layer === 'scenery'
         ? 'canvas.hintSelectScenery'
         : 'canvas.hintSelectLayer',
-  press(context, { at, shiftKey }) {
-    const { project, editor, viewport } = context;
-    const view = viewport.projection;
+  press(context, { hit, shiftKey, screen }) {
+    const { project, editor } = context;
     // An empty track has nothing to select: the first click starts it.
-    if (!project.project.points.length) return void editor.addPoint(view.toWorld(at));
-    if (editor.layer === 'track') {
-      const id = findPoint(view, project.project, at);
-      if (!id) return marquee(context, at, shiftKey);
-      if (shiftKey) return void editor.togglePoint(id);
-      if (!editor.selectedPointIds.includes(id)) editor.selectPoint(id);
-      return dragPoints(context, id, at);
-    }
-    const hit = trackHitAt(view, project.project, project.samples, at);
-    if (editor.layer === 'scenery') {
-      const picked = pickInLayer('scenery', hit, project.project, project.samples);
-      const id = picked?.kind === 'scenery' ? picked.ids[0] : null;
-      if (!id) return marquee(context, at, shiftKey);
-      if (shiftKey) return void editor.toggleScenery(id);
-      if (!editor.selectedSceneryIds.includes(id)) editor.selectScenery(id);
-      return dragScenery(context, id, at);
-    }
+    if (!project.project.points.length)
+      return void editor.addPoint({ x: hit.ground.x, z: hit.ground.z });
     const picked = pickInLayer(
       editor.layer,
       hit,
@@ -174,21 +128,32 @@ export const selectTool: Tool = {
       project.samples,
       editor.selection,
     );
-    editor.select(picked);
-    if (picked?.kind === 'hill') return dragHill(context, picked.id, at);
+    // Points and scenery are selected and dragged several at a time.
+    const many =
+      editor.layer === 'track' ? 'points' : editor.layer === 'scenery' ? 'scenery' : null;
+    if (!many) {
+      editor.select(picked);
+      if (picked?.kind === 'hill') return drag(context, 'hill', [picked.id], picked.id, hit.ground);
+      return;
+    }
+    const id = picked && 'ids' in picked ? picked.ids[0] : null;
+    if (!id) {
+      if (screen) return marquee(context, screen, shiftKey);
+      return void editor.select(shiftKey ? editor.selection : null);
+    }
+    if (shiftKey)
+      return void (many === 'points' ? editor.togglePoint(id) : editor.toggleScenery(id));
+    if (!selectedIds(editor.selection, many).includes(id)) editor.select(picked);
+    return drag(context, many, selectedIds(editor.selection, many), id, hit.ground);
   },
-  hover({ project, editor, viewport }, { at }) {
-    editor.hoveredPointId =
-      editor.layer === 'track' ? findPoint(viewport.projection, project.project, at) : null;
-    editor.hoveredSceneryId =
-      editor.layer === 'scenery' ? findScenery(viewport.projection, project.project, at) : null;
+  hover({ editor }, { hit }) {
+    editor.hoveredPointId = editor.layer === 'track' ? hit.pointId : null;
+    editor.hoveredSceneryId = editor.layer === 'scenery' ? hit.sceneryId : null;
   },
-  doubleClick({ project, editor, viewport }, { at }) {
-    if (editor.layer !== 'track') return;
-    const view = viewport.projection;
-    if (findPoint(view, project.project, at)) return;
-    const road = findRoad(view, project.project, project.samples, at);
-    if (road) editor.addPoint(road, road.segment);
+  doubleClick({ project, editor }, { hit }) {
+    if (editor.layer !== 'track' || hit.pointId || !hit.road) return;
+    const sample = sampleAt(project.samples, hit.road.s)!;
+    editor.addPoint(sample, sample.segment);
   },
   leave({ editor }) {
     editor.hoveredPointId = null;

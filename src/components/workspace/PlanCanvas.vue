@@ -1,12 +1,11 @@
 <script setup lang="ts">
 import { useDevicePixelRatio, useElementSize } from '@vueuse/core';
 import { computed, onBeforeUnmount, onMounted, useTemplateRef, watch } from 'vue';
-import { SculptField } from '../../core/project/sculpt';
 import { usePlanInteraction } from '../../editor/usePlanInteraction';
 import { formatNumber, t } from '../../i18n';
 import { drawPlan } from '../../rendering/plan/draw';
 import type { PlanScene } from '../../rendering/plan/draw';
-import { isEarthworkTool, useEditorStore } from '../../stores/editor';
+import { useEditorStore } from '../../stores/editor';
 import { useProjectStore } from '../../stores/project';
 import { useViewportStore } from '../../stores/viewport';
 
@@ -20,50 +19,19 @@ const { width, height } = useElementSize(host);
 const { pixelRatio } = useDevicePixelRatio();
 const dpr = computed(() => Math.min(pixelRatio.value || 1, 2));
 const { cursor, hint, listeners, end } = usePlanInteraction(canvas);
-/** The relief painted in the project, decoded once each time it changes. */
-const painted = computed(() => new SculptField(store.project.sculpt));
 
 const scene = computed<PlanScene>(() => ({
   project: store.project,
   samples: store.samples,
-  layer: editor.layer,
-  hiddenLayers: editor.hiddenLayers,
-  pitLaneSelected: editor.selection?.kind === 'pitLane',
+  editing: editor.editing,
   tightTurns: store.issues.tightTurns,
-  selectedPointIds: editor.selectedPointIds,
   marquee: editor.marquee,
   hoveredPointId: editor.hoveredPointId,
-  selectedBarrierId: editor.selectedBarrierId,
-  barrierDraft: editor.barrierDraft,
-  barrierTarget: editor.barrierDraft ? editor.barrierTarget : null,
-  pitDraft: editor.pitDraft && { entry: editor.pitDraft.s, side: editor.pitDraft.side },
-  pitTarget: editor.pitDraft ? editor.pitTarget : null,
-  selectedWidthZoneId: editor.selectedWidthZoneId,
-  widthDraft: editor.widthDraft,
-  widthTarget: editor.widthDraft !== null ? editor.widthTarget : null,
-  selectedBankZoneId: editor.selectedBankZoneId,
-  bankDraft: editor.bankDraft,
-  bankTarget: editor.bankDraft !== null ? editor.bankTarget : null,
   drawDraft: editor.drawDraft,
-  selectedSceneryIds: editor.selectedSceneryIds,
   hoveredSceneryId: editor.hoveredSceneryId,
   sceneryGhost: editor.sceneryGhost,
-  selectedEarthworkId: editor.selectedEarthworkId,
-  earthworkDraft:
-    editor.earthworkDraft && isEarthworkTool(editor.tool)
-      ? { ...editor.earthworkDraft, type: editor.tool }
-      : null,
-  earthworkTarget: editor.earthworkDraft ? editor.earthworkTarget : null,
-  selectedHillId: editor.selectedHillId,
   hillGhost: editor.hillGhost,
-  // The stroke under way paints in place: its count tells the plan to draw again.
-  sculpt: editor.stroke && editor.strokeVersion ? editor.stroke.field : painted.value,
-  brush:
-    editor.tool === 'sculpt' && editor.brushPointer
-      ? { ...editor.brushPointer, radius: editor.brushRadius }
-      : null,
-  range: editor.range,
-  hoverS: editor.hoverS,
+  sculpt: editor.relief.field,
   labels: {
     start: t('canvas.start'),
     finish: t('canvas.finish'),

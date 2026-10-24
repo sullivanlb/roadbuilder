@@ -11,7 +11,7 @@ import { buildScene, findFoldedSurface } from '../../src/core/scene/scene';
 import { sampleAt, sampleTrack } from '../../src/core/track/centerline';
 import { terrainBounds } from '../../src/core/track/layout';
 import { buildOverlay } from '../../src/rendering/preview/overlay';
-import { asJson, template } from '../helpers';
+import { asJson, editingOf, template } from '../helpers';
 
 const flat: SculptGround = { base: () => 0, clearance: () => 1 };
 const brush = (patch: Partial<Brush> = {}): Brush => ({
@@ -172,13 +172,8 @@ describe('the brush in 3D', () => {
     const samples = sampleTrack(project);
     const brush = { x: 10, y: 3, z: -5, radius: 12 };
     const { outlines } = buildOverlay(project, samples, {
-      layer: 'terrain',
-      selection: null,
-      range: null,
-      draft: null,
+      editing: editingOf({ layer: 'terrain', brush }),
       sceneryFloors: {},
-      hoverS: null,
-      brush,
     });
     expect(outlines.length).toBe(2 * 48 * 6);
     const reach = Math.max(

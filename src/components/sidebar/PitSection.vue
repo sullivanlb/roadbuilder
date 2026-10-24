@@ -19,7 +19,7 @@ const editor = useEditorStore();
 const circuit = computed(() => isCircuit(store.project));
 const lane = computed(() => store.project.pitLane);
 const status = computed(() => {
-  if (editor.pitDraft) return t('pits.statusDraft');
+  if (editor.laying?.kind === 'pitLane') return t('pits.statusDraft');
   if (editor.tool === 'pits') return t('pits.statusTool');
   return null;
 });

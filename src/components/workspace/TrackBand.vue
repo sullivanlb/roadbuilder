@@ -1,14 +1,7 @@
 <script setup lang="ts">
 import { useDevicePixelRatio, useElementSize } from '@vueuse/core';
 import { computed, ref, useTemplateRef, watch } from 'vue';
-import {
-  setStartLine,
-  updateBankZone,
-  updateBarrier,
-  updateEarthwork,
-  updatePitLane,
-  updateWidthZone,
-} from '../../core/project/edits';
+import { moveLaidEnd, setStartLine } from '../../core/project/edits';
 import type { TrackPosition } from '../../core/project/schema';
 import { trackLength } from '../../core/track/centerline';
 import { positionAt } from '../../core/track/positions';
@@ -78,19 +71,6 @@ const labels = computed<BandLabels>(() => ({
 const rows = computed(() => bandRows(editor.layer, size.value));
 const blocks = computed(() => bandBlocks(store.project, store.samples, editor.layer, labels.value));
 
-/** The block that holds the selection, when the selection is laid along the track. */
-const selectedBlockId = computed(() => {
-  const selection = editor.selection;
-  if (
-    selection?.kind === 'barrier' ||
-    selection?.kind === 'earthwork' ||
-    selection?.kind === 'widthZone' ||
-    selection?.kind === 'bankZone'
-  )
-    return selection.id;
-  return selection?.kind === 'pitLane' ? 'pitLane' : null;
-});
-
 type Drag =
   | { kind: 'edge'; block: BandBlock; edge: 'start' | 'end' }
   | { kind: 'range'; from: number; to: number; x: number; moved: boolean };
@@ -117,21 +97,15 @@ function draw() {
     blocks: blocks.value,
     labels: labels.value,
     corners: store.corners,
-    selectedBlockId: selectedBlockId.value,
-    selectedPointIds: editor.selectedPoints?.ids ?? [],
-    range: editor.range,
+    editing: editor.editing,
     pendingRange: pendingRange.value,
-    hoverS: editor.hoverS,
   });
 }
 watch(
   [
     () => store.samples,
     () => store.project,
-    () => editor.layer,
-    () => editor.selection,
-    () => editor.range,
-    () => editor.hoverS,
+    () => editor.editing,
     view,
     pendingRange,
     labels,
@@ -160,15 +134,10 @@ function moveEdge(block: BandBlock, edge: 'start' | 'end', s: number) {
   const at: TrackPosition = positionAt(store.project, store.samples, s);
   const end = edge === 'start' ? 'from' : 'to';
   store.edit(
-    (draft) => {
-      if (block.kind === 'widthZone') updateWidthZone(draft, block.id, { [end]: at });
-      else if (block.kind === 'bankZone') updateBankZone(draft, block.id, { [end]: at });
-      else if (block.kind === 'barrier') updateBarrier(draft, block.id, { [end]: at });
-      else if (block.kind === 'earthwork') updateEarthwork(draft, block.id, { [end]: at });
-      else if (block.kind === 'pitLane')
-        updatePitLane(draft, edge === 'start' ? { entry: at } : { exit: at });
-      else setStartLine(draft, at);
-    },
+    (draft) =>
+      block.kind === 'startLine'
+        ? setStartLine(draft, at)
+        : moveLaidEnd(draft, block.kind, block.id, end, at),
     { commit: false },
   );
 }
@@ -189,11 +158,8 @@ function onPointerDown(event: PointerEvent) {
   if (corner) return viewport.focusRange(corner);
   const block = hit.block;
   if (block) {
-    if (block.kind === 'widthZone') editor.selectWidthZone(block.id);
-    else if (block.kind === 'bankZone') editor.selectBankZone(block.id);
-    else if (block.kind === 'barrier') editor.selectBarrier(block.id);
-    else if (block.kind === 'earthwork') editor.selectEarthwork(block.id);
-    else if (block.kind === 'pitLane') editor.select({ kind: 'pitLane' });
+    if (block.kind === 'pitLane') editor.select({ kind: 'pitLane' });
+    else if (block.kind !== 'startLine') editor.select({ kind: block.kind, id: block.id });
     if (hit.edge) drag.value = { kind: 'edge', block, edge: hit.edge };
     return;
   }

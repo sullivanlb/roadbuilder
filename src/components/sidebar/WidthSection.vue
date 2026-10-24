@@ -21,7 +21,7 @@ const selected = computed(() => editor.selectedWidthZone);
 const place = usePlaceLabel();
 
 const status = computed(() => {
-  if (editor.widthDraft !== null) return t('widths.statusDraft');
+  if (editor.laying?.kind === 'widthZone') return t('widths.statusDraft');
   if (editor.tool === 'width') return t('widths.statusTool');
   return zones.value.length ? t('widths.statusChoose') : t('widths.empty');
 });
@@ -64,8 +64,8 @@ const preview = (patch: Parameters<typeof updateWidthZone>[2]) => {
         :key="zone.id"
         type="button"
         class="row"
-        :class="{ active: zone.id === editor.selectedWidthZoneId }"
-        @click="editor.selectWidthZone(zone.id)"
+        :class="{ active: zone.id === selected?.id }"
+        @click="editor.select({ kind: 'widthZone', id: zone.id })"
       >
         {{ rowLabel(zone, position) }}
       </button>
@@ -94,7 +94,7 @@ const preview = (patch: Parameters<typeof updateWidthZone>[2]) => {
         @commit="store.commit()"
       />
       <div class="actions">
-        <AppButton id="width-delete" class="delete" small @click="editor.deleteSelectedWidthZone()">
+        <AppButton id="width-delete" class="delete" small @click="editor.deleteSelection()">
           <AppIcon name="trash" />{{ t('widths.delete') }}
         </AppButton>
       </div>

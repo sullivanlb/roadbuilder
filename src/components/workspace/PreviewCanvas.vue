@@ -2,11 +2,10 @@
 import { useDevicePixelRatio, useElementSize } from '@vueuse/core';
 import { computed, onBeforeUnmount, onMounted, ref, useTemplateRef, watch } from 'vue';
 import { buildScene } from '../../core/scene/scene';
-import { rangeBetween } from '../../core/track/ranges';
-import type { TrackRange } from '../../core/track/ranges';
-import { previewClick, previewHover } from '../../editor/previewInput';
+import { previewInput } from '../../editor/previewInput';
+import type { PreviewPointer } from '../../editor/previewInput';
 import { t } from '../../i18n';
-import { trackHitNear } from '../../rendering/plan/hitTest';
+import { trackHitNear } from '../../rendering/preview/hitTest';
 import { buildOverlay } from '../../rendering/preview/overlay';
 import { PreviewRenderer } from '../../rendering/preview/PreviewRenderer';
 import { useEditorStore } from '../../stores/editor';
@@ -27,97 +26,39 @@ const failed = ref(false);
 let renderer: PreviewRenderer | null = null;
 
 const scene = computed(() => buildScene(store.project, store.samples));
-
-/** The stretch being laid with a two-click tool, from its first click to the pointer. */
-const draft = computed<TrackRange | null>(() => {
-  const from =
-    editor.barrierDraft?.s ??
-    editor.earthworkDraft?.s ??
-    editor.widthDraft ??
-    editor.bankDraft ??
-    editor.pitDraft?.s ??
-    null;
-  const to =
-    editor.barrierTarget ??
-    editor.earthworkTarget ??
-    editor.widthTarget ??
-    editor.bankTarget ??
-    editor.pitTarget?.s ??
-    null;
-  return from !== null && to !== null ? rangeBetween(store.project, store.samples, from, to) : null;
-});
 const overlay = computed(() =>
   buildOverlay(store.project, store.samples, {
-    layer: editor.layer,
-    selection: editor.selection,
-    range: editor.range,
-    draft: draft.value,
-    hoverS: editor.hoverS,
+    editing: editor.editing,
     sceneryFloors: scene.value.sceneryFloors,
-    brush:
-      editor.tool === 'sculpt' && editor.brushPointer?.y !== undefined
-        ? { ...editor.brushPointer, y: editor.brushPointer.y, radius: editor.brushRadius }
-        : null,
   }),
 );
+const pointer = previewInput({ project: store, editor, viewport, ui });
 
-/** What lies under the pointer, as a track hit. */
-function hitAt(event: PointerEvent) {
+/** A pointer event, with what lies under it on the ground. */
+function at(event: PointerEvent): PreviewPointer {
   const rect = canvas.value!.getBoundingClientRect();
-  const picked = renderer!.pick(event.clientX - rect.left, event.clientY - rect.top);
-  if (!picked.world) return null;
-  return trackHitNear(store.project, store.samples, picked.world, picked.pointId);
+  const x = event.clientX - rect.left,
+    y = event.clientY - rect.top;
+  const picked = renderer?.pick(x, y);
+  return {
+    x,
+    y,
+    button: event.button,
+    shiftKey: event.shiftKey,
+    hit: picked?.world
+      ? trackHitNear(store.project, store.samples, picked.world, picked.pointId)
+      : null,
+  };
 }
 
-/** The place on the ground under the pointer, as the brush paints it. */
-function groundAt(event: PointerEvent) {
-  const rect = canvas.value!.getBoundingClientRect();
-  return renderer!.pick(event.clientX - rect.left, event.clientY - rect.top).world;
-}
-
-// With the brush, the left button paints for as long as it is held (docs/adr/0016).
-let painting = false;
-function paintFrom(event: PointerEvent) {
-  const at = groundAt(event);
-  if (!at) return false;
-  canvas.value!.setPointerCapture(event.pointerId);
-  painting = true;
-  editor.brushPointer = at;
-  editor.beginStroke(at, event.shiftKey);
-  return true;
-}
-function stopPainting() {
-  if (!painting) return;
-  painting = false;
-  editor.endStroke();
-}
-
-// A press that barely moves is a click; a longer one turns the camera.
-let press: { x: number; y: number } | null = null;
 function onPointerDown(event: PointerEvent) {
-  if (renderer && editor.tool === 'sculpt' && event.button === 0 && paintFrom(event)) return;
-  press = event.button === 0 ? { x: event.clientX, y: event.clientY } : null;
+  if (renderer && pointer.down(at(event))) canvas.value!.setPointerCapture(event.pointerId);
 }
 function onPointerUp(event: PointerEvent) {
-  if (painting) return stopPainting();
-  const start = press;
-  press = null;
-  if (!renderer || !start || Math.hypot(event.clientX - start.x, event.clientY - start.y) > 4)
-    return;
-  const hit = hitAt(event);
-  if (hit) previewClick({ project: store, editor, ui }, hit, event.shiftKey);
+  if (renderer) pointer.up(at(event));
 }
 function onPointerMove(event: PointerEvent) {
-  if (!renderer) return;
-  if (editor.tool === 'sculpt') {
-    const at = groundAt(event);
-    editor.brushPointer = at;
-    if (painting && at) editor.strokeTo(at);
-    if (painting) return;
-  }
-  if (press) return;
-  const hit = hitAt(event);
-  previewHover({ editor }, hit ?? { road: null });
+  if (renderer) pointer.move(at(event));
 }
 
 onMounted(() => {
@@ -144,15 +85,9 @@ onMounted(() => {
   );
   // The terrain shown bends as the stroke paints; the scene is rebuilt when it ends.
   watch(
-    () => editor.strokeVersion,
+    () => editor.relief,
     () => {
-      const stroke = editor.stroke;
-      if (stroke)
-        renderer?.bendTerrain(
-          (p) => stroke.field.at(p) - stroke.before.at(p),
-          stroke.ground.clearance,
-          stroke.covered,
-        );
+      if (editor.stroke) renderer?.bendTerrain(editor.stroke);
     },
   );
   watch(
@@ -170,7 +105,7 @@ const { off } = viewport.onPreviewCommand((command) => {
   else renderer?.centerOn(command.at);
 });
 onBeforeUnmount(() => {
-  stopPainting();
+  pointer.cancel();
   off();
   renderer?.dispose();
   renderer = null;
@@ -186,11 +121,8 @@ onBeforeUnmount(() => {
       @pointerdown="onPointerDown"
       @pointerup="onPointerUp"
       @pointermove="onPointerMove"
-      @pointercancel="stopPainting"
-      @pointerleave="
-        editor.hoverS = null;
-        if (!painting) editor.brushPointer = null;
-      "
+      @pointercancel="pointer.cancel()"
+      @pointerleave="pointer.leave()"
     ></canvas>
     <p v-if="failed" id="preview-unavailable" class="unavailable">{{ t('preview.unavailable') }}</p>
     <div class="hint">

@@ -1,14 +1,16 @@
+import { t } from '../../i18n';
 import type { Tool } from './tool';
 
-/** Draws a straight from the selected point to each click; Shift keeps it on the track heading. */
+/** Draws a straight from the selected point to each click on the plan; Shift keeps it on the track heading. */
 export const straightTool: Tool = {
   cursor: () => 'crosshair',
   hint: () => 'canvas.hintStraight',
-  press({ editor, viewport }, { at, shiftKey }) {
-    editor.drawStraight(viewport.projection.toWorld(at), shiftKey);
+  press({ editor, ui }, { hit, shiftKey, screen }) {
+    if (!screen) return ui.notify(t('preview.drawOnPlan'), true);
+    editor.drawStraight(hit.ground, shiftKey);
   },
-  hover({ editor, viewport }, { at, shiftKey }) {
-    editor.drawPointer = { at: viewport.projection.toWorld(at), snap: shiftKey };
+  hover({ editor }, { hit, shiftKey }) {
+    editor.drawPointer = { at: hit.ground, snap: shiftKey };
   },
   leave({ editor }) {
     editor.drawPointer = null;

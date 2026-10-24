@@ -5,7 +5,7 @@ import { buildScene } from '../src/core/scene/scene';
 import { sampleTrack } from '../src/core/track/centerline';
 import { positionAt } from '../src/core/track/positions';
 import { buildOverlay, meshLayer } from '../src/rendering/preview/overlay';
-import { template } from './helpers';
+import { editingOf, template } from './helpers';
 
 describe('3D preview by layers', () => {
   it('sorts the scene meshes into layers, the roadway on none', () => {
@@ -37,23 +37,24 @@ describe('3D preview by layers', () => {
       });
     });
     const zone = project.widthZones[0];
-    const state = {
-      layer: 'road' as const,
-      selection: { kind: 'widthZone' as const, id: zone.id },
+    const editing = editingOf({
+      layer: 'road',
+      selection: { kind: 'widthZone', id: zone.id },
       range: { start: 500, length: 100 },
-      draft: null,
       hoverS: 50,
-      sceneryFloors: {},
-    };
-    const overlay = buildOverlay(project, sampleTrack(project), state);
+    });
+    const overlay = buildOverlay(project, sampleTrack(project), { editing, sceneryFloors: {} });
     expect(overlay.strips).toHaveLength(2);
     expect(overlay.strips.every((strip) => strip.positions.length > 0)).toBe(true);
     expect(overlay.posts).toEqual([]);
     expect(overlay.cursor).not.toBeNull();
     const track = buildOverlay(project, sampleTrack(project), {
-      ...state,
-      layer: 'track',
-      selection: { kind: 'points', ids: [project.points[1].id] },
+      editing: {
+        ...editing,
+        layer: 'track',
+        selection: { kind: 'points', ids: [project.points[1].id] },
+      },
+      sceneryFloors: {},
     });
     expect(track.posts).toHaveLength(project.points.length);
     expect(track.posts.filter((post) => post.selected).map((post) => post.id)).toEqual([
@@ -68,11 +69,7 @@ describe('3D preview by layers', () => {
     });
     const scene = buildScene(project);
     const overlay = buildOverlay(project, sampleTrack(project), {
-      layer: 'scenery',
-      selection: { kind: 'scenery', ids: [id] },
-      range: null,
-      draft: null,
-      hoverS: null,
+      editing: editingOf({ layer: 'scenery', selection: { kind: 'scenery', ids: [id] } }),
       sceneryFloors: scene.sceneryFloors,
     });
     const heights = overlay.outlines.filter((_, i) => i % 3 === 1);

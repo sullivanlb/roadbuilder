@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { RULES } from '../../core/project/rules';
+import { TOOL_KEYS } from '../../editor/tools';
 import { t } from '../../i18n';
 import type { MessageKey } from '../../i18n';
 import { useUiStore } from '../../stores/ui';
@@ -11,15 +12,7 @@ const ui = useUiStore();
 const shortcuts: { label: MessageKey; key: () => string }[] = [
   { label: 'help.shortcutLayers', key: () => '1 – 6' },
   { label: 'help.shortcutView', key: () => 'C' },
-  { label: 'help.shortcutSelect', key: () => 'V' },
-  { label: 'help.shortcutAdd', key: () => 'A' },
-  { label: 'help.shortcutStraight', key: () => 'S' },
-  { label: 'help.shortcutArc', key: () => 'R' },
-  { label: 'help.shortcutBarrier', key: () => 'B' },
-  { label: 'help.shortcutPits', key: () => 'P' },
-  { label: 'help.shortcutWidth', key: () => 'L' },
-  { label: 'help.shortcutBank', key: () => 'D' },
-  { label: 'help.shortcutPan', key: () => 'H' },
+  ...TOOL_KEYS.map(({ key, help }) => ({ label: help, key: () => key.toUpperCase() })),
   { label: 'help.shortcutFit', key: () => 'F' },
   { label: 'help.shortcutUndo', key: () => t('help.keyCtrlZ') },
   { label: 'help.shortcutRedo', key: () => t('help.keyCtrlShiftZ') },

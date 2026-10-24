@@ -40,10 +40,11 @@ const typeNote = computed(
     t(`barriers.${type.value}Note`),
 );
 const status = computed(() => {
-  const draft = editor.barrierDraft;
-  if (draft)
+  const laying = editor.laying;
+  if (laying?.kind === 'barrier')
     return t('barriers.statusDraft', {
-      side: draft.side === 'right' ? t('barriers.sideRightShort') : t('barriers.sideLeftShort'),
+      side:
+        laying.from.side === 'right' ? t('barriers.sideRightShort') : t('barriers.sideLeftShort'),
     });
   if (editor.tool === 'barrier') return t('barriers.statusTool');
   if (selected.value) return t('barriers.statusSelected');
@@ -97,9 +98,9 @@ function preview(patch: Parameters<typeof updateBarrier>[2]) {
         :key="barrier.id"
         type="button"
         class="row"
-        :class="{ active: barrier.id === editor.selectedBarrierId }"
+        :class="{ active: barrier.id === selected?.id }"
         :title="rowLabel(barrier, position)"
-        @click="editor.selectBarrier(barrier.id)"
+        @click="editor.select({ kind: 'barrier', id: barrier.id })"
       >
         <span class="swatch" :style="{ background: BARRIER_STYLE[barrier.type].color }"></span
         >{{ rowLabel(barrier, position) }}
@@ -133,7 +134,7 @@ function preview(patch: Parameters<typeof updateBarrier>[2]) {
         <AppButton id="barrier-swap" small @click="editor.swapSelectedBarrierSide()">
           <AppIcon name="move" />{{ t('barriers.swap') }}
         </AppButton>
-        <AppButton id="barrier-delete" class="delete" small @click="editor.deleteSelectedBarrier()">
+        <AppButton id="barrier-delete" class="delete" small @click="editor.deleteSelection()">
           <AppIcon name="trash" />{{ t('barriers.delete') }}
         </AppButton>
       </div>

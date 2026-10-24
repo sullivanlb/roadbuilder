@@ -2,10 +2,12 @@ import { useEventListener } from '@vueuse/core';
 import { computed, ref } from 'vue';
 import type { Ref } from 'vue';
 import { t } from '../i18n';
+import { trackHitAt } from '../rendering/plan/hitTest';
+import type { ScreenPoint } from '../rendering/plan/projection';
 import { useEditorStore } from '../stores/editor';
 import { useProjectStore } from '../stores/project';
+import { useUiStore } from '../stores/ui';
 import { useViewportStore } from '../stores/viewport';
-import { findRoadPosition } from '../rendering/plan/hitTest';
 import { isTyping } from './focus';
 import { panGesture, TOOLS } from './tools';
 import type { Gesture, PointerInput, ToolContext } from './tools';
@@ -22,6 +24,7 @@ export function usePlanInteraction(canvas: Ref<HTMLCanvasElement | null>) {
     project: useProjectStore(),
     editor: useEditorStore(),
     viewport: useViewportStore(),
+    ui: useUiStore(),
   };
   const editor = context.editor;
   const tool = computed(() => TOOLS[editor.tool]);
@@ -33,11 +36,15 @@ export function usePlanInteraction(canvas: Ref<HTMLCanvasElement | null>) {
   );
   const hint = computed(() => t(tool.value.hint(context)));
 
-  function input(event: MouseEvent): PointerInput {
+  /** The pointer on the plan, resolved into what lies under it with the plan's reach in pixels. */
+  function input(event: MouseEvent): PointerInput & { screen: ScreenPoint } {
     const rect = canvas.value!.getBoundingClientRect();
+    const screen = { x: event.clientX - rect.left, y: event.clientY - rect.top };
+    const { project, viewport } = context;
     return {
-      at: { x: event.clientX - rect.left, y: event.clientY - rect.top },
+      hit: trackHitAt(viewport.projection, project.project, project.samples, screen),
       shiftKey: event.shiftKey,
+      screen,
     };
   }
 
@@ -49,7 +56,7 @@ export function usePlanInteraction(canvas: Ref<HTMLCanvasElement | null>) {
     const at = input(event);
     if (spaceHeld.value || event.button === 1) {
       event.preventDefault();
-      gesture.value = panGesture(context, at);
+      gesture.value = panGesture(context, at.screen);
     } else gesture.value = tool.value.press?.(context, at) ?? null;
   }
 
@@ -58,9 +65,7 @@ export function usePlanInteraction(canvas: Ref<HTMLCanvasElement | null>) {
     if (gesture.value) gesture.value.move(at);
     else tool.value.hover?.(context, at);
     // The band follows the pointer along the road.
-    const { project, viewport } = context;
-    editor.hoverS =
-      findRoadPosition(viewport.projection, project.project, project.samples, at.at)?.s ?? null;
+    editor.hoverS = at.hit.road?.s ?? null;
   }
 
   function end() {
@@ -75,7 +80,11 @@ export function usePlanInteraction(canvas: Ref<HTMLCanvasElement | null>) {
   function onWheel(event: WheelEvent) {
     event.preventDefault();
     const delta = Math.max(-WHEEL_LIMIT, Math.min(WHEEL_LIMIT, event.deltaY));
-    context.viewport.zoom(Math.exp(-delta * 0.002), input(event).at);
+    const rect = canvas.value!.getBoundingClientRect();
+    context.viewport.zoom(Math.exp(-delta * 0.002), {
+      x: event.clientX - rect.left,
+      y: event.clientY - rect.top,
+    });
   }
 
   function onLeave() {

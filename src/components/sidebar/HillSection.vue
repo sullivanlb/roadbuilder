@@ -53,7 +53,7 @@ function preview(patch: HillPatch) {
       />
       <p class="note">{{ t('hills.heightNote') }}</p>
       <div class="actions">
-        <AppButton id="hill-delete" class="delete" small @click="editor.deleteSelectedHill()">
+        <AppButton id="hill-delete" class="delete" small @click="editor.deleteSelection()">
           <AppIcon name="trash" />{{ t('hills.delete') }}
         </AppButton>
       </div>

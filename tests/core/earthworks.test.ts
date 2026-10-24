@@ -27,8 +27,7 @@ import { issueLayer } from '../../src/editor/layers';
 import { bandBlocks } from '../../src/rendering/band';
 import type { BandLabels } from '../../src/rendering/band';
 import { buildOverlay } from '../../src/rendering/preview/overlay';
-import type { OverlayState } from '../../src/rendering/preview/overlay';
-import { asJson, template } from '../helpers';
+import { asJson, editingOf, template } from '../helpers';
 
 /** A project with an earthwork of a type from track distance `from` to `to`. */
 export function withEarthwork(
@@ -420,12 +419,12 @@ describe('earthworks and hills in the views', () => {
     const blocks = bandBlocks(project, samples, 'terrain', labels as unknown as BandLabels);
     expect(blocks).toMatchObject([{ kind: 'earthwork', row: 'left', label: 'D' }]);
     expect(blocks[0].range.length).toBeCloseTo(200, 0);
-    const state = { layer: 'terrain', range: null, draft: null, sceneryFloors: {}, hoverS: null };
     for (const selection of [
       { kind: 'earthwork', id: project.earthworks[0].id },
       { kind: 'hill', id: project.hills[0].id },
     ] as const) {
-      const { outlines } = buildOverlay(project, samples, { ...state, selection } as OverlayState);
+      const editing = editingOf({ layer: 'terrain', selection });
+      const { outlines } = buildOverlay(project, samples, { editing, sceneryFloors: {} });
       expect(outlines.length).toBeGreaterThan(24);
       expect(outlines.every(Number.isFinite)).toBe(true);
     }

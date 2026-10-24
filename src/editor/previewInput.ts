@@ -1,92 +1,80 @@
-import { sampleAt } from '../core/track/centerline';
-import type { TrackHit } from '../rendering/plan/hitTest';
-import { t } from '../i18n';
-import { isEarthworkTool, isSceneryTool } from '../stores/editor';
-import type { useUiStore } from '../stores/ui';
-import { pickInLayer } from './layers';
-import type { ToolContext } from './tools';
+import type { TrackHit } from '../rendering/hits';
+import { TOOLS } from './tools';
+import type { Gesture, PointerInput, ToolContext } from './tools';
 
-type PreviewContext = Omit<ToolContext, 'viewport'> & { ui: ReturnType<typeof useUiStore> };
-
-/**
- * A click in the 3D preview, resolved into what lies under it. The active tool
- * and layer act on it as they would on the plan; control points are selected
- * there but only dragged on the plan.
- */
-export function previewClick(
-  { project, editor, ui }: PreviewContext,
-  hit: TrackHit,
-  shiftKey: boolean,
-) {
-  const road = hit.road;
-  if (isSceneryTool(editor.tool)) return editor.placeScenery(editor.tool, hit.ground);
-  if (editor.tool === 'hill') return editor.placeHill(hit.ground);
-  if (isEarthworkTool(editor.tool)) {
-    if (!road) return;
-    if (editor.earthworkDraft) editor.completeEarthwork(road.s);
-    else editor.beginEarthwork(road);
-    return;
-  }
-  switch (editor.tool) {
-    case 'barrier':
-      if (!road) return;
-      if (editor.barrierDraft) editor.completeBarrier(road.s);
-      else editor.beginBarrier(road);
-      return;
-    case 'width':
-      if (!road) return;
-      if (editor.widthDraft !== null) editor.completeWidthZone(road.s);
-      else editor.beginWidthZone(road.s);
-      return;
-    case 'bank':
-      if (!road) return;
-      if (editor.bankDraft !== null) editor.completeBankZone(road.s);
-      else editor.beginBankZone(road.s);
-      return;
-    case 'pits':
-      if (!road) return;
-      if (editor.pitDraft) editor.completePitLane(road.s);
-      else editor.beginPitLane(road);
-      return;
-    case 'add': {
-      if (!road) return ui.notify(t('preview.addOnRoad'), true);
-      const sample = sampleAt(project.samples, road.s)!;
-      editor.addPoint(sample, sample.segment);
-      return;
-    }
-    case 'straight':
-    case 'arc':
-      return ui.notify(t('preview.drawOnPlan'), true);
-    case 'select':
-      if (editor.layer === 'track' && hit.pointId) {
-        if (shiftKey) editor.togglePoint(hit.pointId);
-        else editor.selectPoint(hit.pointId);
-        return;
-      }
-      if (editor.layer === 'scenery' && hit.sceneryId && shiftKey)
-        return editor.toggleScenery(hit.sceneryId);
-      editor.select(
-        pickInLayer(editor.layer, hit, project.project, project.samples, editor.selection),
-      );
-      return;
-    case 'pan':
-      return;
-    // The brush paints while held, from the preview itself.
-    case 'sculpt':
-      return;
-  }
+/** A pointer event in the 3D preview: where it is on the canvas, and what lies under it. */
+export interface PreviewPointer {
+  x: number;
+  y: number;
+  button: number;
+  shiftKey: boolean;
+  /** What lies under the pointer, or null where it misses the ground. */
+  hit: TrackHit | null;
 }
 
-/** The pointer moving over the preview: the band follows it, and so does a stretch being laid. */
-export function previewHover(
-  { editor }: Pick<PreviewContext, 'editor'>,
-  hit: Pick<TrackHit, 'road'>,
-) {
-  const road = hit.road;
-  editor.hoverS = road?.s ?? null;
-  if (editor.barrierDraft) editor.barrierTarget = road?.s ?? null;
-  if (editor.widthDraft !== null) editor.widthTarget = road?.s ?? null;
-  if (editor.bankDraft !== null) editor.bankTarget = road?.s ?? null;
-  if (editor.pitDraft) editor.pitTarget = road;
-  if (editor.earthworkDraft) editor.earthworkTarget = road?.s ?? null;
+/** How far a press may move, in pixels, and still be a click rather than a turn of the camera. */
+const CLICK = 4;
+
+/**
+ * Routes the pointer of the 3D preview to the active tool, which acts on what
+ * lies under it as it would on the plan (docs/adr/0009). A press that barely
+ * moves is a click, made when the button is released; one that moves turns the
+ * camera instead. A tool that holds acts as soon as the left button goes down,
+ * and the camera stays still while it does.
+ */
+export function previewInput(context: ToolContext) {
+  const { editor } = context;
+  const tool = () => TOOLS[editor.tool];
+  const input = (event: PreviewPointer, hit: TrackHit): PointerInput => ({
+    hit,
+    shiftKey: event.shiftKey,
+  });
+  let gesture: Gesture | null = null;
+  let press: { x: number; y: number } | null = null;
+  /** The press was cancelled, or released: what it started ends. */
+  function cancel() {
+    gesture?.end();
+    gesture = null;
+    press = null;
+  }
+
+  return {
+    /** A button went down; true when the tool takes the press, so the camera must not turn. */
+    down(event: PreviewPointer): boolean {
+      press = null;
+      if (event.button !== 0) return false;
+      if (!tool().holds) {
+        press = { x: event.x, y: event.y };
+        return false;
+      }
+      if (!event.hit) return false;
+      gesture = tool().press?.(context, input(event, event.hit)) ?? null;
+      return gesture !== null;
+    },
+    move(event: PreviewPointer) {
+      if (gesture) {
+        if (event.hit) gesture.move(input(event, event.hit));
+        return;
+      }
+      // A press under way turns the camera.
+      if (press) return;
+      // The band follows the pointer along the road.
+      editor.hoverS = event.hit?.road?.s ?? null;
+      if (event.hit) tool().hover?.(context, input(event, event.hit));
+      else tool().leave?.(context);
+    },
+    up(event: PreviewPointer) {
+      if (gesture) return cancel();
+      const start = press;
+      press = null;
+      if (!start || !event.hit || Math.hypot(event.x - start.x, event.y - start.y) > CLICK) return;
+      tool().press?.(context, input(event, event.hit))?.end();
+    },
+    cancel,
+    /** The pointer left the preview. */
+    leave() {
+      editor.hoverS = null;
+      if (!gesture) tool().leave?.(context);
+    },
+  };
 }

@@ -10,6 +10,8 @@ import type { TrackRange } from '../core/track/ranges';
 import { bankZoneRanges } from '../core/track/bank';
 import { earthworkRanges } from '../core/track/earthworks';
 import { widthZoneRanges } from '../core/track/width';
+import { selectedIds } from './editing';
+import type { Editing, Selection } from './editing';
 import type { LayerId } from './layers';
 import { BARRIER_STYLE, COLORS } from './theme';
 
@@ -282,13 +284,17 @@ export interface BandScene {
   blocks: readonly BandBlock[];
   labels: BandLabels;
   corners: readonly Corner[];
-  /** The selected block, if the selection is laid along the track. */
-  selectedBlockId: string | null;
-  selectedPointIds: readonly string[];
-  range: TrackRange | null;
+  /** The editing under way: what is selected, the stretch picked, where the pointer is. */
+  editing: Editing;
   /** The range being dragged out, before it is let go. */
   pendingRange: TrackRange | null;
-  hoverS: number | null;
+}
+
+/** Whether a block holds the selection. */
+function isSelectedBlock(selection: Selection, block: BandBlock) {
+  if (block.kind === 'startLine') return false;
+  if (block.kind === 'pitLane') return selection?.kind === 'pitLane';
+  return selectedIds(selection, block.kind).includes(block.id);
 }
 
 type Context = CanvasRenderingContext2D;
@@ -313,7 +319,7 @@ export function drawBand(ctx: Context, size: BandSize, dpr: number, scene: BandS
     const row = scene.rows.find((candidate) => candidate.id === block.row);
     if (row) drawBlock(ctx, size, scene, row, block, total);
   }
-  for (const range of [scene.range, scene.pendingRange])
+  for (const range of [scene.editing.range, scene.pendingRange])
     if (range && total)
       for (const [a, b] of rangeSpans(range, total)) {
         ctx.fillStyle = COLORS.band.range;
@@ -322,9 +328,10 @@ export function drawBand(ctx: Context, size: BandSize, dpr: number, scene: BandS
         ctx.fillRect(x(a), BAND.top, 1.5, h - BAND.top - BAND.bottom);
         ctx.fillRect(x(b) - 1.5, BAND.top, 1.5, h - BAND.top - BAND.bottom);
       }
-  if (scene.hoverS !== null) {
+  const { hoverS } = scene.editing;
+  if (hoverS !== null) {
     ctx.fillStyle = COLORS.accent;
-    ctx.fillRect(x(scene.hoverS), BAND.top, 1, h - BAND.top - BAND.bottom);
+    ctx.fillRect(x(hoverS), BAND.top, 1, h - BAND.top - BAND.bottom);
   }
   drawTicks(ctx, size, scene);
   ctx.restore();
@@ -364,7 +371,7 @@ function drawRow(ctx: Context, size: BandSize, scene: BandScene, row: BandRow) {
     scene.project.points.forEach((point, i) => {
       const sample = controlPointSample(samples, i);
       if (!sample) return;
-      const selected = scene.selectedPointIds.includes(point.id);
+      const selected = selectedIds(scene.editing.selection, 'points').includes(point.id);
       ctx.fillStyle = selected ? COLORS.accent : COLORS.point.outline;
       ctx.beginPath();
       ctx.arc(x(sample.s), y(sample.y), selected ? 4 : 2.5, 0, Math.PI * 2);
@@ -421,7 +428,7 @@ function drawBlock(
   total: number,
 ) {
   const x = (s: number) => bandX(size, scene.view, s);
-  const selected = block.id === scene.selectedBlockId;
+  const selected = isSelectedBlock(scene.editing.selection, block);
   ctx.font = '11px "Segoe UI", sans-serif';
   ctx.textBaseline = 'middle';
   if (block.range.length === 0) {

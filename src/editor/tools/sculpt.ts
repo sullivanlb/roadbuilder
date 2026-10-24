@@ -8,21 +8,20 @@ import type { Tool } from './tool';
 export const sculptTool: Tool = {
   cursor: () => 'crosshair',
   hint: () => 'canvas.hintSculpt',
-  press({ editor, viewport }, { at, shiftKey }) {
-    const world = viewport.projection.toWorld(at);
-    editor.brushPointer = world;
-    editor.beginStroke(world, shiftKey);
+  holds: true,
+  press({ editor }, { hit, shiftKey }) {
+    editor.brushPointer = hit.ground;
+    editor.beginStroke(hit.ground, shiftKey);
     return {
-      move({ at: now }) {
-        const next = viewport.projection.toWorld(now);
-        editor.brushPointer = next;
-        editor.strokeTo(next);
+      move({ hit: now }) {
+        editor.brushPointer = now.ground;
+        editor.strokeTo(now.ground);
       },
       end: () => editor.endStroke(),
     };
   },
-  hover({ editor, viewport }, { at }) {
-    editor.brushPointer = viewport.projection.toWorld(at);
+  hover({ editor }, { hit }) {
+    editor.brushPointer = hit.ground;
   },
   leave({ editor }) {
     editor.brushPointer = null;

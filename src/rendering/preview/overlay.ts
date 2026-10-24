@@ -13,13 +13,23 @@ import { kerbWidth } from '../../core/track/layout';
 import { earthworkOutline, earthworkRanges } from '../../core/track/earthworks';
 import { pitLaneLayout } from '../../core/track/pitLane';
 import { positionRange, rangeSamples } from '../../core/track/ranges';
-import type { TrackRange } from '../../core/track/ranges';
+import type { Editing } from '../editing';
 import type { LayerId } from '../layers';
 import { COLORS } from '../theme';
 
 /** The layer a mesh of the scene belongs to, or null for the roadway, shown on every layer. */
 export const meshLayer = ({ part }: Pick<Mesh, 'part'>): LayerId | null =>
   part === 'roadway' ? null : part;
+
+/** What a brush stroke under way painted, for the preview to bend the terrain by it (docs/adr/0016). */
+export interface TerrainBend {
+  /** Height the stroke added at a place, before it shows. */
+  painted: (p: PlanPoint) => number;
+  /** How much of the relief shows at a place, from 0 beside the track to 1 away from it. */
+  shown: (p: PlanPoint) => number;
+  /** The extent the stroke reached on the plan. */
+  covered: { minX: number; maxX: number; minZ: number; maxZ: number };
+}
 
 /** The edges of a box around a scenery item standing at height `y`, as line segments. */
 function sceneryBox(item: SceneryItem, y: number): number[] {
@@ -77,27 +87,11 @@ export interface PreviewOverlay {
   } | null;
 }
 
-/** What the overlay shows, read from the editor. */
+/** What the overlay shows: the editing under way, and where scenery stands in the scene. */
 export interface OverlayState {
-  layer: LayerId;
-  selection:
-    | { kind: 'points'; ids: readonly Id[] }
-    | { kind: 'barrier'; id: Id }
-    | { kind: 'widthZone'; id: Id }
-    | { kind: 'bankZone'; id: Id }
-    | { kind: 'pitLane' }
-    | { kind: 'scenery'; ids: readonly Id[] }
-    | { kind: 'earthwork'; id: Id }
-    | { kind: 'hill'; id: Id }
-    | null;
-  range: TrackRange | null;
-  /** The stretch being laid with a two-click tool. */
-  draft: TrackRange | null;
+  editing: Editing;
   /** Height of each scenery item's floor in the scene, by ID. */
   sceneryFloors: Readonly<Record<Id, number>>;
-  hoverS: number | null;
-  /** The brush on the ground under the pointer, while the brush tool is on. */
-  brush?: { x: number; y: number; z: number; radius: number } | null;
 }
 
 const LIFT = 0.12;
@@ -170,7 +164,8 @@ export function buildOverlay(
         opacity,
       ),
     );
-  const selection = state.selection;
+  const { editing } = state;
+  const selection = editing.selection;
   if (selection?.kind === 'widthZone' || selection?.kind === 'bankZone') {
     const zones = selection.kind === 'widthZone' ? project.widthZones : project.bankZones;
     const zone = zones.find((candidate) => candidate.id === selection.id);
@@ -219,9 +214,10 @@ export function buildOverlay(
     for (const item of project.scenery)
       if (selection.ids.includes(item.id))
         overlay.outlines.push(...sceneryBox(item, state.sceneryFloors[item.id] ?? 0));
-  if (state.brush) {
+  const brush = editing.brush;
+  if (brush?.y !== undefined) {
     // A ring level with the place under the pointer, drawn over the ground.
-    const { x, y, z, radius } = state.brush;
+    const { x, y, z, radius } = brush;
     for (const reach of [radius, radius / 2])
       for (let k = 0; k < 48; k++) {
         const a = (k * Math.PI) / 24,
@@ -236,9 +232,10 @@ export function buildOverlay(
         );
       }
   }
-  if (state.range) across(rangeSamples(samples, state.range), COLORS.accent, 0.3);
-  if (state.draft) across(rangeSamples(samples, state.draft), COLORS.accent, 0.45);
-  if (state.layer === 'track') {
+  if (editing.range) across(rangeSamples(samples, editing.range), COLORS.accent, 0.3);
+  const laid = editing.laying?.range;
+  if (laid) across(rangeSamples(samples, laid), COLORS.accent, 0.45);
+  if (editing.layer === 'track') {
     const selected = selection?.kind === 'points' ? selection.ids : [];
     overlay.posts = project.points.map((point) => ({
       id: point.id,
@@ -248,8 +245,8 @@ export function buildOverlay(
       selected: selected.includes(point.id),
     }));
   }
-  if (state.hoverS !== null) {
-    const sample = sampleAt(samples, state.hoverS)!;
+  if (editing.hoverS !== null) {
+    const sample = sampleAt(samples, editing.hoverS)!;
     overlay.cursor = { ...sample, y: offsetPoint(sample, 0)[1], reach: sample.half + kerb + 4 };
   }
   return overlay;

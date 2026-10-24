@@ -784,10 +784,10 @@ describe('editor interface', () => {
     // Escape drops a first click, then leaves the tool.
     await click('tool-embankment');
     await clickPlan(roadSide(1, 'left'));
-    expect(stores().editor.earthworkDraft).not.toBeNull();
+    expect(stores().editor.laying).not.toBeNull();
     press('Escape');
     await settle();
-    expect(stores().editor.earthworkDraft).toBeNull();
+    expect(stores().editor.laying).toBeNull();
   });
 
   it('lays an earthwork on a stretch picked in the band', async () => {

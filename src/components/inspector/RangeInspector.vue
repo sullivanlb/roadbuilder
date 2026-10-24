@@ -50,32 +50,36 @@ const sides = [
           id="range-width-zone"
           variant="primary"
           small
-          @click="editor.widthZoneOnRange()"
+          @click="editor.layOnRange('widthZone')"
           >{{ t('range.widthZone') }}</AppButton
         >
-        <AppButton id="range-bank-zone" variant="primary" small @click="editor.bankZoneOnRange()">{{
-          t('range.bankZone')
-        }}</AppButton>
+        <AppButton
+          id="range-bank-zone"
+          variant="primary"
+          small
+          @click="editor.layOnRange('bankZone')"
+          >{{ t('range.bankZone') }}</AppButton
+        >
       </template>
       <template v-else-if="editor.layer === 'edges'">
         <AppButton
           id="range-barrier-left"
           variant="primary"
           small
-          @click="editor.barriersOnRange(['left'])"
+          @click="editor.layOnRange('barrier', ['left'])"
           >{{ t('range.barrierLeft', { type: barrierName }) }}</AppButton
         >
         <AppButton
           id="range-barrier-right"
           variant="primary"
           small
-          @click="editor.barriersOnRange(['right'])"
+          @click="editor.layOnRange('barrier', ['right'])"
           >{{ t('range.barrierRight', { type: barrierName }) }}</AppButton
         >
         <AppButton
           id="range-barrier-both"
           small
-          @click="editor.barriersOnRange(['left', 'right'])"
+          @click="editor.layOnRange('barrier', ['left', 'right'])"
           >{{ t('range.barrierBoth') }}</AppButton
         >
       </template>
@@ -84,7 +88,7 @@ const sides = [
         id="range-pit-lane"
         variant="primary"
         small
-        @click="editor.pitLaneOnRange()"
+        @click="editor.layOnRange('pitLane')"
         >{{ t('range.pitLane') }}</AppButton
       >
       <template v-else-if="editor.layer === 'terrain'">
@@ -95,7 +99,7 @@ const sides = [
             :key="side"
             variant="primary"
             small
-            @click="editor.earthworksOnRange(type, [side])"
+            @click="editor.layOnRange('earthwork', [side], type)"
             >{{ t(label, { type: t(`earthworks.${type}`) }) }}</AppButton
           >
         </template>

@@ -116,9 +116,9 @@ function edit(patch: EarthworkPatch) {
         :key="earthwork.id"
         type="button"
         class="row"
-        :class="{ active: earthwork.id === editor.selectedEarthworkId }"
+        :class="{ active: earthwork.id === editor.selectedEarthwork?.id }"
         :title="rowLabel(earthwork, position)"
-        @click="editor.selectEarthwork(earthwork.id)"
+        @click="editor.select({ kind: 'earthwork', id: earthwork.id })"
       >
         <span class="swatch" :style="{ background: COLORS.earthwork[earthwork.type] }"></span
         >{{ rowLabel(earthwork, position) }}
@@ -158,12 +158,7 @@ function edit(patch: EarthworkPatch) {
         <AppButton id="earthwork-swap" small @click="editor.swapSelectedEarthworkSide()">
           <AppIcon name="move" />{{ t('earthworks.swap') }}
         </AppButton>
-        <AppButton
-          id="earthwork-delete"
-          class="delete"
-          small
-          @click="editor.deleteSelectedEarthwork()"
-        >
+        <AppButton id="earthwork-delete" class="delete" small @click="editor.deleteSelection()">
           <AppIcon name="trash" />{{ t('earthworks.delete') }}
         </AppButton>
       </div>

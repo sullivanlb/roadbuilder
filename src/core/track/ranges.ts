@@ -17,6 +17,12 @@ export interface TrackRange {
 }
 
 /**
+ * What is laid along the track between two track positions (docs/adr/0008):
+ * each kind by its own tool, all of them the same way.
+ */
+export type LaidKind = 'barrier' | 'widthZone' | 'bankZone' | 'pitLane' | 'earthwork';
+
+/**
  * The range between two track positions, in track direction, or null when a
  * position's control point is gone. An end before the start runs through the
  * start of a circuit; on a road the range is then empty.
@@ -33,6 +39,26 @@ export function positionRange(
   const length =
     end >= start ? end - start : isCircuit(track) ? end + trackLength(samples) - start : 0;
   return { start, length };
+}
+
+/**
+ * Things laid between two track positions, resolved on the track in project
+ * order, each under `key`. One whose end comes before its start runs through the
+ * start of a circuit; on a road it is empty. Those shorter than a metre are left out.
+ */
+export function laidRanges<T extends { from: TrackPosition; to: TrackPosition }, K extends string>(
+  track: Track,
+  samples: readonly Sample[],
+  items: readonly T[],
+  key: K,
+): (TrackRange & Record<K, T>)[] {
+  if (!items.length || samples.length < 2) return [];
+  return items.flatMap((item) => {
+    const range = positionRange(track, samples, item.from, item.to);
+    return range && range.length >= 1
+      ? [{ ...range, [key]: item } as TrackRange & Record<K, T>]
+      : [];
+  });
 }
 
 /**

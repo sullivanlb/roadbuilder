@@ -2,10 +2,14 @@
 import { setTerrainMargin } from '../../core/project/edits';
 import { RULES } from '../../core/project/rules';
 import { EARTHWORK_TYPES } from '../../core/project/schema';
+import { LAYERS } from '../../editor/layers';
 import { t } from '../../i18n';
+import type { MessageKey } from '../../i18n';
 import { useEditorStore } from '../../stores/editor';
+import type { ToolId } from '../../stores/editor';
 import { useProjectStore } from '../../stores/project';
 import AppIcon from '../ui/AppIcon.vue';
+import type { IconName } from '../ui/icons';
 import RangeField from '../ui/RangeField.vue';
 import SidebarSection from '../ui/SidebarSection.vue';
 
@@ -13,15 +17,19 @@ import SidebarSection from '../ui/SidebarSection.vue';
 const store = useProjectStore();
 const editor = useEditorStore();
 
-const shapes = [
-  { tool: 'sculpt', icon: 'brush', label: 'sculpt.brush' },
-  { tool: 'hill', icon: 'hill', label: 'hills.hill' },
-  ...EARTHWORK_TYPES.map((type) => ({
-    tool: type,
-    icon: type,
-    label: `earthworks.${type}` as const,
-  })),
-] as const;
+/** How each tool of the terrain layer shows here. */
+const LOOK: Partial<Record<ToolId, { icon: IconName; label: MessageKey }>> = {
+  sculpt: { icon: 'brush', label: 'sculpt.brush' },
+  hill: { icon: 'hill', label: 'hills.hill' },
+  ...Object.fromEntries(
+    EARTHWORK_TYPES.map((type) => [type, { icon: type, label: `earthworks.${type}` as const }]),
+  ),
+};
+/** The tools of the terrain layer, in its order. */
+const shapes = LAYERS.find((layer) => layer.id === 'terrain')!.tools.map((tool) => ({
+  tool,
+  ...LOOK[tool]!,
+}));
 </script>
 
 <template>

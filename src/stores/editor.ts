@@ -4,38 +4,21 @@ import type { Id } from '../core/ids';
 import type { PlanPoint, Vec3 } from '../core/math';
 import {
   addArc,
-  addBankZone,
-  addBarrier,
-  addEarthwork,
   addHill,
   addScenery,
   arcRejection,
-  addWidthZone,
-  bankZoneRejection,
-  barrierRejection,
   duplicateScenery,
-  earthworkRejection,
   hillRejection,
   insertPoint,
   opposite,
   pointRejection,
-  removeBankZone,
-  removeBarrier,
-  removeEarthwork,
-  removeHill,
-  removePoint,
-  removePoints,
-  removeScenery,
   sceneryRejection,
   setAltitude,
   shiftAltitude,
-  removeWidthZone,
-  setPitLane,
   setStraight,
   updateBarrier,
   updateEarthwork,
   updateScenery,
-  widthZoneRejection,
   clearSculpt,
   setSculpt,
 } from '../core/project/edits';
@@ -43,31 +26,36 @@ import { RULES } from '../core/project/rules';
 import { facingTrack, newScenery } from '../core/project/scenery';
 import { EARTHWORK_TYPES, isCircuit, SCENERY_KINDS } from '../core/project/schema';
 import type {
+  BankZone,
+  Barrier,
   BarrierType,
+  Earthwork,
   EarthworkType,
   Hill,
   SceneryItem,
   SceneryKind,
   Side,
+  WidthZone,
 } from '../core/project/schema';
 import { HILL_DEFAULTS } from '../core/project/terrain';
 import { SculptField } from '../core/project/sculpt';
 import type { BrushMode } from '../core/project/sculpt';
-import { groundModel } from '../core/scene/ground';
-import type { GroundModel } from '../core/scene/ground';
-import { outsideOf } from '../core/track/bank';
 import { trackLength } from '../core/track/centerline';
-import { LAYOUT } from '../core/track/layout';
-import { positionAt } from '../core/track/positions';
 import { pointDistance } from '../core/track/positions';
-import { rangeBetween, rangeContains, rangeSamples } from '../core/track/ranges';
+import { rangeContains } from '../core/track/ranges';
 import type { TrackRange } from '../core/track/ranges';
 import { arcDraft, drawStart, straightDraft } from '../core/track/drawing';
 import type { DrawDraft } from '../core/track/drawing';
-import { LAYERS, layerOfSelection, layerOfTool } from '../editor/layers';
-import { hasBand } from '../rendering/band';
-import type { LayerId, Selection } from '../editor/layers';
+import { LAYERS, layerOfTool } from '../editor/layers';
+import type { LayerId } from '../editor/layers';
+import { laidExtent, laidKindOfTool, lay } from '../editor/laying';
+import type { LaidKind, Laying, RoadSpot } from '../editor/laying';
+import { deletion, layerOfSelection, selectedItems, stillSelected } from '../editor/selection';
+import type { Selection } from '../editor/selection';
+import { BrushStroke } from '../editor/stroke';
 import { SNAP_GRID } from '../editor/tools/tool';
+import { hasBand } from '../rendering/band';
+import type { Editing, LayingView } from '../rendering/editing';
 import { t } from '../i18n';
 import { useProjectStore } from './project';
 import { useUiStore } from './ui';
@@ -95,29 +83,9 @@ export const isSceneryTool = (tool: ToolId): tool is SceneryKind =>
 export const isEarthworkTool = (tool: ToolId): tool is EarthworkType =>
   (EARTHWORK_TYPES as readonly ToolId[]).includes(tool);
 
-/** How often a held brush paints, in seconds. */
-export const BRUSH_STEP = 1 / 30;
-
-/**
- * A brush stroke under way: the relief it paints, the relief before it and the
- * ground it paints on, with the extent it has covered so far.
- */
-export interface SculptStroke {
-  field: SculptField;
-  before: SculptField;
-  ground: GroundModel;
-  covered: { minX: number; maxX: number; minZ: number; maxZ: number };
-}
-
 /** How far the turn shortcuts turn scenery, in degrees: three steps of the heading. */
 export const TURN_STEP = 3 * RULES.heading.step;
 export type ViewMode = '2d' | '3d';
-
-/** A place on the road and the side it points at, as a track distance. */
-export interface RoadSpot {
-  s: number;
-  side: Side;
-}
 
 /** What the user is doing: active layer, tool and view, selection, what is being laid, hover. */
 export const useEditorStore = defineStore('editor', () => {
@@ -135,33 +103,20 @@ export const useEditorStore = defineStore('editor', () => {
   };
   const selection = ref<Selection>(firstPoint());
   const barrierType = ref<BarrierType>('guardrail');
-  /** First click of the barrier being laid: where it starts, on which side. */
-  const barrierDraft = ref<RoadSpot | null>(null);
+  /** The first click of what is being laid along the track; the second is awaited. */
+  const laying = ref<Laying | null>(null);
+  /** Where the second click would land, under the pointer. */
+  const layingTarget = ref<RoadSpot | null>(null);
   const hoveredPointId = ref<Id | null>(null);
-  /** Track distance where the next barrier click would land. */
-  const barrierTarget = ref<number | null>(null);
-  /** Entry of the pit lane being laid; the exit click is awaited. */
-  const pitDraft = ref<RoadSpot | null>(null);
-  const pitTarget = ref<RoadSpot | null>(null);
   /** Track distance under the pointer, on the plan, the band or the preview. */
   const hoverS = ref<number | null>(null);
   /** A stretch picked in the band, waiting for something to be laid on it. */
   const range = ref<TrackRange | null>(null);
-  /** Track distance of the first click of the width zone being laid; the second is awaited. */
-  const widthDraft = ref<number | null>(null);
-  const widthTarget = ref<number | null>(null);
-  /** Track distance of the first click of the bank zone being laid; the second is awaited. */
-  const bankDraft = ref<number | null>(null);
-  const bankTarget = ref<number | null>(null);
   /** Where the pointer aims the straight or the arc being drawn, and whether Shift snaps it. */
   const drawPointer = ref<{ at: PlanPoint; snap: boolean } | null>(null);
   /** Where the next scenery item would be placed, under the pointer. */
   const sceneryPointer = ref<PlanPoint | null>(null);
   const hoveredSceneryId = ref<Id | null>(null);
-  /** First click of the earthwork being laid: where it starts, on which side. */
-  const earthworkDraft = ref<RoadSpot | null>(null);
-  /** Track distance where the next earthwork click would land. */
-  const earthworkTarget = ref<number | null>(null);
   /** Where the next hill would be raised, under the pointer. */
   const hillPointer = ref<PlanPoint | null>(null);
   /** How the brush paints, how far it reaches and how fast. */
@@ -171,51 +126,33 @@ export const useEditorStore = defineStore('editor', () => {
   /** Where the brush is on the ground, under the pointer; `y` is known in 3D. */
   const brushPointer = ref<(PlanPoint & { y?: number }) | null>(null);
   /** The stroke being painted, and a count that moves on each time it paints. */
-  const stroke = shallowRef<SculptStroke | null>(null);
-  const strokeVersion = ref(0);
-  let strokeTimer: ReturnType<typeof setInterval> | null = null;
-  /** Moves where the next steps of the stroke paint. */
-  let strokeTarget: ((at: PlanPoint) => void) | null = null;
+  const stroke = shallowRef<BrushStroke | null>(null);
+  const strokeSteps = ref(0);
 
-  const selected = <K extends NonNullable<Selection>['kind']>(kind: K) =>
-    computed(() => {
-      const current = selection.value;
-      return current?.kind === kind ? (current as Extract<Selection, { kind: K }>) : null;
-    });
-  const selectedPoints = selected('points');
+  const selectedPoints = computed(() =>
+    selection.value?.kind === 'points' ? selection.value : null,
+  );
   const selectedPointIds = computed(() => selectedPoints.value?.ids ?? []);
   /** Rectangle being dragged on the plan to select points, in screen pixels. */
   const marquee = ref<{ x0: number; y0: number; x1: number; y1: number } | null>(null);
   /** The selected control point, when the selection holds points. */
   const selectedPointId = computed(() => selectedPoints.value?.ids[0] ?? null);
-  const selectedBarrierId = computed(() => selected('barrier').value?.id ?? null);
-  const selectedWidthZoneId = computed(() => selected('widthZone').value?.id ?? null);
-  const selectedBankZoneId = computed(() => selected('bankZone').value?.id ?? null);
-  const selectedSceneryIds = computed(() => selected('scenery').value?.ids ?? []);
-  const selectedEarthworkId = computed(() => selected('earthwork').value?.id ?? null);
-  const selectedHillId = computed(() => selected('hill').value?.id ?? null);
-  const selectedEarthwork = computed(() =>
-    store.project.earthworks.find((earthwork) => earthwork.id === selectedEarthworkId.value),
-  );
-  const selectedHill = computed(() =>
-    store.project.hills.find((hill) => hill.id === selectedHillId.value),
-  );
-  const selectedScenery = computed(() =>
-    store.project.scenery.filter((item) => selectedSceneryIds.value.includes(item.id)),
-  );
   const selectedIndex = computed(() =>
     selectedPointId.value === null ? -1 : (store.pointIndex.get(selectedPointId.value) ?? -1),
   );
   const selectedPoint = computed(() => store.project.points[selectedIndex.value]);
-  const selectedBarrier = computed(() =>
-    store.project.barriers.find((barrier) => barrier.id === selectedBarrierId.value),
+  const selectedScenery = computed(() =>
+    selectedItems<SceneryItem>(store.project, selection.value, 'scenery'),
   );
-  const selectedWidthZone = computed(() =>
-    store.project.widthZones.find((zone) => zone.id === selectedWidthZoneId.value),
-  );
-  const selectedBankZone = computed(() =>
-    store.project.bankZones.find((zone) => zone.id === selectedBankZoneId.value),
-  );
+  const selectedSceneryIds = computed(() => selectedScenery.value.map((item) => item.id));
+  const selectedOne = <T extends { id: Id }>(
+    kind: 'barrier' | 'widthZone' | 'bankZone' | 'earthwork' | 'hill',
+  ) => computed(() => selectedItems<T>(store.project, selection.value, kind)[0]);
+  const selectedBarrier = selectedOne<Barrier>('barrier');
+  const selectedWidthZone = selectedOne<WidthZone>('widthZone');
+  const selectedBankZone = selectedOne<BankZone>('bankZone');
+  const selectedEarthwork = selectedOne<Earthwork>('earthwork');
+  const selectedHill = selectedOne<Hill>('hill');
   /** The point straights and arcs are drawn on from: the selected one, or the last. */
   const drawFrom = computed(() =>
     drawStart(
@@ -255,51 +192,54 @@ export const useEditorStore = defineStore('editor', () => {
         selectedPointId.value !== null && location.pointIds.includes(selectedPointId.value),
     ),
   );
-
-  /** What is left of a selection in the current project. */
-  function stillThere(current: Selection): Selection {
-    const project = store.project;
-    switch (current?.kind) {
-      case 'points': {
-        const ids = current.ids.filter((id) => store.pointIndex.has(id));
-        return ids.length === current.ids.length
-          ? current
-          : ids.length
-            ? { kind: 'points', ids }
-            : null;
-      }
-      case 'barrier':
-        return project.barriers.some((b) => b.id === current.id) ? current : null;
-      case 'widthZone':
-        return project.widthZones.some((z) => z.id === current.id) ? current : null;
-      case 'bankZone':
-        return project.bankZones.some((z) => z.id === current.id) ? current : null;
-      case 'pitLane':
-        return project.pitLane ? current : null;
-      case 'earthwork':
-        return project.earthworks.some((e) => e.id === current.id) ? current : null;
-      case 'hill':
-        return project.hills.some((h) => h.id === current.id) ? current : null;
-      case 'scenery': {
-        const ids = current.ids.filter((id) => project.scenery.some((item) => item.id === id));
-        return ids.length === current.ids.length
-          ? current
-          : ids.length
-            ? { kind: 'scenery', ids }
-            : null;
-      }
-      case undefined:
-        return null;
-    }
-  }
+  /** The type of earthwork the active tool lays. */
+  const earthworkType = computed(() => (isEarthworkTool(tool.value) ? tool.value : 'embankment'));
+  /** What is being laid along the track, with the stretch it would cover up to the pointer. */
+  const layingView = computed<LayingView | null>(() => {
+    const current = laying.value,
+      target = layingTarget.value;
+    if (!current) return null;
+    return {
+      kind: current.kind,
+      from: current.from,
+      range: target
+        ? laidExtent(current.kind, store.project, store.samples, current.from.s, target.s)
+        : null,
+      earthworkType: earthworkType.value,
+    };
+  });
+  /** The editing under way, the same for the plan, the band and the preview. */
+  const editing = computed<Editing>(() => ({
+    layer: layer.value,
+    hiddenLayers: hiddenLayers.value,
+    selection: selection.value,
+    laying: layingView.value,
+    range: range.value,
+    hoverS: hoverS.value,
+    brush:
+      tool.value === 'sculpt' && brushPointer.value
+        ? { ...brushPointer.value, radius: brushRadius.value }
+        : null,
+  }));
+  const paintedRelief = computed(() => new SculptField(store.project.sculpt));
+  /**
+   * The painted relief as it shows: the stroke's while one is painted. A new
+   * value each time the stroke paints, for the plan to draw it again.
+   */
+  const relief = computed(() => {
+    const current = stroke.value;
+    return current && strokeSteps.value
+      ? { field: current.relief, step: strokeSteps.value }
+      : { field: paintedRelief.value, step: 0 };
+  });
 
   // Undo, redo or an opened file can remove what was selected or being laid.
   watch(
     () => store.project,
     (project) => {
-      const left = stillThere(selection.value);
+      const left = stillSelected(project, selection.value);
       if (left !== selection.value) selection.value = left;
-      if (!isCircuit(project)) pitDraft.value = null;
+      if (laying.value?.kind === 'pitLane' && !isCircuit(project)) cancelLaying();
     },
   );
 
@@ -309,18 +249,9 @@ export const useEditorStore = defineStore('editor', () => {
   function clearDrafts() {
     endStroke();
     brushPointer.value = null;
-    barrierDraft.value = null;
-    barrierTarget.value = null;
-    pitDraft.value = null;
-    pitTarget.value = null;
-    widthDraft.value = null;
-    widthTarget.value = null;
-    bankDraft.value = null;
-    bankTarget.value = null;
+    cancelLaying();
     drawPointer.value = null;
     sceneryPointer.value = null;
-    earthworkDraft.value = null;
-    earthworkTarget.value = null;
     hillPointer.value = null;
   }
 
@@ -332,7 +263,7 @@ export const useEditorStore = defineStore('editor', () => {
     layer.value = next;
     // A stretch is picked in the band, which a layer without rows does not show.
     if (!hasBand(next)) range.value = null;
-    selection.value = stillThere(remembered.get(next) ?? null);
+    selection.value = stillSelected(store.project, remembered.get(next) ?? null);
     clearDrafts();
     if (layerOfTool(tool.value) !== null) tool.value = 'select';
   }
@@ -348,27 +279,9 @@ export const useEditorStore = defineStore('editor', () => {
     const home = layerOfTool(next);
     if (home) setLayer(home);
     tool.value = next;
-    if (next !== 'barrier') {
-      barrierDraft.value = null;
-      barrierTarget.value = null;
-    }
-    if (next !== 'pits') {
-      pitDraft.value = null;
-      pitTarget.value = null;
-    }
-    if (next !== 'width') {
-      widthDraft.value = null;
-      widthTarget.value = null;
-    }
-    if (next !== 'bank') {
-      bankDraft.value = null;
-      bankTarget.value = null;
-    }
-    // A draft carries on from one earthwork type to another: its type is the tool's.
-    if (!isEarthworkTool(next)) {
-      earthworkDraft.value = null;
-      earthworkTarget.value = null;
-    }
+    // What is being laid carries on with a tool laying the same kind: an
+    // earthwork of another type, say.
+    if (laidKindOfTool(next) !== laying.value?.kind) cancelLaying();
     drawPointer.value = null;
     sceneryPointer.value = null;
     hillPointer.value = null;
@@ -406,84 +319,71 @@ export const useEditorStore = defineStore('editor', () => {
     range.value = next;
   }
 
-  /** Tells why something cannot be laid; returns false for the caller to stop. */
+  /** Tells why something cannot be done; returns false for the caller to stop. */
   const refuse = (message: string) => {
     ui.notify(message, true);
     return false;
   };
 
-  /** The two track positions bounding a range. */
-  const rangeEnds = (stretch: TrackRange) => ({
-    from: positionAt(store.project, store.samples, stretch.start),
-    to: positionAt(store.project, store.samples, stretch.start + stretch.length),
-  });
-
-  /** Lays a barrier over a stretch and selects it; false when it is refused. */
-  function layBarrier(stretch: TrackRange, side: Side): boolean {
-    const rejection = barrierRejection(store.project, stretch);
-    if (rejection === 'too-short')
-      return refuse(t('toast.barrierTooShort', { min: RULES.rangeLength }));
-    if (rejection === 'barriers-limit')
-      return refuse(t('toast.barriersLimit', { max: RULES.barriers.max }));
-    const id = store.edit((project) =>
-      addBarrier(project, { type: barrierType.value, side, ...rangeEnds(stretch) }),
-    );
-    selection.value = { kind: 'barrier', id };
-    return true;
+  /** Lays something of a kind over a stretch, on a side, and selects it; false when it is refused. */
+  function layOver(kind: LaidKind, stretch: TrackRange, side: Side, type = earthworkType.value) {
+    const laid = lay(kind, store.project, store.samples, stretch, {
+      side,
+      barrierType: barrierType.value,
+      earthworkType: type,
+    });
+    if ('refusal' in laid) return void refuse(laid.refusal);
+    selection.value = store.edit(laid.recipe);
+    return laid;
   }
 
-  /** Lays a width zone over a stretch and selects it; false when it is refused. */
-  function layWidthZone(stretch: TrackRange): boolean {
-    const rejection = widthZoneRejection(store.project, store.samples, stretch);
-    if (rejection === 'width-zones-limit')
-      return refuse(t('toast.widthZonesLimit', { max: RULES.widthZones.max }));
-    if (rejection === 'too-short')
-      return refuse(t('toast.widthZoneTooShort', { min: RULES.rangeLength }));
-    if (rejection === 'overlap') return refuse(t('toast.widthZoneOverlap'));
-    const id = store.edit((project) => addWidthZone(project, rangeEnds(stretch)));
-    selection.value = { kind: 'widthZone', id };
-    return true;
+  /** First click of what the active tool lays along the track: where it starts, on which side. */
+  function beginLaying(spot: RoadSpot) {
+    const kind = laidKindOfTool(tool.value);
+    if (!kind) return;
+    if (kind === 'pitLane' && !isCircuit(store.project)) return void refuse(t('pits.roadOnly'));
+    laying.value = { kind, from: spot };
+    layingTarget.value = null;
+  }
+
+  /** The pointer moved over the road, or off it, while something is being laid. */
+  function aimLaying(spot: RoadSpot | null) {
+    if (laying.value) layingTarget.value = spot;
+  }
+
+  function cancelLaying() {
+    laying.value = null;
+    layingTarget.value = null;
+  }
+
+  /** Second click, at track distance `s`: what is being laid covers the stretch between the clicks. */
+  function completeLaying(s: number) {
+    const current = laying.value;
+    if (!current) return;
+    const stretch = laidExtent(current.kind, store.project, store.samples, current.from.s, s);
+    const laid = layOver(current.kind, stretch, current.from.side);
+    if (!laid) return;
+    cancelLaying();
+    if (laid.single) setTool('select');
+    ui.notify(laid.added);
   }
 
   /**
-   * Lays a bank zone over a stretch, raised on the outside of its bend, and
-   * selects it; false when it is refused.
+   * Lays something of a kind on the stretch picked in the band, once on each
+   * side; the stretch is kept when it is refused. A pit lane keeps its side.
    */
-  function layBankZone(stretch: TrackRange): boolean {
-    const rejection = bankZoneRejection(store.project, store.samples, stretch);
-    if (rejection === 'bank-zones-limit')
-      return refuse(t('toast.bankZonesLimit', { max: RULES.bankZones.max }));
-    if (rejection === 'too-short')
-      return refuse(t('toast.bankZoneTooShort', { min: RULES.rangeLength }));
-    if (rejection === 'overlap') return refuse(t('toast.bankZoneOverlap'));
-    const high = outsideOf(rangeSamples(store.samples, stretch));
-    const id = store.edit((project) => addBankZone(project, { ...rangeEnds(stretch), high }));
-    selection.value = { kind: 'bankZone', id };
-    return true;
-  }
-
-  /** Lays an earthwork of a type over a stretch, on a side, and selects it; false when it is refused. */
-  function layEarthwork(stretch: TrackRange, side: Side, type: EarthworkType): boolean {
-    const rejection = earthworkRejection(store.project, stretch);
-    if (rejection === 'too-short')
-      return refuse(t('toast.earthworkTooShort', { min: RULES.rangeLength }));
-    if (rejection === 'earthworks-limit')
-      return refuse(t('toast.earthworksLimit', { max: RULES.earthworks.max }));
-    const id = store.edit((project) =>
-      addEarthwork(project, { type, side, ...rangeEnds(stretch) }),
-    );
-    selection.value = { kind: 'earthwork', id };
-    return true;
-  }
-
-  /** Lays the pit lane over a stretch, entry first; false when it is refused. */
-  function layPitLane(stretch: TrackRange, side: Side): boolean {
-    if (!isCircuit(store.project)) return refuse(t('pits.roadOnly'));
-    if (stretch.length < 2 * LAYOUT.pitLane.taper) return refuse(t('toast.pitLaneSamePlace'));
-    const ends = rangeEnds(stretch);
-    store.edit((project) => setPitLane(project, { side, entry: ends.from, exit: ends.to }));
-    selection.value = { kind: 'pitLane' };
-    return true;
+  function layOnRange(kind: LaidKind, sides?: readonly Side[], type?: EarthworkType) {
+    const stretch = range.value;
+    if (!stretch) return;
+    const on = sides ?? [kind === 'pitLane' ? (store.project.pitLane?.side ?? 'right') : 'right'];
+    let added = '';
+    for (const side of on) {
+      const laid = layOver(kind, stretch, side, type);
+      if (!laid) return;
+      added = laid.added;
+    }
+    range.value = null;
+    ui.notify(added);
   }
 
   /** Selects the control points inside the picked stretch. */
@@ -495,43 +395,6 @@ export const useEditorStore = defineStore('editor', () => {
       .filter((_, i) => rangeContains(stretch, total, pointDistance(store.samples, i)))
       .map((point) => point.id);
     select(ids.length ? { kind: 'points', ids } : null);
-  }
-
-  function widthZoneOnRange() {
-    if (range.value && layWidthZone(range.value)) {
-      range.value = null;
-      ui.notify(t('toast.widthZoneAdded'));
-    }
-  }
-
-  function bankZoneOnRange() {
-    if (range.value && layBankZone(range.value)) {
-      range.value = null;
-      ui.notify(t('toast.bankZoneAdded'));
-    }
-  }
-
-  function barriersOnRange(sides: Side[]) {
-    const stretch = range.value;
-    if (stretch && sides.every((side) => layBarrier(stretch, side))) {
-      range.value = null;
-      ui.notify(t('toast.barrierAdded'));
-    }
-  }
-
-  function earthworksOnRange(type: EarthworkType, sides: Side[]) {
-    const stretch = range.value;
-    if (stretch && sides.every((side) => layEarthwork(stretch, side, type))) {
-      range.value = null;
-      ui.notify(t('toast.earthworkAdded'));
-    }
-  }
-
-  function pitLaneOnRange() {
-    if (range.value && layPitLane(range.value, store.project.pitLane?.side ?? 'right')) {
-      range.value = null;
-      ui.notify(t('toast.pitLaneAdded'));
-    }
   }
 
   const selectPoint = (id: Id | null) => select(id ? { kind: 'points', ids: [id] } : null);
@@ -548,10 +411,6 @@ export const useEditorStore = defineStore('editor', () => {
     const next = ids.includes(id) ? ids.filter((other) => other !== id) : [...ids, id];
     select(next.length ? { kind: 'points', ids: next } : null);
   }
-
-  const selectBarrier = (id: Id | null) => select(id ? { kind: 'barrier', id } : null);
-  const selectWidthZone = (id: Id | null) => select(id ? { kind: 'widthZone', id } : null);
-  const selectBankZone = (id: Id | null) => select(id ? { kind: 'bankZone', id } : null);
 
   /** Adds a control point after `index` (by default after the selection) and selects it. */
   function addPoint(at: Pick<Vec3, 'x' | 'z'> & { y?: number }, after = selectedIndex.value) {
@@ -606,23 +465,18 @@ export const useEditorStore = defineStore('editor', () => {
     selection.value = { kind: 'points', ids: [id] };
   }
 
-  /** Deletes the selected control points; after a single one, its neighbour is selected. */
-  function deleteSelectedPoint() {
-    const ids = selectedPointIds.value;
-    if (ids.length > 1) {
-      store.edit((draft) => removePoints(draft, ids));
-      selection.value = null;
-      if (!store.project.points.length) setTool('add');
-      return;
-    }
-    const id = selectedPointId.value;
-    if (id === null || !selectedPoint.value) return;
-    const index = selectedIndex.value;
-    store.edit((draft) => removePoint(draft, id));
-    const points = store.project.points;
-    const next = points[Math.min(index, points.length - 1)];
-    selection.value = next ? { kind: 'points', ids: [next.id] } : null;
-    if (!points.length) setTool('add');
+  /**
+   * Deletes what is selected. After a single control point, zone, barrier or
+   * earthwork, the one taking its place is selected; a track left without points
+   * gets the tool that adds them.
+   */
+  function deleteSelection() {
+    const removal = deletion(store.project, selection.value);
+    if (!removal) return;
+    const kind = selection.value?.kind;
+    store.edit(removal.recipe);
+    selection.value = removal.next(store.project);
+    if (kind === 'points' && !store.project.points.length) setTool('add');
   }
 
   /** Raises or lowers every selected control point. */
@@ -638,102 +492,6 @@ export const useEditorStore = defineStore('editor', () => {
     if (!points.length) return;
     const average = points.reduce((sum, point) => sum + point.y, 0) / points.length;
     store.edit((draft) => setAltitude(draft, ids, Math.round(average * 2) / 2));
-  }
-
-  function beginBarrier(spot: RoadSpot) {
-    barrierDraft.value = spot;
-  }
-
-  function cancelBarrier() {
-    barrierDraft.value = null;
-  }
-
-  /** Second click: the other end. The barrier covers the stretch between the two clicks. */
-  function completeBarrier(s: number) {
-    const draft = barrierDraft.value;
-    if (!draft) return;
-    if (!layBarrier(rangeBetween(store.project, store.samples, draft.s, s), draft.side)) return;
-    barrierDraft.value = null;
-    barrierTarget.value = null;
-    ui.notify(t('toast.barrierAdded'));
-  }
-
-  /** First click of the pit lane: its entry. Pits only exist on circuits. */
-  function beginPitLane(spot: RoadSpot) {
-    if (!isCircuit(store.project)) return ui.notify(t('pits.roadOnly'), true);
-    pitDraft.value = spot;
-  }
-
-  function cancelPitLane() {
-    pitDraft.value = null;
-  }
-
-  /** Second click: the exit. The lane runs from the entry to the exit in track direction. */
-  function completePitLane(exit: number) {
-    const draft = pitDraft.value;
-    if (!draft) return;
-    const total = trackLength(store.samples);
-    const length = (((exit - draft.s) % total) + total) % total;
-    if (!layPitLane({ start: draft.s, length }, draft.side)) return;
-    pitDraft.value = null;
-    setTool('select');
-    ui.notify(t('toast.pitLaneAdded'));
-  }
-
-  /** First click of a width zone: one end. */
-  function beginWidthZone(s: number) {
-    widthDraft.value = s;
-  }
-
-  function cancelWidthZone() {
-    widthDraft.value = null;
-  }
-
-  /** Second click: the other end. The zone covers the stretch between the two clicks. */
-  function completeWidthZone(s: number) {
-    const first = widthDraft.value;
-    if (first === null) return;
-    if (!layWidthZone(rangeBetween(store.project, store.samples, first, s))) return;
-    widthDraft.value = null;
-    widthTarget.value = null;
-    ui.notify(t('toast.widthZoneAdded'));
-  }
-
-  function deleteSelectedWidthZone() {
-    const zone = selectedWidthZone.value;
-    if (!zone) return;
-    const zones = store.project.widthZones;
-    const index = zones.indexOf(zone);
-    store.edit((draft) => removeWidthZone(draft, zone.id));
-    selectWidthZone(store.project.widthZones[Math.min(index, zones.length - 2)]?.id ?? null);
-  }
-
-  /** First click of a bank zone: one end. */
-  function beginBankZone(s: number) {
-    bankDraft.value = s;
-  }
-
-  function cancelBankZone() {
-    bankDraft.value = null;
-  }
-
-  /** Second click: the other end. The zone covers the stretch between the two clicks. */
-  function completeBankZone(s: number) {
-    const first = bankDraft.value;
-    if (first === null) return;
-    if (!layBankZone(rangeBetween(store.project, store.samples, first, s))) return;
-    bankDraft.value = null;
-    bankTarget.value = null;
-    ui.notify(t('toast.bankZoneAdded'));
-  }
-
-  function deleteSelectedBankZone() {
-    const zone = selectedBankZone.value;
-    if (!zone) return;
-    const zones = store.project.bankZones;
-    const index = zones.indexOf(zone);
-    store.edit((draft) => removeBankZone(draft, zone.id));
-    selectBankZone(store.project.bankZones[Math.min(index, zones.length - 2)]?.id ?? null);
   }
 
   /** Places a scenery item at `at`, facing the track, and selects it. */
@@ -752,13 +510,6 @@ export const useEditorStore = defineStore('editor', () => {
     const ids = selectedSceneryIds.value;
     const next = ids.includes(id) ? ids.filter((other) => other !== id) : [...ids, id];
     select(next.length ? { kind: 'scenery', ids: next } : null);
-  }
-
-  function deleteSelectedScenery() {
-    const ids = selectedSceneryIds.value;
-    if (!ids.length) return;
-    store.edit((draft) => removeScenery(draft, ids));
-    selection.value = null;
   }
 
   /** Turns every selected scenery item about itself by `degrees`, clockwise on the plan. */
@@ -783,41 +534,6 @@ export const useEditorStore = defineStore('editor', () => {
     selection.value = { kind: 'scenery', ids: copies };
   }
 
-  /** Deletes what is selected, when it can be deleted from the keyboard: points, scenery, earthworks or hills. */
-  function deleteSelection() {
-    const kind = selection.value?.kind;
-    if (kind === 'scenery') deleteSelectedScenery();
-    else if (kind === 'earthwork') deleteSelectedEarthwork();
-    else if (kind === 'hill') deleteSelectedHill();
-    else deleteSelectedPoint();
-  }
-
-  function beginEarthwork(spot: RoadSpot) {
-    earthworkDraft.value = spot;
-  }
-
-  function cancelEarthwork() {
-    earthworkDraft.value = null;
-  }
-
-  /**
-   * Second click: the other end. The earthwork, of the type of the active tool,
-   * covers the stretch between the two clicks.
-   */
-  function completeEarthwork(s: number) {
-    const draft = earthworkDraft.value;
-    if (!draft) return;
-    const type = isEarthworkTool(tool.value) ? tool.value : 'embankment';
-    const stretch = rangeBetween(store.project, store.samples, draft.s, s);
-    if (!layEarthwork(stretch, draft.side, type)) return;
-    earthworkDraft.value = null;
-    earthworkTarget.value = null;
-    ui.notify(t('toast.earthworkAdded'));
-  }
-
-  const selectEarthwork = (id: Id | null) => select(id ? { kind: 'earthwork', id } : null);
-  const selectHill = (id: Id | null) => select(id ? { kind: 'hill', id } : null);
-
   function swapSelectedEarthworkSide() {
     const earthwork = selectedEarthwork.value;
     if (earthwork)
@@ -826,68 +542,38 @@ export const useEditorStore = defineStore('editor', () => {
       );
   }
 
-  function deleteSelectedEarthwork() {
-    const earthwork = selectedEarthwork.value;
-    if (!earthwork) return;
-    const earthworks = store.project.earthworks;
-    const index = earthworks.indexOf(earthwork);
-    store.edit((draft) => removeEarthwork(draft, earthwork.id));
-    selectEarthwork(store.project.earthworks[Math.min(index, earthworks.length - 2)]?.id ?? null);
-  }
-
   /**
    * Starts painting with the brush at `at`, and keeps painting there as long as
-   * it is held, even still. `invert` swaps raising and lowering. Flattening
-   * levels the ground to its height under the pointer when the stroke starts.
+   * it is held, even still (docs/adr/0016). `invert` swaps raising and lowering.
    */
   function beginStroke(at: PlanPoint, invert = false) {
     endStroke();
     store.commit();
-    const swap: Partial<Record<BrushMode, BrushMode>> = { raise: 'lower', lower: 'raise' };
-    const mode = (invert && swap[brushMode.value]) || brushMode.value;
-    const ground = groundModel(store.project, store.samples);
-    const target = mode === 'flatten' ? ground.height(at) : 0;
-    const current: SculptStroke = {
-      field: new SculptField(store.project.sculpt),
-      before: new SculptField(store.project.sculpt),
-      ground,
-      covered: { minX: Infinity, maxX: -Infinity, minZ: Infinity, maxZ: -Infinity },
-    };
-    let point = { x: at.x, z: at.z },
-      warned = false;
-    const paint = () => {
-      const brush = { mode, radius: brushRadius.value, strength: brushStrength.value };
-      if (!current.field.paint(brush, point, BRUSH_STEP, ground, target) && !warned) {
-        warned = true;
-        refuse(t('toast.sculptLimit', { max: RULES.sculptTiles.max }));
-      }
-      const box = current.covered,
-        reach = brush.radius;
-      box.minX = Math.min(box.minX, point.x - reach);
-      box.maxX = Math.max(box.maxX, point.x + reach);
-      box.minZ = Math.min(box.minZ, point.z - reach);
-      box.maxZ = Math.max(box.maxZ, point.z + reach);
-      strokeVersion.value++;
-    };
-    stroke.value = current;
-    strokeTarget = (next) => (point = { x: next.x, z: next.z });
-    paint();
-    strokeTimer = setInterval(paint, BRUSH_STEP * 1000);
+    strokeSteps.value = 0;
+    stroke.value = new BrushStroke(
+      store.project,
+      store.samples,
+      () => ({ mode: brushMode.value, radius: brushRadius.value, strength: brushStrength.value }),
+      at,
+      invert,
+      {
+        painted: () => strokeSteps.value++,
+        full: () => refuse(t('toast.sculptLimit', { max: RULES.sculptTiles.max })),
+      },
+    );
   }
 
   function strokeTo(at: PlanPoint) {
-    strokeTarget?.(at);
+    stroke.value?.moveTo(at);
   }
 
   /** Ends the stroke: what it painted becomes one step of the history. */
   function endStroke() {
-    if (strokeTimer !== null) clearInterval(strokeTimer);
-    strokeTimer = null;
-    strokeTarget = null;
     const done = stroke.value;
     if (!done) return;
     stroke.value = null;
-    store.edit((draft) => setSculpt(draft, done.field));
+    const field = done.end();
+    store.edit((draft) => setSculpt(draft, field));
   }
 
   /** Removes all the relief painted with the brush. */
@@ -903,18 +589,11 @@ export const useEditorStore = defineStore('editor', () => {
     selection.value = { kind: 'hill', id };
   }
 
-  function deleteSelectedHill() {
-    const hill = selectedHill.value;
-    if (!hill) return;
-    store.edit((draft) => removeHill(draft, hill.id));
-    selection.value = null;
-  }
-
   /** Chooses the type of the next barrier, and of the selected one if any. */
   function setBarrierType(type: BarrierType) {
     barrierType.value = type;
     const barrier = selectedBarrier.value;
-    if (!barrierDraft.value && barrier && barrier.type !== type)
+    if (laying.value?.kind !== 'barrier' && barrier && barrier.type !== type)
       store.edit((draft) => updateBarrier(draft, barrier.id, { type }));
   }
 
@@ -922,15 +601,6 @@ export const useEditorStore = defineStore('editor', () => {
     const barrier = selectedBarrier.value;
     if (barrier)
       store.edit((draft) => updateBarrier(draft, barrier.id, { side: opposite(barrier.side) }));
-  }
-
-  function deleteSelectedBarrier() {
-    const barrier = selectedBarrier.value;
-    if (!barrier) return;
-    const barriers = store.project.barriers;
-    const index = barriers.indexOf(barrier);
-    store.edit((draft) => removeBarrier(draft, barrier.id));
-    selectBarrier(store.project.barriers[Math.min(index, barriers.length - 2)]?.id ?? null);
   }
 
   return {
@@ -946,25 +616,14 @@ export const useEditorStore = defineStore('editor', () => {
     selectedPointIds,
     marquee,
     selectedPointId,
-    selectedBarrierId,
     barrierType,
-    barrierDraft,
+    laying,
+    layingTarget,
     hoveredPointId,
-    barrierTarget,
-    pitDraft,
-    pitTarget,
-    selectedWidthZoneId,
-    widthDraft,
-    widthTarget,
-    selectedBankZoneId,
-    bankDraft,
-    bankTarget,
     drawPointer,
     sceneryPointer,
     hoveredSceneryId,
     sceneryGhost,
-    earthworkDraft,
-    earthworkTarget,
     hillPointer,
     hillGhost,
     brushMode,
@@ -972,10 +631,9 @@ export const useEditorStore = defineStore('editor', () => {
     brushStrength,
     brushPointer,
     stroke,
-    strokeVersion,
-    selectedEarthworkId,
+    relief,
+    editing,
     selectedEarthwork,
-    selectedHillId,
     selectedHill,
     selectedSceneryIds,
     selectedScenery,
@@ -995,56 +653,29 @@ export const useEditorStore = defineStore('editor', () => {
     select,
     setRange,
     selectPointsInRange,
-    widthZoneOnRange,
-    bankZoneOnRange,
-    barriersOnRange,
-    pitLaneOnRange,
-    earthworksOnRange,
+    layOnRange,
+    beginLaying,
+    aimLaying,
+    cancelLaying,
+    completeLaying,
     selectPoint,
     togglePoint,
     shiftSelectedAltitude,
     flattenSelected,
     selectPointAt,
-    selectBarrier,
-    selectWidthZone,
-    selectBankZone,
     addPoint,
     drawStraight,
     drawArc,
-    deleteSelectedPoint,
-    beginBarrier,
-    cancelBarrier,
-    completeBarrier,
-    beginPitLane,
-    cancelPitLane,
-    completePitLane,
-    beginWidthZone,
-    cancelWidthZone,
-    completeWidthZone,
-    deleteSelectedWidthZone,
-    beginBankZone,
-    cancelBankZone,
-    completeBankZone,
-    deleteSelectedBankZone,
+    deleteSelection,
     setBarrierType,
     swapSelectedBarrierSide,
-    deleteSelectedBarrier,
     placeScenery,
     selectScenery,
     toggleScenery,
-    deleteSelectedScenery,
     turnSelectedScenery,
     duplicateSelectedScenery,
-    deleteSelection,
-    beginEarthwork,
-    cancelEarthwork,
-    completeEarthwork,
-    selectEarthwork,
-    selectHill,
     swapSelectedEarthworkSide,
-    deleteSelectedEarthwork,
     placeHill,
-    deleteSelectedHill,
     beginStroke,
     strokeTo,
     endStroke,

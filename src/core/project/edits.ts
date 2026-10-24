@@ -14,17 +14,18 @@ import { positionAt, positionDistance, reanchorPosition } from '../track/positio
 import { overlapStart } from '../track/ranges';
 import { bankZoneRanges } from '../track/bank';
 import { widthZoneRanges } from '../track/width';
-import type { TrackRange } from '../track/ranges';
+import type { LaidKind, TrackRange } from '../track/ranges';
 import { newScenery, SCENERY_SIZES, SCENERY_VARIANTS } from './scenery';
 import { EARTHWORK_DEFAULTS, EARTHWORK_REACH, EARTHWORK_RULES, HILL_DEFAULTS } from './terrain';
 import type { EarthworkSettings } from './terrain';
 import type { SculptField } from './sculpt';
-import { isCircuit } from './schema';
+import { isCircuit, LAID_LISTS } from './schema';
 import type {
   BankZone,
   Barrier,
   ControlPoint,
   Earthwork,
+  Laid,
   EarthworkType,
   Hill,
   PitLane,
@@ -190,6 +191,9 @@ function measured(draft: ProjectDraft): { track: Project; samples: Sample[] } {
   return { track, samples: sampleTrack(track) };
 }
 
+/** Everything laid between two track positions, the pit lane aside. */
+const laidAlong = (draft: ProjectDraft) => LAID_LISTS.flatMap((list): Draft<Laid>[] => draft[list]);
+
 /** Rewrites every track position of the project. */
 function mapPositions(draft: ProjectDraft, map: (position: TrackPosition) => TrackPosition) {
   if (draft.startLine) draft.startLine = map(draft.startLine);
@@ -197,12 +201,7 @@ function mapPositions(draft: ProjectDraft, map: (position: TrackPosition) => Tra
     draft.pitLane.entry = map(draft.pitLane.entry);
     draft.pitLane.exit = map(draft.pitLane.exit);
   }
-  for (const item of [
-    ...draft.barriers,
-    ...draft.widthZones,
-    ...draft.bankZones,
-    ...draft.earthworks,
-  ]) {
+  for (const item of laidAlong(draft)) {
     item.from = map(item.from);
     item.to = map(item.to);
   }
@@ -265,13 +264,7 @@ export function reverseTrack(draft: ProjectDraft) {
     positionDistance(before.track, before.samples, position) ?? 0;
   const startLine = draft.startLine && distance(draft.startLine);
   const pits = draft.pitLane && [distance(draft.pitLane.entry), distance(draft.pitLane.exit)];
-  const laid = () => [
-    ...draft.barriers,
-    ...draft.widthZones,
-    ...draft.bankZones,
-    ...draft.earthworks,
-  ];
-  const ranges = laid().map((item) => [distance(item.from), distance(item.to)]);
+  const ranges = laidAlong(draft).map((item) => [distance(item.from), distance(item.to)]);
   // A straight is marked on the point it leaves from, which becomes the one it arrives at.
   const n = draft.points.length,
     circuit = isCircuit(draft);
@@ -281,8 +274,9 @@ export function reverseTrack(draft: ProjectDraft) {
   draft.points.forEach((point, i) => setStraight(draft, point.id, straights[i] === true));
   if (circuit) draft.points = [draft.points[0], ...draft.points.slice(1).reverse()];
   else draft.points.reverse();
-  for (const item of [...draft.barriers, ...draft.earthworks]) item.side = opposite(item.side);
-  for (const zone of draft.bankZones) zone.high = opposite(zone.high);
+  for (const item of laidAlong(draft))
+    if ('side' in item) item.side = opposite(item.side);
+    else if ('high' in item) item.high = opposite(item.high);
   const after = measured(draft);
   const mirrored = (s: number) => positionAt(after.track, after.samples, length - s);
   if (draft.startLine && startLine !== undefined) draft.startLine = mirrored(startLine);
@@ -292,7 +286,7 @@ export function reverseTrack(draft: ProjectDraft) {
     draft.pitLane.exit = mirrored(pits[0]);
     draft.pitLane.side = opposite(draft.pitLane.side);
   }
-  laid().forEach((item, index) => {
+  laidAlong(draft).forEach((item, index) => {
     const [from, to] = ranges[index];
     item.from = mirrored(to);
     item.to = mirrored(from);
@@ -311,10 +305,8 @@ export function setClosed(draft: ProjectDraft, closed: boolean) {
   dropPitsUnlessCircuit(draft);
   if (!before || isCircuit(draft)) return;
   const split = splitAtStart(draft, before);
-  draft.barriers = split(draft.barriers);
-  draft.widthZones = split(draft.widthZones);
-  draft.bankZones = split(draft.bankZones);
-  draft.earthworks = split(draft.earthworks);
+  for (const list of LAID_LISTS)
+    Object.assign(draft, { [list]: split(draft[list] as Draft<Laid>[]) });
 }
 
 /**
@@ -326,7 +318,7 @@ function splitAtStart(draft: ProjectDraft, before: { track: Project; samples: Sa
     last = draft.points.at(-1)!.id;
   const distance = (position: TrackPosition) =>
     positionDistance(before.track, before.samples, position) ?? 0;
-  return <T extends Barrier | WidthZone | BankZone | Earthwork>(items: T[]): T[] =>
+  return <T extends { id: Id; from: TrackPosition; to: TrackPosition }>(items: T[]): T[] =>
     items.flatMap((item) => {
       if (distance(item.from) <= distance(item.to)) return [item];
       const parts: T[] = [];
@@ -508,6 +500,29 @@ export function updateBankZone(
 
 export function removeBankZone(draft: ProjectDraft, id: Id) {
   draft.bankZones = draft.bankZones.filter((zone) => zone.id !== id);
+}
+
+/**
+ * Moves one end of something laid along the track to another track position:
+ * the start or the end of a barrier, a zone or an earthwork, the entry or the
+ * exit of the pit lane.
+ */
+export function moveLaidEnd(
+  draft: ProjectDraft,
+  kind: LaidKind,
+  id: Id,
+  end: 'from' | 'to',
+  at: TrackPosition,
+) {
+  if (kind === 'pitLane')
+    return updatePitLane(draft, end === 'from' ? { entry: at } : { exit: at });
+  const update = {
+    barrier: updateBarrier,
+    widthZone: updateWidthZone,
+    bankZone: updateBankZone,
+    earthwork: updateEarthwork,
+  }[kind];
+  update(draft, id, { [end]: at });
 }
 
 export function setStartLine(draft: ProjectDraft, position: TrackPosition) {

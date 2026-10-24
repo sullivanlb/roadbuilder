@@ -39,6 +39,7 @@ import { INACTIVE_LAYER_ALPHA } from '../layers';
 import type { LayerId } from '../layers';
 import { COLORS } from '../theme';
 import { meshLayer } from './overlay';
+import type { TerrainBend } from './overlay';
 import type { PreviewOverlay } from './overlay';
 import type { ViewportSize } from '../plan/projection';
 
@@ -150,15 +151,11 @@ export class PreviewRenderer {
 
   /**
    * Bends the terrain shown by what a brush stroke painted, without waiting for
-   * the scene to be rebuilt: each vertex within `covered` rises from its height
-   * in the scene by `painted` there, as much as the relief shows there. How much
-   * shows is worked out once per vertex.
+   * the scene to be rebuilt: each vertex within the extent the stroke covered
+   * rises from its height in the scene by what it painted there, as much as the
+   * relief shows there. How much shows is worked out once per vertex.
    */
-  bendTerrain(
-    painted: (p: PlanPoint) => number,
-    shown: (p: PlanPoint) => number,
-    covered: { minX: number; maxX: number; minZ: number; maxZ: number },
-  ) {
+  bendTerrain({ painted, shown, covered }: TerrainBend) {
     for (const child of this.content.children) {
       const base = child.userData.baseY as Float32Array | undefined;
       if (!base || !(child instanceof Mesh)) continue;

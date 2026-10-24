@@ -83,7 +83,7 @@ function preview(axis: 'x' | 'y' | 'z', value: number) {
           :aria-label="t('point.next')"
           @click="editor.selectPointAt(editor.selectedIndex + 1)"
           >→</AppButton
-        ><AppButton id="delete-point" class="delete" small @click="editor.deleteSelectedPoint()">
+        ><AppButton id="delete-point" class="delete" small @click="editor.deleteSelection()">
           <AppIcon name="trash" />{{ t('point.delete') }}
         </AppButton>
       </div>

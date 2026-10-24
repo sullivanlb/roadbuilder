@@ -7,7 +7,7 @@ import type { Sample } from './centerline';
 import { clampToBend, LAYOUT } from './layout';
 import { pitLaneLayout, shoulderEdge } from './pitLane';
 import type { PitLaneLayout } from './pitLane';
-import { positionRange, rangeContains, rangeEase, rangeSamples } from './ranges';
+import { laidRanges, rangeContains, rangeEase, rangeSamples } from './ranges';
 import type { TrackRange } from './ranges';
 
 /** An earthwork resolved on the current track. */
@@ -15,21 +15,11 @@ export interface EarthworkRange extends TrackRange {
   earthwork: Earthwork;
 }
 
-/**
- * The earthworks laid out on the track, in project order (docs/adr/0015). One
- * whose end comes before its start runs through the start of a circuit; on a road
- * it is empty. Earthworks shorter than a metre are left out.
- */
-export function earthworkRanges(
+/** The earthworks laid out on the track, in project order (docs/adr/0015, see laidRanges). */
+export const earthworkRanges = (
   project: Pick<Project, 'road' | 'points' | 'earthworks'>,
   samples: readonly Sample[],
-): EarthworkRange[] {
-  if (!project.earthworks.length || samples.length < 2) return [];
-  return project.earthworks.flatMap((earthwork) => {
-    const range = positionRange(project, samples, earthwork.from, earthwork.to);
-    return range && range.length >= 1 ? [{ earthwork, ...range }] : [];
-  });
-}
+): EarthworkRange[] => laidRanges(project, samples, project.earthworks, 'earthwork');
 
 const smoothstep = (t: number) => t * t * (3 - 2 * t);
 

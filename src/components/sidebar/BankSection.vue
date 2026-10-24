@@ -23,7 +23,7 @@ const selected = computed(() => editor.selectedBankZone);
 const place = usePlaceLabel();
 
 const status = computed(() => {
-  if (editor.bankDraft !== null) return t('banks.statusDraft');
+  if (editor.laying?.kind === 'bankZone') return t('banks.statusDraft');
   if (editor.tool === 'bank') return t('banks.statusTool');
   return zones.value.length ? t('banks.statusChoose') : t('banks.empty');
 });
@@ -83,8 +83,8 @@ const preview = (patch: Parameters<typeof updateBankZone>[2]) => {
         :key="zone.id"
         type="button"
         class="row"
-        :class="{ active: zone.id === editor.selectedBankZoneId }"
-        @click="editor.selectBankZone(zone.id)"
+        :class="{ active: zone.id === selected?.id }"
+        @click="editor.select({ kind: 'bankZone', id: zone.id })"
       >
         {{ rowLabel(zone, position) }}
       </button>
@@ -123,7 +123,7 @@ const preview = (patch: Parameters<typeof updateBankZone>[2]) => {
         @commit="store.commit()"
       />
       <div class="actions">
-        <AppButton id="bank-delete" class="delete" small @click="editor.deleteSelectedBankZone()">
+        <AppButton id="bank-delete" class="delete" small @click="editor.deleteSelection()">
           <AppIcon name="trash" />{{ t('banks.delete') }}
         </AppButton>
       </div>

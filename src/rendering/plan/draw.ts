@@ -1,14 +1,7 @@
 import type { Id } from '../../core/ids';
 import type { PlanPoint, Vec3 } from '../../core/math';
 import { DEFAULTS } from '../../core/project/rules';
-import type {
-  Earthwork,
-  EarthworkType,
-  Hill,
-  Project,
-  SceneryItem,
-  Side,
-} from '../../core/project/schema';
+import type { Earthwork, Hill, Project, SceneryItem } from '../../core/project/schema';
 import { EARTHWORK_DEFAULTS, hillOutline } from '../../core/project/terrain';
 import { SCULPT } from '../../core/project/sculpt';
 import type { SculptField } from '../../core/project/sculpt';
@@ -32,12 +25,14 @@ import {
 import type { EarthworkRange } from '../../core/track/earthworks';
 import { pitLaneLayout } from '../../core/track/pitLane';
 import type { PitLaneLayout } from '../../core/track/pitLane';
-import { rangeBetween, rangeSamples } from '../../core/track/ranges';
+import { rangeSamples } from '../../core/track/ranges';
 import { bankZoneRanges } from '../../core/track/bank';
 import { widthZoneRanges } from '../../core/track/width';
-import type { TrackRange } from '../../core/track/ranges';
+import type { LaidKind, TrackRange } from '../../core/track/ranges';
 import { arcDegrees } from '../../core/track/drawing';
 import type { DrawDraft } from '../../core/track/drawing';
+import { selectedIds } from '../editing';
+import type { Editing, SelectionKind } from '../editing';
 import { INACTIVE_LAYER_ALPHA } from '../layers';
 import type { LayerId } from '../layers';
 import { BARRIER_STYLE, COLORS } from '../theme';
@@ -47,56 +42,21 @@ import type { PlanProjection, ScreenPoint } from './projection';
 export interface PlanScene {
   project: Project;
   samples: readonly Sample[];
-  /** The layer being edited; the others are dimmed, the hidden ones left out. */
-  layer: LayerId;
-  hiddenLayers: readonly LayerId[];
-  pitLaneSelected: boolean;
+  /** The editing under way, as every view shows it. */
+  editing: Editing;
   tightTurns: readonly TightTurn[];
-  selectedPointIds: readonly Id[];
   /** Rectangle being dragged to select points, in screen pixels. */
   marquee: { x0: number; y0: number; x1: number; y1: number } | null;
   hoveredPointId: Id | null;
-  selectedBarrierId: Id | null;
-  /** First click of the barrier being laid, as a track distance. */
-  barrierDraft: { s: number; side: Side } | null;
-  /** Where the next barrier click would land. */
-  barrierTarget: number | null;
-  /** Entry of the pit lane being laid, as a track distance. */
-  pitDraft: { entry: number; side: Side } | null;
-  /** Where the next pit lane click would land. */
-  pitTarget: { s: number; side: Side } | null;
-  selectedWidthZoneId: Id | null;
-  /** First click of the width zone being laid, as a track distance. */
-  widthDraft: number | null;
-  /** Where the next width zone click would land. */
-  widthTarget: number | null;
-  selectedBankZoneId: Id | null;
-  /** First click of the bank zone being laid, as a track distance. */
-  bankDraft: number | null;
-  /** Where the next bank zone click would land. */
-  bankTarget: number | null;
-  /** The stretch picked in the band. */
-  range: TrackRange | null;
-  /** Track distance under the pointer, here or in the band. */
-  hoverS: number | null;
   /** The straight or the arc the next click would draw. */
   drawDraft: DrawDraft | null;
-  selectedSceneryIds: readonly Id[];
   hoveredSceneryId: Id | null;
   /** The item the active scenery tool would place under the pointer. */
   sceneryGhost: SceneryItem | null;
-  selectedEarthworkId: Id | null;
-  /** First click of the earthwork being laid, with the type of the active tool. */
-  earthworkDraft: { s: number; side: Side; type: EarthworkType } | null;
-  /** Where the next earthwork click would land. */
-  earthworkTarget: number | null;
-  selectedHillId: Id | null;
   /** The hill the hill tool would raise under the pointer. */
   hillGhost: Hill | null;
   /** The painted relief, as the stroke under way leaves it. */
   sculpt: SculptField;
-  /** The brush under the pointer, while the brush tool is on. */
-  brush: { x: number; z: number; radius: number } | null;
   labels: {
     start: string;
     finish: string;
@@ -110,6 +70,16 @@ export interface PlanScene {
 }
 
 type Context = CanvasRenderingContext2D;
+
+/** Whether the selection holds an item of a kind. */
+const isSelected = (scene: PlanScene, kind: SelectionKind, id: Id) =>
+  selectedIds(scene.editing.selection, kind).includes(id);
+
+/** What is being laid, when it is of a kind. */
+const layingOf = (scene: PlanScene, kind: LaidKind) => {
+  const laying = scene.editing.laying;
+  return laying?.kind === kind ? laying : null;
+};
 
 function trace(ctx: Context, view: PlanProjection, points: readonly PlanPoint[]) {
   ctx.beginPath();
@@ -372,7 +342,7 @@ function drawRelief(ctx: Context, view: PlanProjection, field: SculptField) {
 }
 
 /** The reach of the brush around the pointer. */
-function drawBrush(ctx: Context, view: PlanProjection, brush: NonNullable<PlanScene['brush']>) {
+function drawBrush(ctx: Context, view: PlanProjection, brush: NonNullable<Editing['brush']>) {
   const p = view.toScreen(brush),
     radius = brush.radius * view.camera.scale;
   ctx.strokeStyle = COLORS.accent;
@@ -389,10 +359,10 @@ function drawBrush(ctx: Context, view: PlanProjection, brush: NonNullable<PlanSc
 function drawTerrainShapes(ctx: Context, view: PlanProjection, scene: PlanScene) {
   const { project, samples } = scene;
   drawRelief(ctx, view, scene.sculpt);
-  if (scene.brush) drawBrush(ctx, view, scene.brush);
+  if (scene.editing.brush) drawBrush(ctx, view, scene.editing.brush);
   for (const hill of project.hills) {
     drawHill(ctx, view, hill);
-    if (hill.id !== scene.selectedHillId) continue;
+    if (!isSelected(scene, 'hill', hill.id)) continue;
     hillRing(ctx, view, hill);
     ctx.strokeStyle = COLORS.accent;
     ctx.lineWidth = 3;
@@ -401,7 +371,7 @@ function drawTerrainShapes(ctx: Context, view: PlanProjection, scene: PlanScene)
   const lane = pitLaneLayout(project, samples);
   for (const laid of earthworkRanges(project, samples)) {
     drawEarthwork(ctx, view, scene, lane, laid);
-    if (laid.earthwork.id !== scene.selectedEarthworkId) continue;
+    if (!isSelected(scene, 'earthwork', laid.earthwork.id)) continue;
     earthworkArea(ctx, view, scene, laid.earthwork, laid);
     ctx.strokeStyle = COLORS.accent;
     ctx.lineWidth = 2.5;
@@ -414,18 +384,19 @@ function drawTerrainShapes(ctx: Context, view: PlanProjection, scene: PlanScene)
     ctx.lineWidth = 1.5;
     dashed(ctx, [5, 4], () => ctx.stroke());
   }
-  const draft = scene.earthworkDraft;
-  if (!draft) return;
-  if (scene.earthworkTarget !== null) {
-    const range = rangeBetween(project, samples, draft.s, scene.earthworkTarget);
-    earthworkArea(ctx, view, scene, { side: draft.side, ...EARTHWORK_DEFAULTS[draft.type] }, range);
+  const laying = layingOf(scene, 'earthwork');
+  if (!laying) return;
+  const { from } = laying;
+  if (laying.range) {
+    const shape = { side: from.side, ...EARTHWORK_DEFAULTS[laying.earthworkType] };
+    earthworkArea(ctx, view, scene, shape, laying.range);
     ctx.strokeStyle = COLORS.accent;
     ctx.lineWidth = 2;
     dashed(ctx, [6, 5], () => ctx.stroke());
   }
   // The first click, on its side of the track.
-  const start = sampleAt(samples, draft.s)!;
-  const p = view.toScreen(pointBesideShoulders(project, lane, start, draft.side, 0));
+  const start = sampleAt(samples, from.s)!;
+  const p = view.toScreen(pointBesideShoulders(project, lane, start, from.side, 0));
   ctx.beginPath();
   ctx.arc(p.x, p.y, 6, 0, Math.PI * 2);
   ctx.strokeStyle = COLORS.accent;
@@ -465,7 +436,7 @@ function drawPits(ctx: Context, view: PlanProjection, scene: PlanScene) {
   const edge = (sample: Sample) => roadEdge(project.road, sample);
   const beside = (sample: Sample, lateral: number) =>
     view.toScreen({ x: sample.x + sample.nx * lateral, z: sample.z + sample.nz * lateral });
-  if (lane && scene.pitLaneSelected) {
+  if (lane && scene.editing.selection?.kind === 'pitLane') {
     // A halo along the middle of the lane.
     const middle = samples.filter((sample) => lane.profile(sample.s));
     trace(
@@ -527,20 +498,16 @@ function drawPits(ctx: Context, view: PlanProjection, scene: PlanScene) {
   mark(pitBoxPlaces(project, samples), COLORS.pits.box);
   mark(gridPlaces(project, samples), COLORS.pits.grid);
 
-  const draft = scene.pitDraft,
-    target = scene.pitTarget;
-  if (draft && target) {
-    const total = trackLength(samples);
-    const span = (((target.s - draft.entry) % total) + total) % total;
-    const sign = draft.side === 'right' ? 1 : -1;
+  const laying = layingOf(scene, 'pitLane');
+  if (laying?.range) {
+    const sign = laying.from.side === 'right' ? 1 : -1;
     const lateral = LAYOUT.pitLane.wallGap + DEFAULTS.pitLaneWidth / 2;
     ctx.beginPath();
-    for (let d = 0; d <= span; d += 3) {
-      const sample = sampleAt(samples, (draft.entry + d) % total)!;
+    rangeSamples(samples, laying.range).forEach((sample, i) => {
       const p = beside(sample, sign * (edge(sample) + lateral));
-      if (d === 0) ctx.moveTo(p.x, p.y);
+      if (i === 0) ctx.moveTo(p.x, p.y);
       else ctx.lineTo(p.x, p.y);
-    }
+    });
     ctx.strokeStyle = COLORS.accent;
     ctx.lineWidth = 3;
     dashed(ctx, [6, 5], () => ctx.stroke());
@@ -589,24 +556,22 @@ function drawRoadZones(ctx: Context, view: PlanProjection, scene: PlanScene) {
   ctx.save();
   ctx.lineCap = 'round';
   for (const range of widthZoneRanges(project, samples))
-    zone(range, [-1, 1], COLORS.widthZone, range.zone.id === scene.selectedWidthZoneId);
+    zone(range, [-1, 1], COLORS.widthZone, isSelected(scene, 'widthZone', range.zone.id));
   for (const range of bankZoneRanges(project, samples))
     zone(
       range,
       [range.zone.high === 'right' ? 1 : -1],
       COLORS.bankZone,
-      range.zone.id === scene.selectedBankZoneId,
+      isSelected(scene, 'bankZone', range.zone.id),
     );
-  for (const [draft, target] of [
-    [scene.widthDraft, scene.widthTarget],
-    [scene.bankDraft, scene.bankTarget],
-  ])
-    if (draft !== null && target !== null) {
-      roadwayEdges(ctx, view, samples, rangeBetween(project, samples, draft, target), [-1, 1]);
-      ctx.strokeStyle = COLORS.accent;
-      ctx.lineWidth = 2.5;
-      dashed(ctx, [6, 5], () => ctx.stroke());
-    }
+  for (const kind of ['widthZone', 'bankZone'] as const) {
+    const laying = layingOf(scene, kind);
+    if (!laying?.range) continue;
+    roadwayEdges(ctx, view, samples, laying.range, [-1, 1]);
+    ctx.strokeStyle = COLORS.accent;
+    ctx.lineWidth = 2.5;
+    dashed(ctx, [6, 5], () => ctx.stroke());
+  }
   ctx.restore();
 }
 
@@ -652,7 +617,7 @@ function drawBarriers(ctx: Context, view: PlanProjection, scene: PlanScene) {
     if (path.length < 2) continue;
     const style = BARRIER_STYLE[barrier.type];
     trace(ctx, view, path);
-    if (barrier.id === scene.selectedBarrierId) {
+    if (isSelected(scene, 'barrier', barrier.id)) {
       ctx.strokeStyle = COLORS.selection;
       ctx.lineWidth = style.width + 5;
       ctx.stroke();
@@ -661,12 +626,11 @@ function drawBarriers(ctx: Context, view: PlanProjection, scene: PlanScene) {
     ctx.lineWidth = style.width;
     dashed(ctx, style.dash, () => ctx.stroke());
   }
-  const draft = scene.barrierDraft;
-  if (!draft) return;
-  const line = { side: draft.side, offset: DEFAULTS.barrierOffset };
-  if (scene.barrierTarget !== null) {
-    const range = rangeBetween(project, samples, draft.s, scene.barrierTarget);
-    const path = barrierLine(project, samples, rangeSamples(samples, range), line);
+  const laying = layingOf(scene, 'barrier');
+  if (!laying) return;
+  const line = { side: laying.from.side, offset: DEFAULTS.barrierOffset };
+  if (laying.range) {
+    const path = barrierLine(project, samples, rangeSamples(samples, laying.range), line);
     if (path.length > 1) {
       trace(ctx, view, path);
       ctx.strokeStyle = COLORS.accent;
@@ -675,7 +639,7 @@ function drawBarriers(ctx: Context, view: PlanProjection, scene: PlanScene) {
     }
   }
   // The first click, on its side of the road.
-  const [start] = barrierLine(project, samples, [sampleAt(samples, draft.s)!], line);
+  const [start] = barrierLine(project, samples, [sampleAt(samples, laying.from.s)!], line);
   const p = view.toScreen(start);
   ctx.beginPath();
   ctx.arc(p.x, p.y, 6, 0, Math.PI * 2);
@@ -765,7 +729,7 @@ function drawItem(ctx: Context, view: PlanProjection, item: SceneryItem) {
 /** The scenery items, the selected ones highlighted, and the one the active tool would place. */
 function drawScenery(ctx: Context, view: PlanProjection, scene: PlanScene) {
   for (const item of scene.project.scenery) {
-    const selected = scene.selectedSceneryIds.includes(item.id);
+    const selected = isSelected(scene, 'scenery', item.id);
     if (selected || item.id === scene.hoveredSceneryId) {
       sceneryOutline(ctx, view, item);
       ctx.strokeStyle = selected ? COLORS.accent : COLORS.point.hover;
@@ -798,7 +762,7 @@ function drawPoints(ctx: Context, view: PlanProjection, scene: PlanScene) {
   const affected = new Set(scene.tightTurns.flatMap((turn) => turn.pointIds));
   ctx.font = '9px Consolas, monospace';
   // Off the track layer, points are only landmarks for track positions.
-  if (scene.layer !== 'track') {
+  if (scene.editing.layer !== 'track') {
     ctx.save();
     ctx.globalAlpha = INACTIVE_LAYER_ALPHA;
     ctx.fillStyle = COLORS.point.outline;
@@ -813,7 +777,7 @@ function drawPoints(ctx: Context, view: PlanProjection, scene: PlanScene) {
   }
   scene.project.points.forEach((point, i) => {
     const p = view.toScreen(point),
-      selected = scene.selectedPointIds.includes(point.id),
+      selected = isSelected(scene, 'points', point.id),
       invalid = affected.has(point.id);
     if (selected) {
       ctx.fillStyle = COLORS.point.halo;
@@ -949,8 +913,8 @@ function drawDraft(ctx: Context, view: PlanProjection, scene: PlanScene) {
 
 /** The stretch picked in the band, its roadway edges dashed. */
 function drawRange(ctx: Context, view: PlanProjection, scene: PlanScene) {
-  if (!scene.range) return;
-  const path = rangeSamples(scene.samples, scene.range);
+  if (!scene.editing.range) return;
+  const path = rangeSamples(scene.samples, scene.editing.range);
   ctx.beginPath();
   for (const side of [-1, 1])
     path.forEach((sample, i) => {
@@ -969,8 +933,9 @@ function drawRange(ctx: Context, view: PlanProjection, scene: PlanScene) {
 
 /** A line across the road where the pointer is, here or in the band, with its track distance. */
 function drawCursor(ctx: Context, view: PlanProjection, scene: PlanScene) {
-  if (scene.hoverS === null) return;
-  const sample = sampleAt(scene.samples, scene.hoverS)!;
+  const { hoverS } = scene.editing;
+  if (hoverS === null) return;
+  const sample = sampleAt(scene.samples, hoverS)!;
   const reach = sample.half + 6;
   const a = view.toScreen({ x: sample.x - sample.nx * reach, z: sample.z - sample.nz * reach });
   const b = view.toScreen({ x: sample.x + sample.nx * reach, z: sample.z + sample.nz * reach });
@@ -984,14 +949,14 @@ function drawCursor(ctx: Context, view: PlanProjection, scene: PlanScene) {
   ctx.textAlign = 'left';
   ctx.textBaseline = 'middle';
   ctx.fillStyle = COLORS.accent;
-  ctx.fillText(scene.labels.distance(scene.hoverS), b.x + 6, b.y);
+  ctx.fillText(scene.labels.distance(hoverS), b.x + 6, b.y);
 }
 
 /** Draws what belongs to a layer: in full on the active layer, dimmed otherwise, not at all when hidden. */
 function inLayer(ctx: Context, scene: PlanScene, layer: LayerId, draw: () => void) {
-  if (scene.hiddenLayers.includes(layer)) return;
+  if (scene.editing.hiddenLayers.includes(layer)) return;
   ctx.save();
-  if (layer !== scene.layer) ctx.globalAlpha = INACTIVE_LAYER_ALPHA;
+  if (layer !== scene.editing.layer) ctx.globalAlpha = INACTIVE_LAYER_ALPHA;
   draw();
   ctx.restore();
 }
@@ -1010,7 +975,7 @@ export function drawPlan(ctx: Context, view: PlanProjection, scene: PlanScene, d
     drawRange(ctx, view, scene);
   }
   inLayer(ctx, scene, 'scenery', () => drawScenery(ctx, view, scene));
-  if (scene.layer === 'track') drawCorners(ctx, view, scene);
+  if (scene.editing.layer === 'track') drawCorners(ctx, view, scene);
   drawPoints(ctx, view, scene);
   drawDraft(ctx, view, scene);
   if (scene.samples.length > 1) drawCursor(ctx, view, scene);

@@ -44,7 +44,7 @@ const issues = computed(() =>
         }}</AppButton>
       </div>
       <div class="actions">
-        <AppButton id="points-delete" class="delete" small @click="editor.deleteSelectedPoint()">
+        <AppButton id="points-delete" class="delete" small @click="editor.deleteSelection()">
           <AppIcon name="trash" />{{ t('points.delete', { count: points.length }) }}
         </AppButton>
       </div>

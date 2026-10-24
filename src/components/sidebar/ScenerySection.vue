@@ -170,7 +170,7 @@ function edit(patch: SceneryPatch) {
         <AppButton id="scenery-duplicate" small @click="editor.duplicateSelectedScenery()">
           <AppIcon name="plus" />{{ t('scenery.duplicate') }}
         </AppButton>
-        <AppButton id="scenery-delete" class="delete" small @click="editor.deleteSelectedScenery()">
+        <AppButton id="scenery-delete" class="delete" small @click="editor.deleteSelection()">
           <AppIcon name="trash" />{{ t('scenery.delete') }}
         </AppButton>
       </div>

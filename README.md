@@ -37,11 +37,11 @@ Le vocabulaire du domaine est défini dans [`CONTEXT.md`](CONTEXT.md), les déci
 
 - `src/core/` : le domaine, sans framework. `project/` contient le format v2 (schéma zod, règles et bornes, modèles, opérations d’édition immer), `track/` l’axe du tracé (courbes, droites et points arrondis), les plages entre deux repères, les largeurs, les dévers et les diagnostics, `scene/` la construction de la scène (chaussée, terrain et terrassements, barrières, repères).
 - `src/export/` : archives Assetto Corsa (KN5, fichiers ini, carte) et OBJ, encodeurs binaires PNG/ZIP. Les textes des documents exportés sont fournis par l’appelant.
-- `src/rendering/` : dessin du plan 2D et de la bande de piste (Canvas 2D), aperçu 3D (Three.js, chargé à la demande), palette de couleurs.
+- `src/rendering/` : dessin du plan 2D et de la bande de piste (Canvas 2D), aperçu 3D (Three.js, chargé à la demande), palette de couleurs. Les trois vues dessinent l’édition en cours depuis une même valeur (`editing.ts`) et résolvent chacune ce qui se trouve sous le pointeur (`hits.ts`).
 - `src/workers/` : construction des archives dans un Web Worker (Comlink), pour que l’éditeur reste fluide pendant un export ; repli sur le thread principal si les workers ne sont pas disponibles.
 - `src/platform/` : accès au stockage et aux fichiers derrière une interface ; implémentation web aujourd’hui, Tauri ensuite.
-- `src/stores/` : état Pinia — projet et historique, éditeur (couche, sélection, outil, tracés en cours, plage, survol), vue du plan et de la bande, fichiers et sauvegarde automatique, export, interface.
-- `src/editor/` : couches et ce que le clic y attrape, outils du plan (un module par outil), clics dans l’aperçu 3D, interactions au pointeur et raccourcis clavier.
+- `src/stores/` : état Pinia — projet et historique, éditeur (couche, sélection, outil, pose en cours, coup de pinceau, plage, survol), vue du plan et de la bande, fichiers et sauvegarde automatique, export, interface.
+- `src/editor/` : couches et ce que le clic y attrape, sélection, pose le long du tracé, coup de pinceau, outils communs au plan et à l’aperçu 3D (docs/adr/0017), interactions au pointeur et raccourcis clavier.
 - `src/components/` : composants Vue avec styles scoped — `layout/` (barre du haut, couches), `inspector/` et `sidebar/` (réglages de la couche active), `workspace/` (plan, bande, 3D), `dialogs/` et `ui/` (primitives partagées).
 - `src/i18n/` : vue-i18n avec catalogues français et anglais typés.
 - `src/styles/` : jetons de design et styles de base uniquement.

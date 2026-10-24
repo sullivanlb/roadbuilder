@@ -1,13 +1,6 @@
-import type { PlanPoint } from '../../core/math';
 import type { SceneryKind } from '../../core/project/schema';
-import type { PlanProjection, ScreenPoint } from '../../rendering/plan/projection';
-import { onGrid } from './tool';
+import { placeAt } from './tool';
 import type { Tool } from './tool';
-
-function placeAt(view: PlanProjection, at: ScreenPoint, snap: boolean): PlanPoint {
-  const world = view.toWorld(at);
-  return snap ? { x: onGrid(world.x), z: onGrid(world.z) } : world;
-}
 
 /**
  * Places a scenery item of one kind at each click, facing the nearest part of
@@ -16,11 +9,11 @@ function placeAt(view: PlanProjection, at: ScreenPoint, snap: boolean): PlanPoin
 export const placeTool = (kind: SceneryKind): Tool => ({
   cursor: () => 'crosshair',
   hint: () => 'canvas.hintScenery',
-  press({ editor, viewport }, { at, shiftKey }) {
-    editor.placeScenery(kind, placeAt(viewport.projection, at, shiftKey));
+  press({ editor }, input) {
+    editor.placeScenery(kind, placeAt(input));
   },
-  hover({ editor, viewport }, { at, shiftKey }) {
-    editor.sceneryPointer = placeAt(viewport.projection, at, shiftKey);
+  hover({ editor }, input) {
+    editor.sceneryPointer = placeAt(input);
   },
   leave({ editor }) {
     editor.sceneryPointer = null;
