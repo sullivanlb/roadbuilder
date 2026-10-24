@@ -24,6 +24,12 @@ export function createProject(template: Template, name: string): Project {
     terrain: { margin: DEFAULTS.terrainMargin },
     points,
     barriers: [],
+    widthZones: [],
+    bankZones: [],
+    scenery: [],
+    earthworks: [],
+    hills: [],
+    sculpt: [],
     ...(points.length ? { startLine: { point: points[0].id, distance: DEFAULTS.startLine } } : {}),
     pitLane: pits
       ? {

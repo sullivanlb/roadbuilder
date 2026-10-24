@@ -1,36 +1,54 @@
 import { bounds } from '../../core/math';
 import type { Scene } from '../../core/scene/scene';
+import { emissive, look } from '../../core/scene/materials';
+import type { MaterialId } from '../../core/scene/materials';
 import { vertexCount } from '../../core/scene/mesh';
 import { BinaryWriter, utf8 } from '../binary/writer';
 import { texture, textureFile, usedMaterials } from '../textures';
+import type { SceneryImages } from '../textures';
 
 const IDENTITY = [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1];
 const TANGENT = [1, 0, 0];
-const SHADING = {
+const shading = (material: MaterialId) => ({
   ksAmbient: 0.35,
   ksDiffuse: 0.65,
   ksSpecular: 0.05,
   ksSpecularEXP: 12,
-  ksEmissive: 0,
-};
+  ksEmissive: emissive(material),
+});
 
 // KN5 v5 field layout independently implemented from the public AcTools format.
 // Reference: github.com/gro-ove/actools/blob/master/AcTools/Kn5File/Kn5Writer.cs
-export function encodeKn5(scene: Scene) {
+export function encodeKn5(scene: Scene, images: SceneryImages = {}) {
   const writer = new BinaryWriter(1024 * 1024);
   const materials = usedMaterials(scene);
   const slot = new Map(materials.map((material, index) => [material, index]));
   writer.raw(utf8('sc6969')).u32(5).u32(materials.length);
   for (const material of materials) {
-    const png = texture(material);
+    const png = texture(material, images);
     writer.u32(1).string(textureFile(material)).u32(png.length).raw(png);
   }
   writer.u32(materials.length);
   for (const material of materials) {
-    writer.string(material).string('ksPerPixel').u8(0).u8(0).u32(0);
-    writer.u32(Object.keys(SHADING).length);
-    for (const [name, value] of Object.entries(SHADING))
-      writer.string(name).f32(value).floats(new Array<number>(9).fill(0));
+    // Foliage is cut out where its image is transparent: the alpha-tested shader.
+    const cutOut = look(material).alphaTest ?? false;
+    writer
+      .string(material)
+      .string(cutOut ? 'ksPerPixelAT' : 'ksPerPixel')
+      .u8(0)
+      .u8(cutOut ? 1 : 0)
+      .u32(0);
+    const properties = shading(material);
+    writer.u32(Object.keys(properties).length);
+    // Each property holds a float, then a vec2, a vec3 and a vec4; ksEmissive is a
+    // colour, read from the vec3.
+    for (const [name, value] of Object.entries(properties)) {
+      const colour = name === 'ksEmissive' ? [value, value, value] : [0, 0, 0];
+      writer
+        .string(name)
+        .f32(value)
+        .floats([0, 0, ...colour, 0, 0, 0, 0]);
+    }
     writer.u32(1).string('txDiffuse').u32(0).string(textureFile(material));
   }
   writer
@@ -47,7 +65,8 @@ export function encodeKn5(scene: Scene) {
       writer
         .floats(mesh.positions.slice(i * 3, i * 3 + 3))
         .floats(mesh.normals.slice(i * 3, i * 3 + 3))
-        .floats(mesh.uvs.slice(i * 2, i * 2 + 2))
+        // Texture coordinates start at the bottom of an image in the scene, at the top in the game.
+        .floats([mesh.uvs[i * 2], 1 - mesh.uvs[i * 2 + 1]])
         .floats(TANGENT);
     writer.u32(mesh.indices.length);
     for (const index of mesh.indices) writer.u16(index);

@@ -1,10 +1,18 @@
 import { bounds, clamp } from '../math';
 import type { Bounds, PlanPoint, Vec3 } from '../math';
 import type { Project } from '../project/schema';
+import { SCULPT } from '../project/sculpt';
+import { hillReach } from '../project/terrain';
 import type { Sample } from '../track/centerline';
 import { terrainBounds } from '../track/layout';
+import { groundHeight } from './ground';
 import { addVertex, createMesh, MAX_MESH_VERTICES, vertexCount, vertexPosition } from './mesh';
 import type { Mesh } from './mesh';
+
+/** Size of the terrain cells under a hill: a share of its size, within bounds, in metres. */
+const HILL_STEP = { min: 2, perSize: 10, maxDivision: 8 };
+/** Cells under painted relief are divided down to its grid, at most this many times a side. */
+const SCULPT_DIVISION = 10;
 
 // Terrain is a tiled height field with the actual road/verge/pit footprint cut out.
 // Clipping the footprint (instead of hiding a plane under the road) keeps elevated
@@ -107,19 +115,54 @@ export function buildTerrain(
         }
     }
   }
+  // Cells under a hill or painted relief are divided to show its shape
+  // (docs/adr/0015, 0016); the alignment below stitches them to their
+  // undivided neighbours.
+  const hills = project.hills.map((hill) => ({
+    hill,
+    reach: hillReach(hill),
+    step: Math.max(HILL_STEP.min, Math.min(hill.width, hill.depth) / HILL_STEP.perSize),
+  }));
+  const tile = SCULPT.cell * SCULPT.tile;
+  const painted = new Set(project.sculpt.map((t) => `${t.i},${t.j}`));
+  /** Whether painted relief reaches into the cell at (x, z), a tile's edge blending one cell further. */
+  const underSculpt = (x: number, z: number) => {
+    if (!painted.size) return false;
+    for (let j = Math.floor((z - SCULPT.cell) / tile); j <= Math.floor((z + dz) / tile); j++)
+      for (let i = Math.floor((x - SCULPT.cell) / tile); i <= Math.floor((x + dx) / tile); i++)
+        if (painted.has(`${i},${j}`)) return true;
+    return false;
+  };
+  const sculptDivision = Math.min(SCULPT_DIVISION, Math.ceil(Math.max(dx, dz) / SCULPT.cell));
+  const division = (x: number, z: number) =>
+    hills.reduce(
+      (n, { hill, reach, step }) =>
+        x > hill.x + reach ||
+        x + dx < hill.x - reach ||
+        z > hill.z + reach ||
+        z + dz < hill.z - reach
+          ? n
+          : Math.max(n, Math.min(HILL_STEP.maxDivision, Math.ceil(Math.max(dx, dz) / step))),
+      underSculpt(x, z) ? sculptDivision : 1,
+    );
   const polygons = [];
   for (let row = 0; row < rows; row++)
     for (let column = 0; column < columns; column++) {
       const x = extent.minX + column * dx,
         z = extent.minZ + row * dz;
-      let parts = [
-        [
-          { x, z },
-          { x: x + dx, z },
-          { x: x + dx, z: z + dz },
-          { x, z: z + dz },
-        ],
-      ];
+      const n = division(x, z);
+      let parts = Array.from({ length: n * n }, (_, k) => {
+        const x0 = x + (dx * (k % n)) / n,
+          x1 = x + (dx * ((k % n) + 1)) / n,
+          z0 = z + (dz * Math.floor(k / n)) / n,
+          z1 = z + (dz * (Math.floor(k / n) + 1)) / n;
+        return [
+          { x: x0, z: z0 },
+          { x: x1, z: z0 },
+          { x: x1, z: z1 },
+          { x: x0, z: z1 },
+        ];
+      });
       for (const index of cells.get(row * columns + column) || []) {
         const triangle = triangles[index],
           bb = triangle.bounds;
@@ -199,8 +242,7 @@ export function buildTerrain(
     }
     return result;
   });
-  const anchors = samples.filter((_, i) => i % Math.max(1, Math.ceil(samples.length / 400)) === 0);
-  if (anchors.at(-1) !== samples.at(-1)) anchors.push(samples.at(-1)!);
+  const ground = groundHeight(project, samples);
   const heightAt = (p: PlanPoint) => {
     let border = -Infinity;
     for (let row = cellZ(p.z - 2e-6); row <= cellZ(p.z + 2e-6); row++) {
@@ -215,16 +257,7 @@ export function buildTerrain(
         }
       }
     }
-    if (Number.isFinite(border)) return border;
-    let weighted = 0,
-      total = 0;
-    for (const a of anchors) {
-      const d2 = (p.x - a.x) ** 2 + (p.z - a.z) ** 2 + 36,
-        weight = 1 / (d2 * Math.sqrt(d2));
-      weighted += weight * (a.y - 0.04);
-      total += weight;
-    }
-    return weighted / total;
+    return Number.isFinite(border) ? border : ground(p);
   };
   for (const id of new Set(aligned.flat())) points[id].y = heightAt(points[id]);
   const faces = [];

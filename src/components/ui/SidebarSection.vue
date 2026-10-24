@@ -1,12 +1,12 @@
 <script setup lang="ts">
-/** A numbered section of the sidebar, with an optional badge beside its title. */
-defineProps<{ index: number; title: string; last?: boolean }>();
+/** A section of the inspector, with an optional badge beside its title. */
+defineProps<{ title: string; last?: boolean }>();
 </script>
 
 <template>
   <section class="section" :class="{ last }">
     <h2>
-      <span class="index">{{ String(index).padStart(2, '0') }}</span> {{ title }}
+      {{ title }}
       <span v-if="$slots.badge" class="badge"><slot name="badge" /></span>
     </h2>
     <slot />
@@ -29,12 +29,6 @@ h2 {
   align-items: center;
   gap: 9px;
   margin: 0 0 17px;
-}
-.index {
-  font-family: monospace;
-  font-size: 10px;
-  color: var(--faint);
-  font-weight: 400;
 }
 .badge {
   font-family: monospace;

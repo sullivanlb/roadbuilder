@@ -20,6 +20,33 @@ export const ICONS = {
   wall: 'M4 4v16M12 4v16M20 4v16M3 9h18M3 15h18',
   flag: 'M5 22V3m0 1c5-4 9 4 15 0v10c-6 4-10-4-15 0',
   pits: 'M3 4v16M8 4v16M8 8h13M8 14h13M12 8v6M17 8v6',
+  width: 'M7 3v18M17 3v18M10 12H3m4-3-3 3 3 3m7-3h7m-4-3 3 3-3 3',
+  eye: 'M2 12s4-7 10-7 10 7 10 7-4 7-10 7S2 12 2 12zM9 12a3 3 0 1 0 6 0a3 3 0 1 0-6 0',
+  straight: 'M4 20 20 4M3 21h3v-3M18 6V3h3',
+  arc: 'M4 20a16 16 0 0 1 16-16',
+  freehand: 'M3 17c3-6 5 4 8-2s5-8 10-4',
+  banking: 'M3 18h18L3 9zM15 13v5',
+  surface: 'M4 4h16v16H4zM4 12h16M12 4v16',
+  gravel: 'M3 20c4-8 14-8 18 0M8 17v.5M12 15v.5M16 17v.5',
+  sectors: 'M5 3v18M5 4h11l-3 3.5 3 3.5H5',
+  hill: 'm2 20 6-9 4 5 3-4 7 8z',
+  brush: 'M3 21c3 0 5-1.5 5-4a2.5 2.5 0 0 0-5 0c0 1.5-.5 3-2 4zM7.5 14.5 19 3l2 2L9.5 16.5',
+  embankment: 'M2 18h6l7-9h7M2 21h20M10 15.5l1.5 1M12.5 12.5l1.5 1',
+  ditch: 'M2 8h6l2.5 8h3L16 8h6M2 21h20',
+  runoff: 'M2 13h20M2 18h20M5 9v4m7-4v4m7-4v4',
+  trees: 'm12 3 6 8h-4l4 6H6l4-6H6zM12 17v4',
+  grandstands: 'M3 20h18M5 20v-4h14v4M7 16v-4h10v4M9 12V8h6v4',
+  building: 'M4 21V7l8-4 8 4v14zM2 21h20M8 10h2m4 0h2m-8 4h2m4 0h2m-6 7v-4h2v4',
+  sign: 'M3 4h18v10H3zM7 14v7m10-7v7M7 8h10',
+  light: 'M7 21h4M9 21V5h8M15 5v3h4V5M17 11v1M14 13l-1 1m7-1 1 1',
 } as const;
 
+/** The icon of each kind of scenery, in the tool palette and the inspector. */
+export const SCENERY_ICON = {
+  tree: 'trees',
+  building: 'building',
+  grandstand: 'grandstands',
+  sign: 'sign',
+  light: 'light',
+} as const satisfies Record<string, keyof typeof ICONS>;
 export type IconName = keyof typeof ICONS;

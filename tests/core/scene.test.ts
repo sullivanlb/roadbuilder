@@ -3,16 +3,27 @@ import { describe, expect, it } from 'vitest';
 import { addBarrier, setRoad } from '../../src/core/project/edits';
 import type { BarrierType, Project, Side } from '../../src/core/project/schema';
 import { barrierLateral } from '../../src/core/scene/barriers';
-import { vertexCount } from '../../src/core/scene/mesh';
+import {
+  addVertex,
+  createMesh,
+  MAX_MESH_VERTICES,
+  splitTriangles,
+  vertexCount,
+} from '../../src/core/scene/mesh';
 import type { Mesh } from '../../src/core/scene/mesh';
 import { buildScene, findFoldedSurface } from '../../src/core/scene/scene';
 import { sampleTrack } from '../../src/core/track/centerline';
 import { roadEdge } from '../../src/core/track/layout';
-import { template, tightTurnProject } from '../helpers';
+import { onPoint, template, tightTurnProject } from '../helpers';
 
 const barrier = (project: Project, type: BarrierType, side: Side, from: number, to: number) =>
   produce(project, (draft) => {
-    addBarrier(draft, { type, side, from: draft.points[from].id, to: draft.points[to].id });
+    addBarrier(draft, {
+      type,
+      side,
+      from: onPoint(draft.points[from]),
+      to: onPoint(draft.points[to]),
+    });
   });
 
 const allBarrierTypes = (project: Project) =>
@@ -55,8 +66,31 @@ describe('scene', () => {
     ).toMatchSnapshot();
   });
 
+  it('split triangle meshes for 16-bit indices, keeping every triangle whole', () => {
+    const mesh = createMesh('model', 'bark', 'scenery');
+    // A fan of triangles sharing their first corner, more vertices than one piece holds.
+    const centre = addVertex(mesh, [0, 0, 0], [0, 1, 0], [0, 0]);
+    for (let i = 0; i < MAX_MESH_VERTICES + 10; i++) {
+      addVertex(mesh, [Math.cos(i), 0, Math.sin(i)], [0, 1, 0], [i, 0]);
+      if (i) mesh.indices.push(centre, i, i + 1);
+    }
+    const pieces = splitTriangles(mesh);
+    expect(pieces.map((piece) => piece.name)).toEqual(['model_0', 'model_1']);
+    expect(pieces.reduce((sum, piece) => sum + piece.indices.length, 0)).toBe(mesh.indices.length);
+    for (const piece of pieces) {
+      expect(vertexCount(piece)).toBeLessThanOrEqual(MAX_MESH_VERTICES);
+      expect(piece.indices.every((index) => index < vertexCount(piece))).toBe(true);
+    }
+    expect(splitTriangles(createMesh('empty', 'bark', 'scenery'))).toEqual([]);
+  });
+
   it('is empty without a track', () => {
-    expect(buildScene(template('blank'))).toEqual({ meshes: [], markers: [] });
+    expect(buildScene(template('blank'))).toEqual({
+      meshes: [],
+      markers: [],
+      lights: [],
+      sceneryFloors: {},
+    });
   });
 });
 
@@ -64,12 +98,12 @@ describe('barriers', () => {
   it('stand one offset beyond the kerb and stay clear of the centre of tight bends', () => {
     const project = template('club');
     const straight = sampleTrack(project).find((s) => Math.abs(s.curvature) < 0.005)!;
-    const edge = roadEdge(project.road);
+    const edge = roadEdge(project.road, straight);
     expect(barrierLateral(project, null, straight, 'right', 1)).toBeCloseTo(edge + 1, 5);
     expect(barrierLateral(project, null, straight, 'left', 10)).toBeCloseTo(-(edge + 10), 5);
 
     const tight = tightTurnProject();
-    const tightEdge = roadEdge(tight.road);
+    const tightEdge = roadEdge(tight.road, { half: tight.road.width / 2 });
     const bend = sampleTrack(tight).reduce((a, b) =>
       Math.abs(b.curvature) > Math.abs(a.curvature) ? b : a,
     );

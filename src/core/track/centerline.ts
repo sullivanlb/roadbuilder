@@ -1,7 +1,12 @@
 import { clamp, distance } from '../math';
-import type { Vec3 } from '../math';
+import type { PlanPoint, Vec3 } from '../math';
 import { isCircuit } from '../project/schema';
 import type { Project } from '../project/schema';
+import { bankAt, bankZoneRanges } from './bank';
+import { along, corners, straightPieces, straightSide } from './geometry';
+import type { Corner } from './geometry';
+import { kerbWidth } from './layout';
+import { halfWidthAt, widthZoneRanges } from './width';
 
 /** A point of the centerline with its local frame, laid out at regular spacing. */
 export interface Sample extends Vec3 {
@@ -18,9 +23,20 @@ export interface Sample extends Vec3 {
   grade: number;
   /** Signed curvature in 1/m: positive when the track bends to the right. */
   curvature: number;
+  /** Half the roadway width here, kerbs excluded: the base width, or that of a width zone. */
+  half: number;
+  /** Cross slope of the roadway, rise per metre towards the right: 0 unless banked. */
+  bank: number;
+  /** Lateral distance to the outer edge of the kerbs: the bank stops there and the ground stays flat beyond. */
+  edge: number;
 }
 
-export type Track = Pick<Project, 'road' | 'points'>;
+/**
+ * What the centerline is laid out from; without width zones the roadway keeps its
+ * base width, without bank zones it stays flat across.
+ */
+export type Track = Pick<Project, 'road' | 'points'> &
+  Partial<Pick<Project, 'widthZones' | 'bankZones'>>;
 
 // Centripetal Catmull–Rom: stable bends even with unevenly spaced control points.
 function interpolate(p0: Vec3, p1: Vec3, p2: Vec3, p3: Vec3, t: number): Vec3 {
@@ -43,14 +59,74 @@ function interpolate(p0: Vec3, p1: Vec3, p2: Vec3, p3: Vec3, t: number): Vec3 {
   return p;
 }
 
-const frameless = { s: 0, nx: 0, nz: 1, grade: 0, curvature: 0 };
+/** A cubic between p1 and p2 with the tangents `m1` and `m2`, per unit of t. */
+function hermite(p1: Vec3, p2: Vec3, m1: PlanPoint, m2: PlanPoint, t: number): PlanPoint {
+  const t2 = t * t,
+    t3 = t2 * t;
+  const h00 = 2 * t3 - 3 * t2 + 1,
+    h10 = t3 - 2 * t2 + t,
+    h01 = -2 * t3 + 3 * t2,
+    h11 = t3 - t2;
+  return {
+    x: h00 * p1.x + h10 * m1.x + h01 * p2.x + h11 * m2.x,
+    z: h00 * p1.z + h10 * m1.z + h01 * p2.z + h11 * m2.z,
+  };
+}
+
+/**
+ * The curved segment `i`. Next to a straight it leaves or joins the straight
+ * along its direction, so the track has no kink; elsewhere it is the plain
+ * Catmull–Rom curve.
+ */
+function curveOf(
+  track: Track,
+  arcs: ReadonlyMap<number, Corner>,
+  i: number,
+  get: (i: number) => Vec3,
+): (t: number) => Vec3 {
+  const p0 = get(i - 1),
+    p1 = get(i),
+    p2 = get(i + 1),
+    p3 = get(i + 2);
+  const plain = (t: number) => interpolate(p0, p1, p2, p3, t);
+  const n = track.points.length;
+  const before = straightSide(track, arcs, i, 'before'),
+    after = straightSide(track, arcs, (i + 1) % n, 'after');
+  if (!before && !after) return plain;
+  // The curve's own tangents, kept in length where a straight sets their direction.
+  const h = 1e-4;
+  const start = plain(0),
+    end = plain(1),
+    nearStart = plain(h),
+    nearEnd = plain(1 - h);
+  const tangent = (a: PlanPoint, b: PlanPoint, direction: PlanPoint | null): PlanPoint => {
+    const x = (b.x - a.x) / h,
+      z = (b.z - a.z) / h;
+    if (!direction) return { x, z };
+    const length = Math.hypot(x, z);
+    return { x: direction.x * length, z: direction.z * length };
+  };
+  const m1 = tangent(start, nearStart, before),
+    m2 = tangent(nearEnd, end, after);
+  return (t) => ({ ...hermite(p1, p2, m1, m2, t), y: plain(t).y });
+}
+
+const frameless = { s: 0, nx: 0, nz: 1, grade: 0, curvature: 0, half: 0, bank: 0, edge: 0 };
 
 /** Lays out the centerline as samples roughly `spacing` metres apart. */
 export function sampleTrack(track: Track, spacing = 3): Sample[] {
   const points = track.points,
     n = points.length;
   const position = (p: Vec3): Vec3 => ({ x: p.x, y: p.y, z: p.z });
-  if (n < 2) return points.map((p) => ({ ...position(p), segment: 0, t: 0, ...frameless }));
+  if (n < 2)
+    return points.map((p) => ({
+      ...position(p),
+      segment: 0,
+      t: 0,
+      ...frameless,
+      half: track.road.width / 2,
+      edge: track.road.width / 2 + kerbWidth(track.road),
+    }));
   const circuit = isCircuit(track);
   // A road is extended past its ends in a straight line so its first and last bends stay natural.
   const get = (i: number): Vec3 => {
@@ -69,16 +145,22 @@ export function sampleTrack(track: Track, spacing = 3): Sample[] {
     points.reduce((total, p, i) => total + (i ? distance(points[i - 1], p) : 0), 0) +
     (circuit ? distance(points[n - 1], points[0]) : 0);
   const step = Math.max(spacing, roughLength / 6000);
+  const arcs = corners(track);
   const samples: Sample[] = [];
   for (let i = 0; i < (circuit ? n : n - 1); i++) {
-    const count = Math.max(8, Math.ceil(distance(get(i), get(i + 1)) / step));
-    for (let j = 0; j < count; j++)
-      samples.push({
-        ...interpolate(get(i - 1), get(i), get(i + 1), get(i + 2), j / count),
-        segment: i,
-        t: j / count,
-        ...frameless,
-      });
+    const p1 = get(i),
+      p2 = get(i + 1);
+    // Altitude eases from one point to the next whatever the shape of the segment.
+    const height = (t: number) => p1.y + (p2.y - p1.y) * t * t * (3 - 2 * t);
+    const straight = straightPieces(track, arcs, i);
+    const curve = straight ? null : curveOf(track, arcs, i, get);
+    const length = straight ? straight.reduce((total, piece) => total + piece.length, 0) : 0;
+    const count = Math.max(8, Math.ceil((straight ? length : distance(p1, p2)) / step));
+    for (let j = 0; j < count; j++) {
+      const t = j / count;
+      const p = straight ? { ...along(straight, t * length), y: height(t) } : curve!(t);
+      samples.push({ ...p, segment: i, t, ...frameless });
+    }
   }
   samples.push({
     ...position(circuit ? samples[0] : points[n - 1]),
@@ -104,6 +186,14 @@ export function sampleTrack(track: Track, spacing = 3): Sample[] {
       bz = after.z - p.z;
     p.curvature = (2 * (ax * bz - az * bx)) / (Math.hypot(ax, az) * Math.hypot(bx, bz) * l || 1);
   });
+  // Width and bank zones are track positions: they can only be placed once distances are known.
+  const widths = widthZoneRanges(track, samples),
+    banks = bankZoneRanges(track, samples);
+  for (const p of samples) {
+    p.half = halfWidthAt(track.road.width / 2, widths, length, p.s);
+    p.edge = p.half + kerbWidth(track.road);
+    p.bank = bankAt(banks, length, p.s);
+  }
   return samples;
 }
 
@@ -125,7 +215,8 @@ export function sampleAt(samples: readonly Sample[], s: number): Sample | null {
     b = samples[hi],
     t = (s - a.s) / (b.s - a.s || 1);
   const p = { ...a };
-  for (const k of ['x', 'y', 'z', 'nx', 'nz', 'grade'] as const) p[k] = a[k] + (b[k] - a[k]) * t;
+  for (const k of ['x', 'y', 'z', 'nx', 'nz', 'grade', 'half', 'bank', 'edge'] as const)
+    p[k] = a[k] + (b[k] - a[k]) * t;
   const normalLength = Math.hypot(p.nx, p.nz) || 1;
   p.nx /= normalLength;
   p.nz /= normalLength;

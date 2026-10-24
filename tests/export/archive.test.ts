@@ -1,13 +1,13 @@
 import { produce } from 'immer';
 import { describe, expect, it } from 'vitest';
-import { addBarrier } from '../../src/core/project/edits';
+import { addBarrier, addScenery } from '../../src/core/project/edits';
 import { parseProjectFile } from '../../src/core/project/schema';
 import { buildArchive } from '../../src/export/archive';
 import { crc32 } from '../../src/export/binary/crc32';
 import { zipFiles } from '../../src/export/binary/zip';
 import { ExportError } from '../../src/export/errors';
 import { documentTexts } from '../../src/i18n';
-import { template, tightTurnProject } from '../helpers';
+import { onPoint, sceneryImages, template, tightTurnProject } from '../helpers';
 
 const texts = documentTexts('fr');
 
@@ -23,7 +23,7 @@ const failure = (run: () => unknown) => {
 describe('Assetto Corsa archive', () => {
   it('lays out the track folder with a valid KN5', () => {
     const project = template('club');
-    const archive = buildArchive(project, 'assetto', texts);
+    const archive = buildArchive(project, 'assetto', texts, sceneryImages());
     const root = `content/tracks/rb_test_club/`;
     expect(archive.filename).toBe('rb_test_club_assetto.zip');
     expect(Object.keys(archive.files)).toEqual([
@@ -63,16 +63,38 @@ describe('Assetto Corsa archive', () => {
     );
   });
 
+  it('lights the lamps at night through Custom Shaders Patch', () => {
+    const root = `content/tracks/rb_test_club/`;
+    const config = `${root}extension/ext_config.ini`;
+    expect(
+      buildArchive(template('club'), 'assetto', texts, sceneryImages()).files[config],
+    ).toBeUndefined();
+    const lit = produce(template('club'), (draft) => {
+      addScenery(draft, 'light', { x: -150, z: 0 });
+    });
+    const ini = buildArchive(lit, 'assetto', texts, sceneryImages()).files[config] as string;
+    expect(ini.startsWith('[INCLUDE]\nINCLUDE=common/conditions.ini\n')).toBe(true);
+    expect(ini).toContain('[LIGHTING]\nLIT_MULT=1\nCAR_LIGHTS_LIT_MULT=1');
+    expect(ini).toContain('[MATERIAL_ADJUSTMENT_0]\nACTIVE=1\nMATERIALS=lamp\nKEY_0=ksEmissive');
+    expect(ini).not.toContain('CONDITION_');
+    expect(ini.match(/^CONDITION=.*$/gm)).toEqual([
+      'CONDITION=NIGHT_SMOOTH',
+      'CONDITION=NIGHT_SMOOTH',
+    ]);
+    expect(ini.match(/^\[LIGHT_\d+\]$/gm)).toEqual(['[LIGHT_0]']);
+    expect(ini).toMatch(/POSITION=-150(\.\d+)?, [-\d.]+, [-\d.]+/);
+  });
+
   it('includes barrier materials and documents them', () => {
     const project = produce(template('club'), (draft) => {
       addBarrier(draft, {
         type: 'tecpro',
         side: 'right',
-        from: draft.points[1].id,
-        to: draft.points[3].id,
+        from: onPoint(draft.points[1]),
+        to: onPoint(draft.points[3]),
       });
     });
-    const archive = buildArchive(project, 'assetto', texts);
+    const archive = buildArchive(project, 'assetto', texts, sceneryImages());
     const kn5 = Object.entries(archive.files).find(([path]) =>
       path.endsWith('.kn5'),
     )![1] as Uint8Array;
@@ -88,11 +110,11 @@ describe('OBJ sources', () => {
       addBarrier(draft, {
         type: 'wall',
         side: 'left',
-        from: draft.points[7].id,
-        to: draft.points[2].id,
+        from: onPoint(draft.points[7]),
+        to: onPoint(draft.points[2]),
       });
     });
-    const archive = buildArchive(project, 'obj', texts);
+    const archive = buildArchive(project, 'obj', texts, sceneryImages());
     expect(archive.filename).toBe('rb_test_club_obj.zip');
     expect(archive.files['track.obj']).toContain('mtllib track.mtl');
     expect(archive.files['track.obj']).toContain('o 1GRASS_terrain_0');
@@ -101,16 +123,39 @@ describe('OBJ sources', () => {
     expect(archive.files['texture/concrete.png']).toBeInstanceOf(Uint8Array);
     expect(archive.files['README.txt']).toContain('1WALL');
   });
+
+  it('ships the scenery images, the foliage cut out where they are transparent', () => {
+    const project = produce(template('club'), (draft) => {
+      addScenery(draft, 'tree', { x: -150, z: 0 });
+      addScenery(draft, 'building', { x: -100, z: 0 });
+    });
+    const images = sceneryImages();
+    const obj = buildArchive(project, 'obj', texts, images);
+    expect(obj.files['texture/leaves.png']).toEqual(images['leaves.png']);
+    expect(obj.files['texture/brick.png']).toEqual(images['brick.png']);
+    expect(obj.files['track.mtl']).toContain('newmtl leaves');
+    expect(obj.files['track.mtl']).toContain('map_d texture/leaves.png');
+    expect(obj.files['track.mtl']).not.toContain('map_d texture/brick.png');
+    const kn5 = buildArchive(project, 'assetto', texts, images).files[
+      'content/tracks/rb_test_club/rb_test_club.kn5'
+    ] as Uint8Array;
+    const text = new TextDecoder('latin1').decode(kn5);
+    expect(text).toContain('ksPerPixelAT');
+    expect(text).toContain('leaves.png');
+    expect(() => buildArchive(project, 'obj', texts)).toThrow('Missing scenery image');
+  });
 });
 
 describe('export checks', () => {
   it('refuses a track with blocking issues', () => {
-    const issues = failure(() => buildArchive(tightTurnProject(), 'assetto', texts));
+    const issues = failure(() =>
+      buildArchive(tightTurnProject(), 'assetto', texts, sceneryImages()),
+    );
     expect(issues).toBeInstanceOf(ExportError);
     expect(issues.detail.code).toBe('invalid-track');
-    expect(failure(() => buildArchive(template('blank'), 'obj', texts)).detail.code).toBe(
-      'invalid-track',
-    );
+    expect(
+      failure(() => buildArchive(template('blank'), 'obj', texts, sceneryImages())).detail.code,
+    ).toBe('invalid-track');
   });
 });
 

@@ -23,7 +23,7 @@ import { trackIssues } from '../../src/core/track/issues';
 import { roadEdge } from '../../src/core/track/layout';
 import { pitLaneLayout } from '../../src/core/track/pitLane';
 import { positionAt, positionDistance } from '../../src/core/track/positions';
-import { asJson, template, tightTurnProject } from '../helpers';
+import { onPoint, asJson, template, tightTurnProject } from '../helpers';
 
 const failure = (run: () => unknown) => {
   try {
@@ -159,7 +159,7 @@ describe('pit lane geometry', () => {
     const lane = pitLaneLayout(project, samples)!;
     for (const box of pitBoxPlaces(project, samples)) {
       expect(lane.along(box.sample.s)).not.toBeNull();
-      expect(Math.abs(box.lateral)).toBeGreaterThan(roadEdge(project.road));
+      expect(Math.abs(box.lateral)).toBeGreaterThan(roadEdge(project.road, box.sample));
     }
     const line = startLine(project, samples);
     const grid = gridPlaces(project, samples);
@@ -173,8 +173,8 @@ describe('pit lane geometry', () => {
       addBarrier(draft, {
         type: 'guardrail',
         side: 'right',
-        from: draft.points[8].id,
-        to: draft.points[1].id,
+        from: onPoint(draft.points[8]),
+        to: onPoint(draft.points[1]),
       });
     });
     const samples = sampleTrack(project);

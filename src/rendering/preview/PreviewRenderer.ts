@@ -1,5 +1,8 @@
+import type { Texture } from 'three';
 import {
+  BoxGeometry,
   BufferGeometry,
+  CylinderGeometry,
   Color,
   DirectionalLight,
   DoubleSide,
@@ -9,22 +12,35 @@ import {
   LineBasicMaterial,
   LineSegments,
   Mesh,
+  MOUSE,
+  MeshBasicMaterial,
   MeshLambertMaterial,
   PerspectiveCamera,
+  Raycaster,
+  RepeatWrapping,
   Scene,
   Spherical,
   SRGBColorSpace,
+  TextureLoader,
+  Vector2,
   Vector3,
   WebGLRenderer,
 } from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
+import { SCENERY_TEXTURE_URLS } from '../../assets/scenery';
 import { bounds } from '../../core/math';
-import { MATERIALS } from '../../core/scene/materials';
+import type { PlanPoint, Vec3 } from '../../core/math';
+import { emissive, look } from '../../core/scene/materials';
 import type { MaterialId } from '../../core/scene/materials';
 import type { Scene as TrackScene } from '../../core/scene/scene';
 import type { Sample } from '../../core/track/centerline';
 import type { TightTurn } from '../../core/track/issues';
+import { INACTIVE_LAYER_ALPHA } from '../layers';
+import type { LayerId } from '../layers';
 import { COLORS } from '../theme';
+import { meshLayer } from './overlay';
+import type { TerrainBend } from './overlay';
+import type { PreviewOverlay } from './overlay';
 import type { ViewportSize } from '../plan/projection';
 
 /** Initial orbit: looking from the south-west, 45° above the horizon. */
@@ -44,7 +60,20 @@ export class PreviewRenderer {
   private readonly camera = new PerspectiveCamera(45, 1, 0.5, 50000);
   private readonly controls: OrbitControls;
   private readonly content = new Group();
-  private readonly materials = new Map<MaterialId, MeshLambertMaterial>();
+  /** Selection, stretches and the pointer, drawn over the scene. */
+  private readonly overlay = new Group();
+  private readonly posts: Mesh[] = [];
+  private readonly postGeometry = new CylinderGeometry(1.2, 1.2, 4, 10);
+  private readonly cursorMesh = new Mesh(
+    new BoxGeometry(1, 0.3, 1.2),
+    new MeshBasicMaterial({ color: COLORS.accent }),
+  );
+  /** One material per scene material, and a see-through one for the layers not edited. */
+  private readonly materials = new Map<string, MeshLambertMaterial>();
+  /** The scenery images, loaded once each, shared by plain and dimmed materials. */
+  private readonly textures = new Map<string, Texture>();
+  private readonly loader = new TextureLoader();
+  private layers: { active: LayerId; hidden: readonly LayerId[] } = { active: 'track', hidden: [] };
   private readonly highlight = new LineBasicMaterial({ color: COLORS.danger, depthTest: false });
   private frame: number | null = null;
   private extent = bounds([]);
@@ -55,20 +84,202 @@ export class PreviewRenderer {
     this.scene.add(new HemisphereLight(0xe8f0e0, 0x2c3a2a, 1.4));
     const sun = new DirectionalLight(0xfff6e0, 1.6);
     sun.position.set(-0.6, 1, 0.4);
-    this.scene.add(sun, this.content);
+    this.cursorMesh.visible = false;
+    this.scene.add(sun, this.content, this.overlay, this.cursorMesh);
     this.controls = new OrbitControls(this.camera, canvas);
     // Stay above the horizon: the terrain has no underside worth seeing.
     this.controls.maxPolarAngle = Math.PI / 2 - 0.08;
     this.controls.addEventListener('change', () => this.requestRender());
   }
 
-  private material(id: MaterialId) {
-    let material = this.materials.get(id);
+  private material(id: MaterialId, dimmed = false) {
+    const key = `${id}${dimmed ? ':dimmed' : ''}`;
+    let material = this.materials.get(key);
     if (!material) {
-      material = new MeshLambertMaterial({ color: rgb(MATERIALS[id].color), side: DoubleSide });
-      this.materials.set(id, material);
+      const { color, image, alphaTest } = look(id);
+      material = new MeshLambertMaterial({ color: rgb(color), side: DoubleSide });
+      if (image) {
+        // The image shows as loaded; until then the material keeps its colour.
+        material.color.set(0xffffff);
+        material.map = this.texture(image);
+        if (alphaTest) material.alphaTest = 0.5;
+      }
+      if (emissive(id)) material.emissive = rgb(color).multiplyScalar(emissive(id));
+      if (dimmed) {
+        material.transparent = true;
+        material.opacity = INACTIVE_LAYER_ALPHA;
+        material.depthWrite = false;
+      }
+      this.materials.set(key, material);
     }
     return material;
+  }
+
+  private texture(image: string) {
+    let texture = this.textures.get(image);
+    if (!texture) {
+      texture = this.loader.load(SCENERY_TEXTURE_URLS[image], () => this.requestRender());
+      texture.colorSpace = SRGBColorSpace;
+      texture.wrapS = texture.wrapT = RepeatWrapping;
+      texture.anisotropy = 4;
+      this.textures.set(image, texture);
+    }
+    return texture;
+  }
+
+  /** Dims what belongs to the layers not being edited and hides the hidden ones. */
+  setLayers(active: LayerId, hidden: readonly LayerId[]) {
+    this.layers = { active, hidden };
+    for (const child of this.content.children) {
+      const layer = child.userData.layer as LayerId | null | undefined;
+      if (!layer || !(child instanceof Mesh)) continue;
+      child.visible = !hidden.includes(layer);
+      child.material = this.material(child.userData.material as MaterialId, layer !== active);
+    }
+    this.requestRender();
+  }
+
+  /**
+   * With the brush on, the left button paints (docs/adr/0016): the right one
+   * turns the view and the middle one pans it.
+   */
+  setBrush(on: boolean) {
+    this.controls.mouseButtons = on
+      ? { LEFT: null, MIDDLE: MOUSE.PAN, RIGHT: MOUSE.ROTATE }
+      : { LEFT: MOUSE.ROTATE, MIDDLE: MOUSE.DOLLY, RIGHT: MOUSE.PAN };
+  }
+
+  /**
+   * Bends the terrain shown by what a brush stroke painted, without waiting for
+   * the scene to be rebuilt: each vertex within the extent the stroke covered
+   * rises from its height in the scene by what it painted there, as much as the
+   * relief shows there. How much shows is worked out once per vertex.
+   */
+  bendTerrain({ painted, shown, covered }: TerrainBend) {
+    for (const child of this.content.children) {
+      const base = child.userData.baseY as Float32Array | undefined;
+      if (!base || !(child instanceof Mesh)) continue;
+      const cache = child.userData.shown as Float32Array;
+      const geometry = child.geometry as BufferGeometry;
+      const positions = geometry.getAttribute('position');
+      let moved = false;
+      for (let k = 0; k < positions.count; k++) {
+        const x = positions.getX(k),
+          z = positions.getZ(k);
+        if (x < covered.minX || x > covered.maxX || z < covered.minZ || z > covered.maxZ) continue;
+        if (Number.isNaN(cache[k])) cache[k] = shown({ x, z });
+        positions.setY(k, base[k] + painted({ x, z }) * cache[k]);
+        moved = true;
+      }
+      if (!moved) continue;
+      positions.needsUpdate = true;
+      geometry.computeVertexNormals();
+      geometry.computeBoundingSphere();
+      geometry.computeBoundingBox();
+    }
+    this.requestRender();
+  }
+
+  /** Replaces what is drawn over the scene: highlighted stretches, point posts, the pointer. */
+  setOverlay(overlay: PreviewOverlay) {
+    for (const child of this.overlay.children) {
+      const mesh = child as Mesh;
+      if (mesh.geometry !== this.postGeometry) mesh.geometry.dispose();
+      (mesh.material as MeshBasicMaterial).dispose();
+    }
+    this.overlay.clear();
+    this.posts.length = 0;
+    for (const strip of overlay.strips) {
+      if (!strip.positions.length) continue;
+      const geometry = new BufferGeometry();
+      geometry.setAttribute('position', new Float32BufferAttribute(strip.positions, 3));
+      const material = new MeshBasicMaterial({
+        color: strip.color,
+        transparent: true,
+        opacity: strip.opacity,
+        depthWrite: false,
+        side: DoubleSide,
+      });
+      this.overlay.add(new Mesh(geometry, material));
+    }
+    for (const post of overlay.posts) {
+      const mesh = new Mesh(
+        this.postGeometry,
+        new MeshLambertMaterial({ color: post.selected ? COLORS.accent : COLORS.point.outline }),
+      );
+      mesh.position.set(post.x, post.y + 2, post.z);
+      mesh.userData.point = post.id;
+      this.overlay.add(mesh);
+      this.posts.push(mesh);
+    }
+    if (overlay.outlines.length) {
+      const geometry = new BufferGeometry();
+      geometry.setAttribute('position', new Float32BufferAttribute(overlay.outlines, 3));
+      const material = new LineBasicMaterial({ color: COLORS.accent, depthTest: false });
+      const lines = new LineSegments(geometry, material);
+      // Drawn last, over the scenery it outlines.
+      lines.renderOrder = 1;
+      this.overlay.add(lines);
+    }
+    const cursor = overlay.cursor;
+    this.cursorMesh.visible = cursor !== null;
+    if (cursor) {
+      this.cursorMesh.position.set(cursor.x, cursor.y + 0.3, cursor.z);
+      this.cursorMesh.scale.set(2 * cursor.reach, 1, 1);
+      // Turned across the track, then rolled about it so the bar lies on a banked roadway.
+      this.cursorMesh.rotation.set(
+        0,
+        Math.atan2(-cursor.nz, cursor.nx),
+        Math.atan(cursor.bank),
+        'YXZ',
+      );
+    }
+    this.requestRender();
+  }
+
+  /**
+   * What lies under a point of the canvas: the place hit on the ground and the
+   * control point post, if any. `x` and `y` are in pixels from the canvas corner.
+   */
+  pick(x: number, y: number): { world: Vec3 | null; pointId: string | null } {
+    const size = this.renderer.domElement.getBoundingClientRect();
+    const ray = new Raycaster();
+    ray.setFromCamera(
+      new Vector2((x / size.width) * 2 - 1, -(y / size.height) * 2 + 1),
+      this.camera,
+    );
+    const post = ray.intersectObjects(this.posts, false)[0];
+    const ground = ray.intersectObjects(
+      this.content.children.filter((child) => child.visible),
+      false,
+    )[0];
+    return {
+      world: ground ? { x: ground.point.x, y: ground.point.y, z: ground.point.z } : null,
+      pointId: (post?.object.userData.point as string | undefined) ?? null,
+    };
+  }
+
+  /** Frames a few places, e.g. a corner, from the current viewing direction. */
+  framePlaces(points: readonly PlanPoint[]) {
+    if (!points.length) return;
+    const box = bounds(points, 30);
+    const center = new Vector3((box.minX + box.maxX) / 2, 0, (box.minZ + box.maxZ) / 2);
+    center.y = this.controls.target.y;
+    const radius = Math.max(60, box.maxX - box.minX, box.maxZ - box.minZ) * 1.1;
+    const direction = this.camera.position.clone().sub(this.controls.target).normalize();
+    this.controls.target.copy(center);
+    this.camera.position.copy(center).addScaledVector(direction, radius);
+    this.controls.update();
+    this.requestRender();
+  }
+
+  /** Moves the camera so it looks at a place, keeping its distance and direction. */
+  centerOn(at: PlanPoint) {
+    const offset = this.camera.position.clone().sub(this.controls.target);
+    this.controls.target.set(at.x, this.controls.target.y, at.z);
+    this.camera.position.copy(this.controls.target).add(offset);
+    this.controls.update();
+    this.requestRender();
   }
 
   /** Replaces the displayed scene; tight turns are outlined above the road. */
@@ -81,8 +292,25 @@ export class PreviewRenderer {
       const geometry = new BufferGeometry();
       geometry.setAttribute('position', new Float32BufferAttribute(mesh.positions, 3));
       geometry.setAttribute('normal', new Float32BufferAttribute(mesh.normals, 3));
+      geometry.setAttribute('uv', new Float32BufferAttribute(mesh.uvs, 2));
       geometry.setIndex(mesh.indices);
-      this.content.add(new Mesh(geometry, this.material(mesh.material)));
+      const layer = meshLayer(mesh);
+      const shown = new Mesh(
+        geometry,
+        this.material(mesh.material, layer !== null && layer !== this.layers.active),
+      );
+      shown.userData = { layer, material: mesh.material };
+      // The ground keeps its heights, for a brush stroke to bend it from them.
+      if (mesh.kind === 'terrain')
+        Object.assign(shown.userData, {
+          baseY: Float32Array.from(
+            { length: mesh.positions.length / 3 },
+            (_, k) => mesh.positions[k * 3 + 1],
+          ),
+          shown: new Float32Array(mesh.positions.length / 3).fill(NaN),
+        });
+      shown.visible = !layer || !this.layers.hidden.includes(layer);
+      this.content.add(shown);
     }
     const segments = new Set(tightTurns.map((turn) => turn.segment));
     const lines: number[] = [];
@@ -155,6 +383,11 @@ export class PreviewRenderer {
     for (const child of this.content.children)
       if ('geometry' in child) (child as Mesh).geometry.dispose();
     for (const material of this.materials.values()) material.dispose();
+    for (const texture of this.textures.values()) texture.dispose();
+    this.setOverlay({ strips: [], posts: [], outlines: [], cursor: null });
+    this.postGeometry.dispose();
+    this.cursorMesh.geometry.dispose();
+    this.cursorMesh.material.dispose();
     this.highlight.dispose();
     this.renderer.dispose();
   }

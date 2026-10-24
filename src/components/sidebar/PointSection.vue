@@ -10,7 +10,6 @@ import AppIcon from '../ui/AppIcon.vue';
 import NumberInput from '../ui/NumberInput.vue';
 import SidebarSection from '../ui/SidebarSection.vue';
 
-defineProps<{ index: number }>();
 const store = useProjectStore();
 const editor = useEditorStore();
 const point = computed(() => editor.selectedPoint);
@@ -22,7 +21,7 @@ function preview(axis: 'x' | 'y' | 'z', value: number) {
 </script>
 
 <template>
-  <SidebarSection :index="index" :title="t('point.title')" last>
+  <SidebarSection :title="t('point.title')" last>
     <template v-if="point" #badge>
       <span id="point-badge">{{
         t('point.badge', { index: String(editor.selectedIndex + 1).padStart(2, '0') })
@@ -84,7 +83,7 @@ function preview(axis: 'x' | 'y' | 'z', value: number) {
           :aria-label="t('point.next')"
           @click="editor.selectPointAt(editor.selectedIndex + 1)"
           >→</AppButton
-        ><AppButton id="delete-point" class="delete" small @click="editor.deleteSelectedPoint()">
+        ><AppButton id="delete-point" class="delete" small @click="editor.deleteSelection()">
           <AppIcon name="trash" />{{ t('point.delete') }}
         </AppButton>
       </div>

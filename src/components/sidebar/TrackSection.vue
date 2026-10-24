@@ -1,21 +1,17 @@
 <script setup lang="ts">
 import { computed } from 'vue';
-import { reverseTrack, setClosed, setStartLine } from '../../core/project/edits';
-import { startLinePosition } from '../../core/track/positions';
+import { reverseTrack, setClosed } from '../../core/project/edits';
 import { t } from '../../i18n';
 import { useProjectStore } from '../../stores/project';
 import SegmentedControl from '../ui/SegmentedControl.vue';
 import SidebarSection from '../ui/SidebarSection.vue';
-import TrackPositionField from './TrackPositionField.vue';
 
-defineProps<{ index: number }>();
 const store = useProjectStore();
 
 const mode = computed({
   get: () => (store.project.road.closed ? 'closed' : 'open'),
   set: (next) => store.edit((draft) => setClosed(draft, next === 'closed')),
 });
-const startLine = computed(() => startLinePosition(store.project));
 const modes = computed(() => [
   {
     value: 'closed' as const,
@@ -28,19 +24,11 @@ const modes = computed(() => [
 </script>
 
 <template>
-  <SidebarSection :index="index" :title="t('sidebar.track')">
+  <SidebarSection :title="t('sidebar.track')">
     <SegmentedControl v-model="mode" :options="modes" :label="t('sidebar.modeAria')" />
     <p class="note">
       {{ store.project.road.closed ? t('sidebar.closedNote') : t('sidebar.openNote') }}
     </p>
-    <TrackPositionField
-      v-if="startLine"
-      id="start-line"
-      :label="t('sidebar.startLine')"
-      :position="startLine"
-      @input="store.edit((draft) => setStartLine(draft, $event), { commit: false })"
-      @commit="store.commit()"
-    />
     <button id="reverse-track" type="button" class="reverse" @click="store.edit(reverseTrack)">
       {{ t('sidebar.reverse') }} <span>⇄</span>
     </button>

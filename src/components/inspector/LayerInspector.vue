@@ -1,0 +1,79 @@
+<script setup lang="ts">
+import { t } from '../../i18n';
+import { useEditorStore } from '../../stores/editor';
+import { useProjectStore } from '../../stores/project';
+import BankSection from '../sidebar/BankSection.vue';
+import BarrierSection from '../sidebar/BarrierSection.vue';
+import BrushSection from '../sidebar/BrushSection.vue';
+import EarthworkSection from '../sidebar/EarthworkSection.vue';
+import HillSection from '../sidebar/HillSection.vue';
+import PitSection from '../sidebar/PitSection.vue';
+import PointSection from '../sidebar/PointSection.vue';
+import PointsSection from '../sidebar/PointsSection.vue';
+import RoadSection from '../sidebar/RoadSection.vue';
+import ScenerySection from '../sidebar/ScenerySection.vue';
+import ShapeSection from '../sidebar/ShapeSection.vue';
+import StartSection from '../sidebar/StartSection.vue';
+import TerrainSection from '../sidebar/TerrainSection.vue';
+import TrackSection from '../sidebar/TrackSection.vue';
+import WidthSection from '../sidebar/WidthSection.vue';
+import RangeInspector from './RangeInspector.vue';
+
+/** The settings of the active layer and of what is selected in it. */
+const editor = useEditorStore();
+const store = useProjectStore();
+</script>
+
+<template>
+  <aside id="inspector" class="inspector" :aria-label="t('inspector.aria')">
+    <h1>{{ t(`layers.${editor.layer}`) }}</h1>
+    <RangeInspector v-if="editor.range" />
+    <template v-if="editor.layer === 'track'">
+      <TrackSection />
+      <PointsSection v-if="editor.selectedPointIds.length > 1" />
+      <template v-else>
+        <ShapeSection v-if="editor.selectedPoint" />
+        <PointSection />
+      </template>
+    </template>
+    <template v-else-if="editor.layer === 'road'">
+      <RoadSection />
+      <WidthSection />
+      <BankSection />
+    </template>
+    <BarrierSection v-else-if="editor.layer === 'edges'" />
+    <template v-else-if="editor.layer === 'pits'">
+      <StartSection />
+      <PitSection />
+    </template>
+    <template v-else-if="editor.layer === 'terrain'">
+      <TerrainSection />
+      <BrushSection v-if="editor.tool === 'sculpt' || store.project.sculpt.length" />
+      <EarthworkSection />
+      <HillSection />
+    </template>
+    <ScenerySection v-else />
+  </aside>
+</template>
+
+<style scoped>
+.inspector {
+  background: var(--panel);
+  border-left: 1px solid var(--line);
+  padding: 18px 20px;
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: #3b494c transparent;
+}
+h1 {
+  font-size: 17px;
+  font-weight: 600;
+  letter-spacing: -0.3px;
+}
+@media (max-width: 860px) {
+  .inspector {
+    border-left: 0;
+    border-top: 1px solid var(--line);
+  }
+}
+</style>

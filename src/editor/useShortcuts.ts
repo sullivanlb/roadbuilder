@@ -1,11 +1,11 @@
 import { useEventListener } from '@vueuse/core';
-import { useEditorStore } from '../stores/editor';
-import type { ToolId } from '../stores/editor';
+import { TURN_STEP, useEditorStore } from '../stores/editor';
 import { useFilesStore } from '../stores/files';
 import { useProjectStore } from '../stores/project';
 import { useUiStore } from '../stores/ui';
 import { useViewportStore } from '../stores/viewport';
 import { isTyping } from './focus';
+import { TOOL_KEYS } from './tools';
 
 interface Shortcut {
   key: string;
@@ -25,26 +25,26 @@ export function useShortcuts() {
   const viewport = useViewportStore();
   const files = useFilesStore();
   const ui = useUiStore();
-  const tool = (id: ToolId) => () => editor.setTool(id);
 
   const shortcuts: Shortcut[] = [
     { key: 's', mod: true, global: true, run: () => void files.saveProject() },
     { key: 'z', mod: true, run: project.undo },
     { key: 'z', mod: true, shift: true, run: project.redo },
     { key: 'y', mod: true, run: project.redo },
-    { key: 'v', run: tool('select') },
-    { key: 'a', run: tool('add') },
-    { key: 'b', run: tool('barrier') },
-    { key: 'p', run: tool('pits') },
-    { key: 'h', run: tool('pan') },
+    ...TOOL_KEYS.map(({ key, tool }) => ({ key, run: () => editor.setTool(tool) })),
     { key: 'f', run: viewport.fit },
-    { key: 'delete', run: editor.deleteSelectedPoint },
-    { key: 'backspace', run: editor.deleteSelectedPoint },
+    { key: 'c', run: () => editor.setView(editor.view === '3d' ? '2d' : '3d') },
+    ...editor.layers.map((layer) => ({ key: layer.key, run: () => editor.setLayer(layer.id) })),
+    { key: 'delete', run: editor.deleteSelection },
+    { key: 'backspace', run: editor.deleteSelection },
+    { key: 'e', run: () => editor.turnSelectedScenery(TURN_STEP) },
+    { key: 'e', shift: true, run: () => editor.turnSelectedScenery(-TURN_STEP) },
+    { key: 'd', mod: true, run: editor.duplicateSelectedScenery },
     {
       key: 'escape',
       run: () => {
-        if (editor.barrierDraft) editor.cancelBarrier();
-        else if (editor.pitDraft) editor.cancelPitLane();
+        if (editor.laying) editor.cancelLaying();
+        else if (editor.range) editor.setRange(null);
         else editor.setTool('select');
       },
     },

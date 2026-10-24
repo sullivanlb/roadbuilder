@@ -2,6 +2,17 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { nextTick } from 'vue';
 import { setRoad, updatePoint } from '../src/core/project/edits';
 import { parseProjectFile, serializeProject } from '../src/core/project/schema';
+import { headingVector } from '../src/core/project/scenery';
+import { SculptField } from '../src/core/project/sculpt';
+import { pitLaneLayout } from '../src/core/track/pitLane';
+import { positionDistance } from '../src/core/track/positions';
+import { LAYERS, pickInLayer } from '../src/editor/layers';
+import { TOOL_KEYS, TOOLS } from '../src/editor/tools';
+import { previewInput } from '../src/editor/previewInput';
+import { trackHitNear } from '../src/rendering/preview/hitTest';
+import { sampleAt, trackLength } from '../src/core/track/centerline';
+import type { LayerId, TrackHit } from '../src/editor/layers';
+import { useViewportStore } from '../src/stores/viewport';
 import { useEditorStore } from '../src/stores/editor';
 import { useExportStore } from '../src/stores/export';
 import { AUTOSAVE_KEY, useFilesStore } from '../src/stores/files';
@@ -21,7 +32,16 @@ function stores() {
     editor: useEditorStore(),
     ui: useUiStore(),
     exporter: useExportStore(),
+    viewport: useViewportStore(),
   }));
+}
+
+/** A click in the 3D preview on what `hit` holds: a press released where it went down. */
+function clickIn3d(pointer: ReturnType<typeof previewInput>, hit: TrackHit, shiftKey = false) {
+  const event = { x: 10, y: 10, button: 0, shiftKey, hit };
+  pointer.move(event);
+  pointer.down(event);
+  pointer.up(event);
 }
 
 beforeEach(() => {
@@ -86,7 +106,7 @@ describe('editor', () => {
     const { project, editor } = stores();
     editor.selectPointAt(3);
     const next = project.project.points[4].id;
-    editor.deleteSelectedPoint();
+    editor.deleteSelection();
     expect(editor.selectedPointId).toBe(next);
     editor.selectPointAt(0);
     editor.addPoint({ x: 0, z: 0 });
@@ -95,23 +115,27 @@ describe('editor', () => {
     expect(editor.selectedPointId).toBeNull();
   });
 
-  it('lays a barrier in two clicks, refusing a single point', () => {
+  it('lays a barrier in two clicks anywhere on the track, refusing one too short', () => {
     const { project, editor, ui } = stores();
-    const [a, , , d] = project.project.points.map((point) => point.id);
     editor.setTool('barrier');
-    editor.beginBarrier({ pointId: a, side: 'right' });
-    editor.completeBarrier(a);
+    editor.beginLaying({ s: 240, side: 'right' });
+    editor.completeLaying(242);
     expect(ui.notification?.error).toBe(true);
-    editor.completeBarrier(d);
+    editor.completeLaying(100);
     expect(project.project.barriers).toEqual([
-      expect.objectContaining({ type: 'guardrail', side: 'right', from: a, to: d, offset: 1 }),
+      expect.objectContaining({ type: 'guardrail', side: 'right', offset: 1 }),
     ]);
+    const [laid] = project.project.barriers;
+    const distance = (position: typeof laid.from) =>
+      positionDistance(project.project, project.samples, position);
+    expect(distance(laid.from)).toBeCloseTo(100, 6);
+    expect(distance(laid.to)).toBeCloseTo(240, 6);
     expect(editor.selectedBarrier?.id).toBe(project.project.barriers[0].id);
-    expect(editor.barrierDraft).toBeNull();
+    expect(editor.laying).toBeNull();
     editor.setBarrierType('wall');
     editor.swapSelectedBarrierSide();
     expect(project.project.barriers[0]).toMatchObject({ type: 'wall', side: 'left' });
-    editor.deleteSelectedBarrier();
+    editor.deleteSelection();
     expect(project.project.barriers).toEqual([]);
     project.undo();
     expect(project.project.barriers).toHaveLength(1);
@@ -121,25 +145,368 @@ describe('editor', () => {
     const { project, editor, ui } = stores();
     project.replace(template('kart'));
     editor.setTool('pits');
-    editor.beginPitLane({ s: 20, side: 'left' });
-    editor.completePitLane(30);
+    editor.beginLaying({ s: 20, side: 'left' });
+    editor.completeLaying(30);
     expect(ui.notification?.error).toBe(true);
-    editor.completePitLane(220);
+    editor.completeLaying(220);
     expect(project.project.pitLane).toMatchObject({ side: 'left', width: 7 });
     expect(editor.tool).toBe('select');
     project.replace(template('mountain'));
-    editor.beginPitLane({ s: 20, side: 'left' });
-    expect(editor.pitDraft).toBeNull();
+    editor.setTool('pits');
+    editor.beginLaying({ s: 20, side: 'left' });
+    expect(editor.laying).toBeNull();
     expect(ui.notification?.message).toContain('circuits');
   });
 
-  it('leaves the 3D view for every tool but panning', () => {
-    const { editor } = stores();
+  it('lays a width zone in two clicks, refusing one too short or overlapping', () => {
+    const { project, editor, ui } = stores();
+    project.replace(template('club'));
+    editor.setTool('width');
+    editor.beginLaying({ s: 300, side: 'left' });
+    editor.completeLaying(302);
+    expect(ui.notification?.error).toBe(true);
+    editor.completeLaying(120);
+    expect(project.project.widthZones).toEqual([expect.objectContaining({ width: 16 })]);
+    expect(editor.selectedWidthZone?.id).toBe(project.project.widthZones[0].id);
+    expect(editor.laying).toBeNull();
+    expect(project.samples.find((sample) => sample.s > 210)!.half).toBeCloseTo(8, 6);
+    editor.beginLaying({ s: 200, side: 'left' });
+    editor.completeLaying(400);
+    expect(ui.notification?.message).toContain('chevauche');
+    expect(project.project.widthZones).toHaveLength(1);
+    editor.setTool('select');
+    expect(editor.laying).toBeNull();
+    editor.deleteSelection();
+    expect(project.project.widthZones).toEqual([]);
+    project.undo();
+    expect(project.project.widthZones).toHaveLength(1);
+  });
+
+  it('picks only what belongs to the active layer', () => {
+    const { project, editor } = stores();
+    project.replace(template('club'));
+    editor.setTool('width');
+    editor.beginLaying({ s: 100, side: 'left' });
+    editor.completeLaying(300);
+    editor.setTool('barrier');
+    editor.beginLaying({ s: 100, side: 'left' });
+    editor.completeLaying(300);
+    const [zone] = project.project.widthZones;
+    const [barrier] = project.project.barriers;
+    const lane = pitLaneLayout(project.project, project.samples)!;
+    // One click that lands on a point, a barrier and a width zone at once.
+    const hit: TrackHit = {
+      ground: { x: 0, z: 0 },
+      road: { s: 200, side: 'left' },
+      pointId: project.project.points[1].id,
+      barrierId: barrier.id,
+      sceneryId: 'tree',
+      earthworkId: 'ditch',
+      hillId: 'hill',
+    };
+    const pick = (layer: LayerId, at = hit) =>
+      pickInLayer(layer, at, project.project, project.samples);
+    expect(pick('track')).toEqual({ kind: 'points', ids: [project.project.points[1].id] });
+    expect(pick('road')).toEqual({ kind: 'widthZone', id: zone.id });
+    expect(pick('edges')).toEqual({ kind: 'barrier', id: barrier.id });
+    expect(pick('pits')).toBeNull();
+    const onLane = { ...hit, road: { s: lane.entry + lane.length / 2, side: lane.side } };
+    expect(pick('pits', onLane)).toEqual({ kind: 'pitLane' });
+    expect(pick('terrain')).toEqual({ kind: 'earthwork', id: 'ditch' });
+    expect(pick('terrain', { ...hit, earthworkId: null })).toEqual({ kind: 'hill', id: 'hill' });
+    expect(pick('terrain', { ...hit, earthworkId: null, hillId: null })).toBeNull();
+    expect(pick('scenery')).toEqual({ kind: 'scenery', ids: ['tree'] });
+  });
+
+  it('paints relief while the brush is held, in one undo step', () => {
+    const { project, editor } = stores();
+    project.replace(template('club'));
+    editor.setTool('sculpt');
+    expect(editor.layer).toBe('terrain');
+    const at = { x: -100, z: 60 };
+    editor.beginStroke(at);
+    vi.advanceTimersByTime(500);
+    const half = editor.relief.field.at(at);
+    // Held still, matter keeps piling up; nothing is saved before the end.
+    vi.advanceTimersByTime(500);
+    expect(editor.relief.field.at(at)).toBeGreaterThan(half * 1.5);
+    // The preview bends the terrain by what the stroke painted.
+    expect(editor.stroke!.painted(at)).toBeCloseTo(editor.relief.field.at(at), 6);
+    expect(project.project.sculpt).toEqual([]);
+    editor.strokeTo({ x: -60, z: 60 });
+    vi.advanceTimersByTime(300);
+    editor.endStroke();
+    expect(editor.stroke).toBeNull();
+    const field = new SculptField(project.project.sculpt);
+    expect(field.at(at)).toBeCloseTo(editor.brushStrength, 0);
+    expect(field.at({ x: -60, z: 60 })).toBeGreaterThan(0.5);
+    // The timer stopped with the stroke.
+    vi.advanceTimersByTime(1000);
+    expect(new SculptField(project.project.sculpt).at(at)).toBe(field.at(at));
+    project.undo();
+    expect(project.project.sculpt).toEqual([]);
+    project.redo();
+    // Shift lowers instead; leaving the tool ends a stroke.
+    editor.beginStroke(at, true);
+    vi.advanceTimersByTime(2000);
+    editor.setTool('select');
+    expect(editor.stroke).toBeNull();
+    expect(new SculptField(project.project.sculpt).at(at)).toBeLessThan(field.at(at) - 1);
+    editor.clearPaintedRelief();
+    expect(project.project.sculpt).toEqual([]);
+  });
+
+  it('places scenery facing the track, then turns, copies and deletes the selection', async () => {
+    const { project, editor, ui } = stores();
+    project.replace(template('club'));
+    editor.setTool('grandstand');
+    expect(editor.layer).toBe('scenery');
+    // Beside the main straight, which passes x = -100 at z = 203.
+    editor.placeScenery('grandstand', { x: -100, z: 230 });
+    const [stand] = project.project.scenery;
+    expect(stand).toMatchObject({ kind: 'grandstand', solid: true });
+    // It faces the straight, north of it on the plan.
+    expect(headingVector(stand.heading).z).toBeLessThan(-0.95);
+    expect(editor.selection).toEqual({ kind: 'scenery', ids: [stand.id] });
+    editor.placeScenery('tree', { x: -100, z: 100 });
+    const tree = project.project.scenery[1];
+    expect(headingVector(tree.heading).z).toBeGreaterThan(0.95);
+    editor.select({ kind: 'scenery', ids: [stand.id, tree.id] });
+    editor.turnSelectedScenery(-15);
+    expect(project.project.scenery.map((item) => item.heading)).toEqual([
+      (stand.heading + 345) % 360,
+      tree.heading - 15,
+    ]);
+    editor.duplicateSelectedScenery();
+    expect(project.project.scenery).toHaveLength(4);
+    expect(editor.selectedSceneryIds).toEqual(project.project.scenery.slice(2).map((i) => i.id));
+    editor.deleteSelection();
+    expect(project.project.scenery).toHaveLength(2);
+    expect(editor.selection).toBeNull();
+    // Undo brings the copies back but not their selection; redo drops it again.
+    editor.selectScenery(stand.id);
+    editor.deleteSelection();
+    project.undo();
+    await nextTick();
+    expect(project.project.scenery).toHaveLength(2);
+    editor.selectScenery(stand.id);
+    project.undo();
+    project.undo();
+    await nextTick();
+    expect(editor.selectedSceneryIds).toEqual([stand.id]);
+    expect(ui.notification).toBeNull();
+  });
+
+  it('places scenery from the 3D preview and picks it there', () => {
+    const { project, editor, ui, viewport } = stores();
+    project.replace(template('club'));
+    const pointer = previewInput({ project, editor, ui, viewport });
+    editor.setTool('light');
+    const ground = { x: -100, y: 0, z: 230 };
+    clickIn3d(pointer, trackHitNear(project.project, project.samples, ground));
+    const [light] = project.project.scenery;
+    expect(light).toMatchObject({ kind: 'light', x: -100, z: 230 });
+    editor.setTool('select');
+    editor.select(null);
+    clickIn3d(pointer, trackHitNear(project.project, project.samples, ground));
+    expect(editor.selection).toEqual({ kind: 'scenery', ids: [light.id] });
+  });
+
+  it('paints in the 3D preview as soon as the button goes down, and turns the camera otherwise', () => {
+    const { project, editor, ui, viewport } = stores();
+    project.replace(template('club'));
+    const pointer = previewInput({ project, editor, ui, viewport });
+    const hit = trackHitNear(project.project, project.samples, { x: -100, y: 3, z: 60 });
+    const event = { x: 10, y: 10, button: 0, shiftKey: false, hit };
+    editor.setTool('sculpt');
+    expect(pointer.down(event)).toBe(true);
+    expect(editor.stroke).not.toBeNull();
+    expect(editor.brushPointer).toEqual({ x: -100, y: 3, z: 60 });
+    vi.advanceTimersByTime(200);
+    pointer.up(event);
+    expect(editor.stroke).toBeNull();
+    expect(new SculptField(project.project.sculpt).at(hit.ground)).toBeGreaterThan(0);
+    // Another tool lets the press turn the camera: a press that moves is no click.
+    editor.setTool('tree');
+    expect(pointer.down(event)).toBe(false);
+    pointer.up({ ...event, x: 60 });
+    expect(project.project.scenery).toEqual([]);
+  });
+
+  it('moves to the layer of a tool or a selection, and keeps each layer’s selection', () => {
+    const { project, editor } = stores();
+    project.replace(template('club'));
+    editor.reset();
+    expect(editor.layer).toBe('track');
+    expect(editor.selectedPointId).toBe(project.project.points[0].id);
+    editor.setTool('barrier');
+    expect(editor.layer).toBe('edges');
+    expect(editor.selection).toBeNull();
+    editor.setTool('select');
+    expect(editor.layer).toBe('edges');
+    editor.selectPoint(project.project.points[2].id);
+    expect(editor.layer).toBe('track');
+    editor.setLayer('road');
+    expect(editor.tool).toBe('select');
+    expect(editor.selection).toBeNull();
+    editor.setLayer('track');
+    expect(editor.selectedPointId).toBe(project.project.points[2].id);
+    editor.toggleLayer('edges');
+    expect(editor.hiddenLayers).toEqual(['edges']);
+    editor.toggleLayer('edges');
+    expect(editor.hiddenLayers).toEqual([]);
+  });
+
+  it('lays a width zone, barriers or the pit lane on a stretch picked in the band', () => {
+    const { project, editor } = stores();
+    project.replace(template('club'));
+    editor.reset();
+    editor.setRange({ start: 50, length: 600 });
+    editor.selectPointsInRange();
+    expect(editor.selectedPoints?.ids.length).toBeGreaterThan(0);
+    expect(editor.range).toBeNull();
+
+    editor.setLayer('road');
+    editor.setRange({ start: 100, length: 150 });
+    editor.layOnRange('widthZone');
+    expect(project.project.widthZones).toHaveLength(1);
+    expect(editor.selection).toEqual({ kind: 'widthZone', id: project.project.widthZones[0].id });
+    expect(editor.range).toBeNull();
+    // The same stretch again overlaps: refused, and the stretch stays.
+    editor.setRange({ start: 120, length: 50 });
+    editor.layOnRange('widthZone');
+    expect(project.project.widthZones).toHaveLength(1);
+    expect(editor.range).not.toBeNull();
+
+    editor.setLayer('edges');
+    editor.layOnRange('barrier', ['left', 'right']);
+    expect(project.project.barriers.map((barrier) => barrier.side)).toEqual(['left', 'right']);
+
+    editor.setLayer('terrain');
+    editor.setRange({ start: 120, length: 50 });
+    editor.layOnRange('earthwork', ['left'], 'ditch');
+    expect(project.project.earthworks).toEqual([
+      expect.objectContaining({ type: 'ditch', side: 'left' }),
+    ]);
+
+    editor.setLayer('pits');
+    editor.setRange({ start: 300, length: 200 });
+    editor.layOnRange('pitLane');
+    const lane = pitLaneLayout(project.project, project.samples)!;
+    expect(lane.entry).toBeCloseTo(300, 6);
+    expect(lane.length).toBeCloseTo(200, 6);
+  });
+
+  it('keeps the 3D view whatever the tool, and acts on clicks made in it', () => {
+    const { project, editor, ui } = stores();
+    project.replace(template('club'));
+    editor.reset();
     editor.setView('3d');
-    editor.setTool('pan');
+    editor.setTool('barrier');
     expect(editor.view).toBe('3d');
-    editor.setTool('add');
-    expect(editor.view).toBe('2d');
+    const pointer = previewInput({ project, editor, ui, viewport: useViewportStore() });
+    const at = (s: number, side: 1 | -1 = -1) => {
+      const sample = sampleAt(project.samples, s)!;
+      const lateral = side * (sample.half + 1);
+      return trackHitNear(project.project, project.samples, {
+        x: sample.x + sample.nx * lateral,
+        z: sample.z + sample.nz * lateral,
+      });
+    };
+    // Two clicks on the left of the road lay a barrier there.
+    clickIn3d(pointer, at(100));
+    expect(editor.hoverS).toBeCloseTo(100, -1);
+    pointer.move({ x: 0, y: 0, button: 0, shiftKey: false, hit: at(260) });
+    expect(editor.editing.laying?.range?.length).toBeCloseTo(160, -1);
+    clickIn3d(pointer, at(260));
+    expect(project.project.barriers).toEqual([expect.objectContaining({ side: 'left' })]);
+    // Selecting picks in the active layer: the barrier now, a point on the track layer.
+    editor.setTool('select');
+    clickIn3d(pointer, at(180));
+    expect(editor.selection).toEqual({ kind: 'barrier', id: project.project.barriers[0].id });
+    editor.setLayer('track');
+    const point = project.project.points[2];
+    clickIn3d(pointer, trackHitNear(project.project, project.samples, point));
+    expect(editor.selectedPointId).toBe(point.id);
+  });
+
+  it('lays every kind of range the same way, and the Delete key deletes each of them', () => {
+    const { project, editor } = stores();
+    project.replace(template('club'));
+    const lay = (tool: Parameters<typeof editor.setTool>[0], from: number, to: number) => {
+      editor.setTool(tool);
+      editor.beginLaying({ s: from, side: 'right' });
+      editor.aimLaying({ s: to, side: 'right' });
+      editor.completeLaying(to);
+    };
+    lay('barrier', 100, 200);
+    lay('width', 100, 200);
+    lay('bank', 300, 400);
+    lay('ditch', 100, 200);
+    lay('pits', 500, 700);
+    expect(project.project.barriers).toHaveLength(1);
+    expect(project.project.widthZones).toHaveLength(1);
+    expect(project.project.bankZones).toHaveLength(1);
+    expect(project.project.earthworks).toEqual([expect.objectContaining({ type: 'ditch' })]);
+    expect(project.project.pitLane).not.toBeNull();
+    for (const selection of [
+      { kind: 'barrier', id: project.project.barriers[0].id },
+      { kind: 'widthZone', id: project.project.widthZones[0].id },
+      { kind: 'bankZone', id: project.project.bankZones[0].id },
+      { kind: 'earthwork', id: project.project.earthworks[0].id },
+      { kind: 'pitLane' },
+    ] as const) {
+      editor.select(selection);
+      editor.deleteSelection();
+      expect(editor.selection).toBeNull();
+    }
+    expect(project.project).toMatchObject({
+      barriers: [],
+      widthZones: [],
+      bankZones: [],
+      earthworks: [],
+      pitLane: null,
+    });
+  });
+
+  it('shows the pit lane being laid forward from its entry, past half the track', () => {
+    const { project, editor } = stores();
+    project.replace(template('club'));
+    const total = trackLength(project.samples);
+    editor.setTool('pits');
+    editor.beginLaying({ s: 100, side: 'right' });
+    editor.aimLaying({ s: 100 + total * 0.7, side: 'right' });
+    expect(editor.editing.laying?.range?.start).toBe(100);
+    expect(editor.editing.laying?.range?.length).toBeCloseTo(total * 0.7, 6);
+    // Another kind takes the shorter way round.
+    editor.setTool('barrier');
+    expect(editor.laying).toBeNull();
+    editor.beginLaying({ s: 100, side: 'right' });
+    editor.aimLaying({ s: 100 + total * 0.7, side: 'right' });
+    expect(editor.editing.laying?.range?.length).toBeCloseTo(total * 0.3, 6);
+    // An earthwork of another type carries on with the one being laid.
+    editor.setTool('ditch');
+    editor.beginLaying({ s: 100, side: 'left' });
+    editor.setTool('embankment');
+    expect(editor.laying).toMatchObject({ kind: 'earthwork' });
+    editor.completeLaying(200);
+    expect(project.project.earthworks).toEqual([
+      expect.objectContaining({ type: 'embankment', side: 'left' }),
+    ]);
+  });
+});
+
+describe('tools', () => {
+  it('offers every tool on one layer, or on every layer, and picks each with its own key', () => {
+    const everywhere = ['select', 'pan'];
+    for (const tool of Object.keys(TOOLS)) {
+      const homes = LAYERS.filter((layer) => (layer.tools as readonly string[]).includes(tool));
+      expect(homes.length, tool).toBe(everywhere.includes(tool) ? 0 : 1);
+    }
+    const keys = TOOL_KEYS.map(({ key }) => key);
+    expect(new Set(keys).size).toBe(keys.length);
+    // Layers are picked with digits, the view with C and fitting with F.
+    expect(keys.some((key) => /[0-9cf]/.test(key))).toBe(false);
   });
 });
 

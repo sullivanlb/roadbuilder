@@ -35,9 +35,8 @@ export function buildPitWall(project: Project, samples: readonly Sample[]): Mesh
 
   const { wall, wallGap } = LAYOUT.pitLane;
   const sign = lane.sign;
-  const edge = roadEdge(project.road);
-  const at = (offset: number) => () => sign * (edge + offset);
-  const decor = createMesh('divider_decor', 'concrete', 'barrier');
+  const at = (offset: number) => (p: Frame) => sign * (roadEdge(project.road, p) + offset);
+  const decor = createMesh('divider_decor', 'concrete', 'barrier', true, 'pits');
   solidWall(
     decor,
     frames,
@@ -49,7 +48,7 @@ export function buildPitWall(project: Project, samples: readonly Sample[]): Mesh
   );
   // The name must not contain another surface key (ROAD, GRASS, KERB, PIT):
   // « 1WALL_pitwall » was read as pit lane floor, with no collision (docs/assetto-corsa.md).
-  const collider = createMesh('1WALL_divider', 'concrete', 'barrier', false);
+  const collider = createMesh('1WALL_divider', 'concrete', 'barrier', false, 'pits');
   solidWall(
     collider,
     frames,

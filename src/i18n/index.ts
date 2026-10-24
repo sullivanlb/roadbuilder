@@ -97,6 +97,18 @@ export function formatProjectError(detail: ProjectErrorDetail, target?: Locale):
       return tr('projectError.pointsLimit', { max: detail.max });
     case 'barriers-limit':
       return tr('projectError.barriersLimit', { max: detail.max });
+    case 'width-zones-limit':
+      return tr('projectError.widthZonesLimit', { max: detail.max });
+    case 'bank-zones-limit':
+      return tr('projectError.bankZonesLimit', { max: detail.max });
+    case 'scenery-limit':
+      return tr('projectError.sceneryLimit', { max: detail.max });
+    case 'earthworks-limit':
+      return tr('projectError.earthworksLimit', { max: detail.max });
+    case 'hills-limit':
+      return tr('projectError.hillsLimit', { max: detail.max });
+    case 'sculpt-limit':
+      return tr('projectError.sculptLimit', { max: detail.max });
     case 'duplicate-id':
       return tr('projectError.duplicateId');
     case 'barrier-endpoint':
@@ -138,6 +150,22 @@ export function formatTrackIssue(issue: TrackIssue, target?: Locale): string {
       return tr('trackIssue.pitLaneTooShort', { cars: issue.cars, capacity: issue.capacity });
     case 'pit-lane-too-tight':
       return tr('trackIssue.pitLaneTooTight', { from: issue.from + 1, to: issue.to + 1 });
+    case 'width-zones-overlap':
+      return tr('trackIssue.widthZonesOverlap');
+    case 'bank-zones-overlap':
+      return tr('trackIssue.bankZonesOverlap');
+    case 'radius-reduced':
+      return tr('trackIssue.radiusReduced', {
+        point: issue.point + 1,
+        requested: Math.round(issue.requested),
+        actual: Math.round(issue.actual),
+      });
+    case 'sharp-corner':
+      return tr('trackIssue.sharpCorner', { point: issue.point + 1, angle: issue.angle });
+    case 'scenery-on-track':
+      return tr('trackIssue.sceneryOnTrack', { count: issue.count }, issue.count);
+    case 'earthwork-on-track':
+      return tr('trackIssue.earthworkOnTrack', { count: issue.count }, issue.count);
   }
 }
 
@@ -158,9 +186,19 @@ export function documentTexts(target: Locale): DocumentTexts {
       tr('documents.trackDescription', {
         mode: tr(closed ? 'sidebar.closed' : 'sidebar.open'),
       }),
-    objReadme: (barrierCount) =>
-      tr('documents.objReadme') + (barrierCount ? tr('documents.objReadmeBarriers') : ''),
-    installation: ({ name, slug, projectFile, terrainMargin, barrierCount, pitBoxes, warnings }) =>
+    objReadme: (colliders) =>
+      tr('documents.objReadme') + (colliders ? tr('documents.objReadmeBarriers') : ''),
+    installation: ({
+      name,
+      slug,
+      projectFile,
+      terrainMargin,
+      barrierCount,
+      sceneryCount,
+      lights,
+      pitBoxes,
+      warnings,
+    }) =>
       tr('documents.installationHead', { name, slug }) +
       (pitBoxes === null
         ? tr('documents.installationSpawnPit')
@@ -168,6 +206,10 @@ export function documentTexts(target: Locale): DocumentTexts {
       (barrierCount
         ? tr('documents.installationBarriers', { count: barrierCount }, barrierCount) + '\n'
         : '') +
+      (sceneryCount
+        ? tr('documents.installationScenery', { count: sceneryCount }, sceneryCount) + '\n'
+        : '') +
+      (lights ? tr('documents.installationLights') : '') +
       tr('documents.installationBody', { terrainMargin }) +
       (barrierCount
         ? tr('documents.installationBarrierLimits')

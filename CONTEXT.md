@@ -14,6 +14,20 @@ _Avoid_: save, file, circuit file
 A ready-made project offered when starting a new one.
 _Avoid_: preset, example
 
+### The editor
+
+**Layer** (couche):
+One of the subjects the editor works on: track, roadway, edges, pits and start, terrain, scenery. The active layer decides what a click picks and which tools are offered; the others stay visible, dimmed, and can be hidden.
+_Avoid_: mode, tab, panel
+
+**Track band** (bande de piste):
+The track unrolled along its track distance under the plan, with one row per subject of the active layer; ranges show as blocks and new ones are picked by dragging across it.
+_Avoid_: timeline, profile (except for the elevation row)
+
+**Corner** (virage):
+A bend found from the curvature of the centerline, numbered in track direction. Corners are detected, not stored.
+_Avoid_: turn (in French texts), curve
+
 ### The track
 
 **Track** (tracé):
@@ -32,20 +46,31 @@ _Avoid_: open track, point-to-point, hillclimb
 The driving direction, which is the order of the control points. Left and right are always relative to it.
 
 **Control point** (point):
-A point placed by the user that the track passes through; it has a plan position and an altitude.
+A point placed by the user that the track passes through, unless it is rounded; it has a plan position and an altitude.
 _Avoid_: node, vertex, waypoint
 
+**Straight** (ligne droite):
+A segment drawn as a straight line between its two control points. A segment touching a rounded point is always straight.
+_Avoid_: line, straight segment
+
+**Rounded point** (sommet arrondi):
+A control point the track does not go through: it runs along the straight sides leading to it and turns on an arc of the point's radius, tangent to both. Its place on the track is the middle of the arc.
+_Avoid_: fillet, corner (a corner is detected, not drawn), vertex
+
+**Radius** (rayon):
+The radius asked for on a rounded point. When its sides are too short, the arc takes a smaller one, the effective radius, and a warning says so.
+
 **Centerline** (axe):
-The smooth curve interpolated through the control points; every surface is laid out from it.
+The curve laid out through the control points, straight on straights, on arcs at rounded points and smooth elsewhere; every surface is laid out from it.
 _Avoid_: spline, curve
 
 **Segment**:
 The part of the centerline between two consecutive control points, including the closing one of a circuit.
 _Avoid_: leg, section
 
-**Span** (tronçon):
-A stretch of track from one control point to another, following the track direction. It may cover several segments and, on a circuit, run through the start.
-_Avoid_: region, range, section
+**Range** (plage, or tronçon for a barrier):
+A stretch of track between two track positions, following the track direction. It may cover several segments and, on a circuit, run through the start.
+_Avoid_: span, region, section
 
 **Track distance**:
 Distance travelled along the centerline from the first control point.
@@ -58,8 +83,23 @@ _Avoid_: anchor, marker, chainage
 ### Road surfaces
 
 **Roadway** (chaussée):
-The paved driving surface, of uniform width.
+The paved driving surface. Its width is the base width, except inside width zones.
 _Avoid_: asphalt, road surface
+
+**Base width** (largeur de base):
+The roadway width wherever no width zone applies.
+
+**Width zone** (portion de largeur):
+A stretch of track between two track positions where the roadway takes another width, on both edges alike. The width eases in and out over a fixed length at each end; where zones overlap, the later one wins.
+_Avoid_: section, segment, width span
+
+**Banking** (dévers):
+The tilt of the roadway across the track, raising one edge while the other keeps the altitude of the track. It covers the roadway and the kerbs; beyond them the ground stays flat at the height of the kerb edge.
+_Avoid_: camber, superelevation, cant
+
+**Bank zone** (portion de dévers):
+A stretch of track between two track positions where the roadway is banked by an angle, with one edge raised. The bank eases in and out over the zone's transition length at each end; where zones overlap, the later one wins.
+_Avoid_: banked section, banking span
 
 **Kerb** (vibreur):
 The striped strip running along each edge of the roadway.
@@ -70,16 +110,50 @@ The grass strip beyond the kerbs on each side.
 _Avoid_: verge, run-off
 
 **Terrain** (terrain):
-The ground that fills the area around and inside the track, out to the terrain margin.
+The ground that fills the area around and inside the track, out to the terrain margin and over every hill and painted relief. Its relief follows the track, shaped by earthworks, hills and the brush.
 _Avoid_: ground plane, floor
 
 **Terrain margin** (marge du terrain):
 How far the terrain extends beyond the outermost part of the track.
 
+### Shaping the terrain
+
+**Earthwork** (terrassement):
+A shape given to the ground along a range on one side of the track, beyond the shoulders: an embankment, a ditch or a run-off. It moves with the track.
+_Avoid_: sculpt zone, terrain zone
+
+**Embankment** (talus):
+An earthwork where the ground rises, or falls when its height is negative, over its width at some offset from the shoulders, then holds that level before joining the relief.
+_Avoid_: bank (reserved for banking), slope, berm
+
+**Ditch** (fossé):
+An earthwork hollowing the ground along the track, at some offset from the shoulders.
+_Avoid_: trench, gutter
+
+**Run-off** (dégagement):
+An earthwork keeping the ground flat at the height of the shoulders out to its width, before it joins the relief.
+_Avoid_: gravel trap (a surface laid on it, planned in the edges layer), escape road
+
+**Hill** (colline):
+A rise of the ground placed freely on the plan, oval and oriented, or a hollow when its height is negative. It fades out near the track, whose shoulders keep their heights.
+_Avoid_: mound, bump, sculpt
+
+**Painted relief** (relief sculpté):
+Height added to the terrain or taken from it with the brush, on a 4 m grid. It stands where it was painted and fades out near the track.
+_Avoid_: heightmap, displacement
+
+**Brush** (pinceau):
+The tool that paints relief while it is held: it raises, lowers, smooths or flattens the ground under the pointer, the most at its centre.
+_Avoid_: sculpt tool, stamp
+
+**Gravel trap** (bac à graviers):
+A gravel surface beside the track, planned in the edges layer.
+_Avoid_: run-off (the shape of the ground)
+
 ### Barriers
 
 **Barrier** (barrière):
-A guardrail, tyre wall, TecPro line or concrete wall laid along a span on one side of the track.
+A guardrail, tyre wall, TecPro line or concrete wall laid along a range on one side of the track.
 _Avoid_: wall (except for the concrete type), fence
 
 **Barrier offset** (écartement):
@@ -91,7 +165,29 @@ _Avoid_: hitbox, collision mesh
 
 **Decor** (décor):
 The visible geometry of a barrier, drawn in game but not used for collisions.
-_Avoid_: scenery (reserved for future free-standing objects), visual
+_Avoid_: scenery (reserved for free-standing objects), visual
+
+### Scenery
+
+**Scenery item** (objet de décor):
+A free-standing object placed on the plan: a tree or grove, a building, a grandstand, a sign or a light. It stands where it was put, on the ground, and does not follow the track when the track is edited.
+_Avoid_: prop, asset, decor (reserved for the visible geometry of barriers)
+
+**Heading** (orientation):
+The direction the front of a scenery item faces on the plan. A new item faces the nearest part of the track.
+_Avoid_: rotation, yaw, angle
+
+**Grove** (bosquet):
+A tree item holding several trees scattered over its width; the same item always scatters them in the same places.
+_Avoid_: forest, cluster
+
+**Solid** (bloquant):
+A scenery item that stops cars in game, through an invisible collider around it. Buildings and grandstands are solid by default, the other kinds are not.
+_Avoid_: collidable, physical
+
+**Light** (éclairage):
+A lamp post whose lamps glow, and light the track at night with Custom Shaders Patch.
+_Avoid_: lamp, floodlight
 
 ### Checks
 
@@ -124,7 +220,7 @@ _Avoid_: capacity, pitboxes
 ### Output
 
 **Scene** (scène):
-Everything generated from a project to be seen or driven: surfaces, terrain, barriers and markers. The 3D preview and every export show the same scene.
+Everything generated from a project to be seen or driven: surfaces, terrain, barriers, scenery and markers. The 3D preview and every export show the same scene.
 _Avoid_: model, mesh
 
 **Marker**:

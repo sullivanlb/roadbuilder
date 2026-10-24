@@ -1,42 +1,87 @@
 import type { Id } from '../../core/ids';
-import type { Vec3 } from '../../core/math';
+import type { PlanPoint, Vec3 } from '../../core/math';
 import { DEFAULTS } from '../../core/project/rules';
-import { isCircuit } from '../../core/project/schema';
-import type { Project, Side } from '../../core/project/schema';
-import { barrierPath } from '../../core/scene/barriers';
+import type { Earthwork, Hill, Project, SceneryItem } from '../../core/project/schema';
+import { EARTHWORK_DEFAULTS, hillOutline } from '../../core/project/terrain';
+import { SCULPT } from '../../core/project/sculpt';
+import type { SculptField } from '../../core/project/sculpt';
+import { barrierLine, barrierPath } from '../../core/scene/barriers';
 import { gridPlaces, pitBoxPlaces } from '../../core/scene/markers';
 import type { Place } from '../../core/scene/markers';
 import { startLine } from '../../core/scene/road';
+import { headingVector, sceneryFootprint } from '../../core/project/scenery';
+import { groveTrees } from '../../core/scene/scenery/grove';
 import { sampleAt, trackLength } from '../../core/track/centerline';
 import type { Sample } from '../../core/track/centerline';
+import { arcLayout, corners } from '../../core/track/geometry';
+import type { ArcShape } from '../../core/track/geometry';
 import type { TightTurn } from '../../core/track/issues';
 import { kerbWidth, LAYOUT, roadEdge, terrainBounds } from '../../core/track/layout';
+import {
+  earthworkOutline,
+  earthworkRanges,
+  pointBesideShoulders,
+} from '../../core/track/earthworks';
+import type { EarthworkRange } from '../../core/track/earthworks';
 import { pitLaneLayout } from '../../core/track/pitLane';
+import type { PitLaneLayout } from '../../core/track/pitLane';
+import { rangeSamples } from '../../core/track/ranges';
+import { bankZoneRanges } from '../../core/track/bank';
+import { widthZoneRanges } from '../../core/track/width';
+import type { LaidKind, TrackRange } from '../../core/track/ranges';
+import { arcDegrees } from '../../core/track/drawing';
+import type { DrawDraft } from '../../core/track/drawing';
+import { selectedIds } from '../editing';
+import type { Editing, SelectionKind } from '../editing';
+import { INACTIVE_LAYER_ALPHA } from '../layers';
+import type { LayerId } from '../layers';
 import { BARRIER_STYLE, COLORS } from '../theme';
-import type { PlanProjection } from './projection';
+import type { PlanProjection, ScreenPoint } from './projection';
 
 /** Everything the plan shows, read from the stores by the plan canvas. */
 export interface PlanScene {
   project: Project;
   samples: readonly Sample[];
+  /** The editing under way, as every view shows it. */
+  editing: Editing;
   tightTurns: readonly TightTurn[];
-  selectedPointId: Id | null;
+  /** Rectangle being dragged to select points, in screen pixels. */
+  marquee: { x0: number; y0: number; x1: number; y1: number } | null;
   hoveredPointId: Id | null;
-  selectedBarrierId: Id | null;
-  /** First click of the barrier being laid. */
-  barrierDraft: { from: Id; side: Side } | null;
-  /** Where the next barrier click would land. */
-  roadTarget: { pointId: Id; side: Side } | null;
-  /** Entry of the pit lane being laid, as a track distance. */
-  pitDraft: { entry: number; side: Side } | null;
-  /** Where the next pit lane click would land. */
-  pitTarget: { s: number; side: Side } | null;
-  labels: { start: string; finish: string };
+  /** The straight or the arc the next click would draw. */
+  drawDraft: DrawDraft | null;
+  hoveredSceneryId: Id | null;
+  /** The item the active scenery tool would place under the pointer. */
+  sceneryGhost: SceneryItem | null;
+  /** The hill the hill tool would raise under the pointer. */
+  hillGhost: Hill | null;
+  /** The painted relief, as the stroke under way leaves it. */
+  sculpt: SculptField;
+  labels: {
+    start: string;
+    finish: string;
+    distance: (metres: number) => string;
+    /** Label of a straight being drawn: its length and its turn from the track. */
+    straight: (length: number, turn: number) => string;
+    /** Label of an arc being drawn: its radius and its turn, in degrees. */
+    arc: (radius: number, degrees: number) => string;
+    radius: (radius: number) => string;
+  };
 }
 
 type Context = CanvasRenderingContext2D;
 
-function trace(ctx: Context, view: PlanProjection, points: readonly Vec3[]) {
+/** Whether the selection holds an item of a kind. */
+const isSelected = (scene: PlanScene, kind: SelectionKind, id: Id) =>
+  selectedIds(scene.editing.selection, kind).includes(id);
+
+/** What is being laid, when it is of a kind. */
+const layingOf = (scene: PlanScene, kind: LaidKind) => {
+  const laying = scene.editing.laying;
+  return laying?.kind === kind ? laying : null;
+};
+
+function trace(ctx: Context, view: PlanProjection, points: readonly PlanPoint[]) {
   ctx.beginPath();
   points.forEach((point, i) => {
     const p = view.toScreen(point);
@@ -93,6 +138,47 @@ function drawBackground(ctx: Context, view: PlanProjection) {
     }
 }
 
+/**
+ * Strokes the centerline with a width in pixels that follows the roadway width,
+ * one path per run of samples where that width does not change. Dashes carry on
+ * from one run to the next.
+ */
+function strokeAlong(
+  ctx: Context,
+  view: PlanProjection,
+  samples: readonly Sample[],
+  color: string,
+  width: (half: number) => number,
+  dash: number[] = [],
+) {
+  ctx.strokeStyle = color;
+  ctx.setLineDash(dash);
+  let run = NaN;
+  const flush = () => {
+    if (Number.isNaN(run)) return;
+    ctx.lineWidth = width(run);
+    ctx.stroke();
+  };
+  for (let i = 1; i < samples.length; i++) {
+    const a = samples[i - 1],
+      b = samples[i];
+    const half = (a.half + b.half) / 2;
+    if (half !== run) {
+      flush();
+      run = half;
+      ctx.beginPath();
+      if (dash.length) ctx.lineDashOffset = a.s * view.camera.scale;
+      const p = view.toScreen(a);
+      ctx.moveTo(p.x, p.y);
+    }
+    const q = view.toScreen(b);
+    ctx.lineTo(q.x, q.y);
+  }
+  flush();
+  ctx.setLineDash([]);
+  ctx.lineDashOffset = 0;
+}
+
 /** Terrain outline, then the road drawn as stacked strokes from the widest to the narrowest. */
 function drawTrack(ctx: Context, view: PlanProjection, scene: PlanScene) {
   const { project, samples } = scene,
@@ -102,32 +188,32 @@ function drawTrack(ctx: Context, view: PlanProjection, scene: PlanScene) {
   const corner = view.toScreen({ x: terrain.minX, z: terrain.minZ });
   const width = (terrain.maxX - terrain.minX) * scale,
     height = (terrain.maxZ - terrain.minZ) * scale;
-  ctx.fillStyle = COLORS.terrain.fill;
-  ctx.fillRect(corner.x, corner.y, width, height);
-  ctx.strokeStyle = COLORS.terrain.outline;
-  ctx.lineWidth = 1;
-  dashed(ctx, [6, 5], () => ctx.strokeRect(corner.x, corner.y, width, height));
+  inLayer(ctx, scene, 'terrain', () => {
+    ctx.fillStyle = COLORS.terrain.fill;
+    ctx.fillRect(corner.x, corner.y, width, height);
+    ctx.strokeStyle = COLORS.terrain.outline;
+    ctx.lineWidth = 1;
+    dashed(ctx, [6, 5], () => ctx.strokeRect(corner.x, corner.y, width, height));
+    drawTerrainShapes(ctx, view, scene);
+  });
 
   const kerbs = 2 * kerbWidth(road);
-  trace(ctx, view, samples);
   ctx.lineJoin = 'round';
   ctx.lineCap = 'round';
-  const stroke = (color: string, lineWidth: number) => {
-    ctx.strokeStyle = color;
-    ctx.lineWidth = lineWidth;
-    ctx.stroke();
-  };
-  stroke(COLORS.road.shadow, (road.width + road.shoulder * 2 + 5) * scale + 4);
-  stroke(COLORS.road.shoulder, (road.width + road.shoulder * 2 + kerbs) * scale);
+  const stroke = (color: string, width: (half: number) => number, dash?: number[]) =>
+    strokeAlong(ctx, view, samples, color, width, dash);
+  stroke(COLORS.road.shadow, (half) => (2 * half + road.shoulder * 2 + 5) * scale + 4);
+  stroke(COLORS.road.shoulder, (half) => (2 * half + road.shoulder * 2 + kerbs) * scale);
   if (road.kerbs) {
-    stroke(COLORS.road.kerbWhite, (road.width + kerbs) * scale);
-    dashed(ctx, [5 * scale, 5 * scale], () =>
-      stroke(COLORS.road.kerbRed, (road.width + kerbs) * scale),
-    );
+    stroke(COLORS.road.kerbWhite, (half) => (2 * half + kerbs) * scale);
+    stroke(COLORS.road.kerbRed, (half) => (2 * half + kerbs) * scale, [5 * scale, 5 * scale]);
   }
-  stroke(COLORS.road.edge, Math.max(road.width * scale, 2));
-  stroke(COLORS.road.asphalt, Math.max((road.width - 0.6) * scale, 1.5));
-  dashed(ctx, [3, 7], () => stroke(COLORS.road.centerLine, 0.75));
+  stroke(COLORS.road.edge, (half) => Math.max(2 * half * scale, 2));
+  stroke(COLORS.road.asphalt, (half) => Math.max((2 * half - 0.6) * scale, 1.5));
+  trace(ctx, view, samples);
+  ctx.strokeStyle = COLORS.road.centerLine;
+  ctx.lineWidth = 0.75;
+  dashed(ctx, [3, 7], () => ctx.stroke());
 
   // Direction arrows, evenly spread along the track.
   const length = trackLength(samples);
@@ -148,11 +234,181 @@ function drawTrack(ctx: Context, view: PlanProjection, scene: PlanScene) {
   }
 }
 
+/** The outline of a hill on the plan, at a share `r` of its size: 1 for its foot. */
+function hillRing(ctx: Context, view: PlanProjection, hill: Hill, r = 1) {
+  trace(ctx, view, hillOutline(hill, r));
+  ctx.closePath();
+}
+
+/** A hill as contour lines, a hollow in another colour. */
+function drawHill(ctx: Context, view: PlanProjection, hill: Hill) {
+  const hollow = hill.height < 0;
+  hillRing(ctx, view, hill);
+  ctx.fillStyle = hollow ? COLORS.hill.hollowFill : COLORS.hill.fill;
+  ctx.fill();
+  ctx.strokeStyle = hollow ? COLORS.hill.hollow : COLORS.hill.rise;
+  ctx.lineWidth = 1;
+  for (const r of [1, 0.66, 0.33]) {
+    hillRing(ctx, view, hill, r);
+    ctx.stroke();
+  }
+}
+
+/** The ground an earthwork covers along a range, from the shoulders out to its far edge. */
+function earthworkArea(
+  ctx: Context,
+  view: PlanProjection,
+  scene: PlanScene,
+  earthwork: Pick<Earthwork, 'side' | 'offset' | 'width'>,
+  range: TrackRange,
+) {
+  trace(ctx, view, earthworkOutline(scene.project, scene.samples, earthwork, range));
+  ctx.closePath();
+}
+
+/** An earthwork seen from above: slope ticks on an embankment, the bottom line of a ditch. */
+function drawEarthwork(
+  ctx: Context,
+  view: PlanProjection,
+  scene: PlanScene,
+  lane: PitLaneLayout | null,
+  { earthwork, ...range }: EarthworkRange,
+) {
+  const { project, samples } = scene;
+  const { side, offset, width } = earthwork;
+  const path = rangeSamples(samples, range);
+  const beside = (sample: Sample, beyond: number) =>
+    pointBesideShoulders(project, lane, sample, side, beyond);
+  const color = COLORS.earthwork[earthwork.type];
+  earthworkArea(ctx, view, scene, earthwork, range);
+  ctx.save();
+  ctx.globalAlpha *= 0.3;
+  ctx.fillStyle = color;
+  ctx.fill();
+  ctx.restore();
+  ctx.strokeStyle = color;
+  ctx.lineWidth = 1.5;
+  if (earthwork.type === 'ditch') {
+    trace(
+      ctx,
+      view,
+      path.map((sample) => beside(sample, offset + width / 2)),
+    );
+    ctx.stroke();
+  } else if (earthwork.type === 'embankment') {
+    // Slope ticks every 4 m along the track, hanging from the top of the slope.
+    const [top, foot] = earthwork.height >= 0 ? [offset + width, offset] : [offset, offset + width];
+    ctx.beginPath();
+    let next = path[0]?.s ?? 0;
+    for (const sample of path) {
+      if (sample.s < next) continue;
+      next = sample.s + 4;
+      const a = view.toScreen(beside(sample, top)),
+        b = view.toScreen(beside(sample, top + (foot - top) * 0.6));
+      ctx.moveTo(a.x, a.y);
+      ctx.lineTo(b.x, b.y);
+    }
+    ctx.stroke();
+  }
+}
+
+/** Heights of painted relief shaded in steps, each step a little darker. */
+const RELIEF_STEP = 2.5;
+
+/** The painted relief as shaded squares, one per node: raised ground and hollows in their colours. */
+function drawRelief(ctx: Context, view: PlanProjection, field: SculptField) {
+  if (!field.size) return;
+  const half = (SCULPT.cell / 2) * view.camera.scale;
+  // Squares of one shade are filled together.
+  const shades = new Map<string, { hollow: boolean; level: number; squares: ScreenPoint[] }>();
+  for (const node of field.nodes()) {
+    const depth = Math.abs(node.height);
+    if (depth < 0.05) continue;
+    const hollow = node.height < 0,
+      level = Math.min(4, Math.floor(depth / RELIEF_STEP));
+    const key = `${hollow}${level}`;
+    if (!shades.has(key)) shades.set(key, { hollow, level, squares: [] });
+    shades.get(key)!.squares.push(view.toScreen(node));
+  }
+  ctx.save();
+  for (const { hollow, level, squares } of shades.values()) {
+    ctx.beginPath();
+    for (const p of squares) ctx.rect(p.x - half, p.y - half, half * 2, half * 2);
+    ctx.globalAlpha = 0.12 + level * 0.1;
+    ctx.fillStyle = hollow ? COLORS.hill.hollow : COLORS.hill.rise;
+    ctx.fill();
+  }
+  ctx.restore();
+}
+
+/** The reach of the brush around the pointer. */
+function drawBrush(ctx: Context, view: PlanProjection, brush: NonNullable<Editing['brush']>) {
+  const p = view.toScreen(brush),
+    radius = brush.radius * view.camera.scale;
+  ctx.strokeStyle = COLORS.accent;
+  ctx.lineWidth = 1.5;
+  ctx.beginPath();
+  ctx.arc(p.x, p.y, radius, 0, Math.PI * 2);
+  ctx.stroke();
+  ctx.beginPath();
+  ctx.arc(p.x, p.y, radius / 2, 0, Math.PI * 2);
+  dashed(ctx, [4, 4], () => ctx.stroke());
+}
+
+/** Painted relief, hills and earthworks, the selected ones outlined, and what the active tool would lay. */
+function drawTerrainShapes(ctx: Context, view: PlanProjection, scene: PlanScene) {
+  const { project, samples } = scene;
+  drawRelief(ctx, view, scene.sculpt);
+  if (scene.editing.brush) drawBrush(ctx, view, scene.editing.brush);
+  for (const hill of project.hills) {
+    drawHill(ctx, view, hill);
+    if (!isSelected(scene, 'hill', hill.id)) continue;
+    hillRing(ctx, view, hill);
+    ctx.strokeStyle = COLORS.accent;
+    ctx.lineWidth = 3;
+    ctx.stroke();
+  }
+  const lane = pitLaneLayout(project, samples);
+  for (const laid of earthworkRanges(project, samples)) {
+    drawEarthwork(ctx, view, scene, lane, laid);
+    if (!isSelected(scene, 'earthwork', laid.earthwork.id)) continue;
+    earthworkArea(ctx, view, scene, laid.earthwork, laid);
+    ctx.strokeStyle = COLORS.accent;
+    ctx.lineWidth = 2.5;
+    ctx.stroke();
+  }
+  const ghost = scene.hillGhost;
+  if (ghost) {
+    hillRing(ctx, view, ghost);
+    ctx.strokeStyle = COLORS.accent;
+    ctx.lineWidth = 1.5;
+    dashed(ctx, [5, 4], () => ctx.stroke());
+  }
+  const laying = layingOf(scene, 'earthwork');
+  if (!laying) return;
+  const { from } = laying;
+  if (laying.range) {
+    const shape = { side: from.side, ...EARTHWORK_DEFAULTS[laying.earthworkType] };
+    earthworkArea(ctx, view, scene, shape, laying.range);
+    ctx.strokeStyle = COLORS.accent;
+    ctx.lineWidth = 2;
+    dashed(ctx, [6, 5], () => ctx.stroke());
+  }
+  // The first click, on its side of the track.
+  const start = sampleAt(samples, from.s)!;
+  const p = view.toScreen(pointBesideShoulders(project, lane, start, from.side, 0));
+  ctx.beginPath();
+  ctx.arc(p.x, p.y, 6, 0, Math.PI * 2);
+  ctx.strokeStyle = COLORS.accent;
+  ctx.lineWidth = 1.5;
+  ctx.stroke();
+}
+
 /** Chequered start line and the start/finish labels. */
 function drawStart(ctx: Context, view: PlanProjection, scene: PlanScene) {
   const start = startLine(scene.project, scene.samples);
   const p = view.toScreen(start),
-    half = (scene.project.road.width * view.camera.scale) / 2;
+    half = start.half * view.camera.scale;
   ctx.save();
   ctx.translate(p.x, p.y);
   ctx.rotate(Math.atan2(-start.nx, start.nz));
@@ -177,9 +433,24 @@ function drawStart(ctx: Context, view: PlanProjection, scene: PlanScene) {
 function drawPits(ctx: Context, view: PlanProjection, scene: PlanScene) {
   const { project, samples } = scene;
   const lane = pitLaneLayout(project, samples);
-  const edge = roadEdge(project.road);
+  const edge = (sample: Sample) => roadEdge(project.road, sample);
   const beside = (sample: Sample, lateral: number) =>
     view.toScreen({ x: sample.x + sample.nx * lateral, z: sample.z + sample.nz * lateral });
+  if (lane && scene.editing.selection?.kind === 'pitLane') {
+    // A halo along the middle of the lane.
+    const middle = samples.filter((sample) => lane.profile(sample.s));
+    trace(
+      ctx,
+      view,
+      middle.map((sample) => {
+        const lateral = lane.sign * lane.profile(sample.s)!.center;
+        return { x: sample.x + sample.nx * lateral, y: 0, z: sample.z + sample.nz * lateral };
+      }),
+    );
+    ctx.strokeStyle = COLORS.selection;
+    ctx.lineWidth = Math.max(8, lane.width * view.camera.scale);
+    ctx.stroke();
+  }
   if (lane) {
     ctx.fillStyle = COLORS.pits.lane;
     ctx.strokeStyle = COLORS.pits.lane;
@@ -191,10 +462,10 @@ function drawPits(ctx: Context, view: PlanProjection, scene: PlanScene) {
         pb = lane.profile(b.s);
       if (!pa || !pb || lane.along(b.s)! < lane.along(a.s)!) continue;
       const corners = [
-        beside(a, lane.sign * edge),
+        beside(a, lane.sign * pa.edge),
         beside(a, lane.sign * pa.outer),
         beside(b, lane.sign * pb.outer),
-        beside(b, lane.sign * edge),
+        beside(b, lane.sign * pb.edge),
       ];
       ctx.beginPath();
       corners.forEach((p, k) => (k ? ctx.lineTo(p.x, p.y) : ctx.moveTo(p.x, p.y)));
@@ -209,7 +480,7 @@ function drawPits(ctx: Context, view: PlanProjection, scene: PlanScene) {
     for (const sample of samples) {
       const along = lane.along(sample.s);
       const inWall = along !== null && along >= lane.taper && along <= lane.length - lane.taper;
-      const p = beside(sample, lane.sign * (edge + LAYOUT.pitLane.wallGap / 2));
+      const p = beside(sample, lane.sign * (edge(sample) + LAYOUT.pitLane.wallGap / 2));
       if (inWall && drawing) ctx.lineTo(p.x, p.y);
       else if (inWall) ctx.moveTo(p.x, p.y);
       drawing = inWall;
@@ -227,23 +498,81 @@ function drawPits(ctx: Context, view: PlanProjection, scene: PlanScene) {
   mark(pitBoxPlaces(project, samples), COLORS.pits.box);
   mark(gridPlaces(project, samples), COLORS.pits.grid);
 
-  const draft = scene.pitDraft,
-    target = scene.pitTarget;
-  if (draft && target) {
-    const total = trackLength(samples);
-    const span = (((target.s - draft.entry) % total) + total) % total;
-    const sign = draft.side === 'right' ? 1 : -1;
-    const lateral = sign * (edge + LAYOUT.pitLane.wallGap + DEFAULTS.pitLaneWidth / 2);
+  const laying = layingOf(scene, 'pitLane');
+  if (laying?.range) {
+    const sign = laying.from.side === 'right' ? 1 : -1;
+    const lateral = LAYOUT.pitLane.wallGap + DEFAULTS.pitLaneWidth / 2;
     ctx.beginPath();
-    for (let d = 0; d <= span; d += 3) {
-      const p = beside(sampleAt(samples, (draft.entry + d) % total)!, lateral);
-      if (d === 0) ctx.moveTo(p.x, p.y);
+    rangeSamples(samples, laying.range).forEach((sample, i) => {
+      const p = beside(sample, sign * (edge(sample) + lateral));
+      if (i === 0) ctx.moveTo(p.x, p.y);
       else ctx.lineTo(p.x, p.y);
-    }
+    });
     ctx.strokeStyle = COLORS.accent;
     ctx.lineWidth = 3;
     dashed(ctx, [6, 5], () => ctx.stroke());
   }
+}
+
+/** Starts a path along the roadway edges of a range, on the given sides (-1 left, 1 right). */
+function roadwayEdges(
+  ctx: Context,
+  view: PlanProjection,
+  samples: readonly Sample[],
+  range: TrackRange,
+  sides: readonly number[],
+) {
+  const path = rangeSamples(samples, range);
+  ctx.beginPath();
+  for (const side of sides)
+    path.forEach((sample, i) => {
+      const p = view.toScreen({
+        x: sample.x + sample.nx * side * sample.half,
+        z: sample.z + sample.nz * side * sample.half,
+      });
+      if (i === 0) ctx.moveTo(p.x, p.y);
+      else ctx.lineTo(p.x, p.y);
+    });
+}
+
+/**
+ * Zones laid on the roadway: the edges of every width zone and the raised edge of
+ * every bank zone, the selected one highlighted, and the zone being laid as dashed
+ * edges.
+ */
+function drawRoadZones(ctx: Context, view: PlanProjection, scene: PlanScene) {
+  const { project, samples } = scene;
+  const zone = (range: TrackRange, sides: readonly number[], color: string, selected: boolean) => {
+    roadwayEdges(ctx, view, samples, range, sides);
+    if (selected) {
+      ctx.strokeStyle = COLORS.selection;
+      ctx.lineWidth = 6;
+      ctx.stroke();
+    }
+    ctx.strokeStyle = color;
+    ctx.lineWidth = 1.5;
+    ctx.stroke();
+  };
+  ctx.save();
+  ctx.lineCap = 'round';
+  for (const range of widthZoneRanges(project, samples))
+    zone(range, [-1, 1], COLORS.widthZone, isSelected(scene, 'widthZone', range.zone.id));
+  for (const range of bankZoneRanges(project, samples))
+    zone(
+      range,
+      [range.zone.high === 'right' ? 1 : -1],
+      COLORS.bankZone,
+      isSelected(scene, 'bankZone', range.zone.id),
+    );
+  for (const kind of ['widthZone', 'bankZone'] as const) {
+    const laying = layingOf(scene, kind);
+    if (!laying?.range) continue;
+    roadwayEdges(ctx, view, samples, laying.range, [-1, 1]);
+    ctx.strokeStyle = COLORS.accent;
+    ctx.lineWidth = 2.5;
+    dashed(ctx, [6, 5], () => ctx.stroke());
+  }
+  ctx.restore();
 }
 
 /** Highlights the bends that are too tight, with a marker where each is tightest. */
@@ -288,7 +617,7 @@ function drawBarriers(ctx: Context, view: PlanProjection, scene: PlanScene) {
     if (path.length < 2) continue;
     const style = BARRIER_STYLE[barrier.type];
     trace(ctx, view, path);
-    if (barrier.id === scene.selectedBarrierId) {
+    if (isSelected(scene, 'barrier', barrier.id)) {
       ctx.strokeStyle = COLORS.selection;
       ctx.lineWidth = style.width + 5;
       ctx.stroke();
@@ -297,18 +626,11 @@ function drawBarriers(ctx: Context, view: PlanProjection, scene: PlanScene) {
     ctx.lineWidth = style.width;
     dashed(ctx, style.dash, () => ctx.stroke());
   }
-  const draft = scene.barrierDraft,
-    target = scene.roadTarget;
-  if (draft && target && target.pointId !== draft.from) {
-    const index = (id: Id) => project.points.findIndex((point) => point.id === id);
-    const forward = isCircuit(project) || index(draft.from) < index(target.pointId);
-    const [from, to] = forward ? [draft.from, target.pointId] : [target.pointId, draft.from];
-    const path = barrierPath(project, samples, {
-      from,
-      to,
-      side: draft.side,
-      offset: DEFAULTS.barrierOffset,
-    });
+  const laying = layingOf(scene, 'barrier');
+  if (!laying) return;
+  const line = { side: laying.from.side, offset: DEFAULTS.barrierOffset };
+  if (laying.range) {
+    const path = barrierLine(project, samples, rangeSamples(samples, laying.range), line);
     if (path.length > 1) {
       trace(ctx, view, path);
       ctx.strokeStyle = COLORS.accent;
@@ -316,27 +638,146 @@ function drawBarriers(ctx: Context, view: PlanProjection, scene: PlanScene) {
       dashed(ctx, [6, 5], () => ctx.stroke());
     }
   }
-  const ring = (id: Id, color: string) => {
-    const point = project.points.find((candidate) => candidate.id === id);
-    if (!point) return;
-    const p = view.toScreen(point);
+  // The first click, on its side of the road.
+  const [start] = barrierLine(project, samples, [sampleAt(samples, laying.from.s)!], line);
+  const p = view.toScreen(start);
+  ctx.beginPath();
+  ctx.arc(p.x, p.y, 6, 0, Math.PI * 2);
+  ctx.strokeStyle = COLORS.accent;
+  ctx.lineWidth = 1.5;
+  ctx.stroke();
+}
+
+/** The outline of a scenery item on the plan: the round of a tree or grove, the rectangle of the others. */
+function sceneryOutline(ctx: Context, view: PlanProjection, item: SceneryItem) {
+  ctx.beginPath();
+  if (item.kind === 'tree') {
+    const p = view.toScreen(item);
+    ctx.arc(p.x, p.y, Math.max(3, (item.width / 2) * view.camera.scale), 0, Math.PI * 2);
+    return;
+  }
+  sceneryFootprint(item).forEach((corner, i) => {
+    const p = view.toScreen(corner);
+    if (i) ctx.lineTo(p.x, p.y);
+    else ctx.moveTo(p.x, p.y);
+  });
+  ctx.closePath();
+}
+
+/** One scenery item as seen from above, with its front marked when it has one. */
+function drawItem(ctx: Context, view: PlanProjection, item: SceneryItem) {
+  const scale = view.camera.scale;
+  if (item.kind === 'tree') {
+    ctx.fillStyle = item.variant === 'conifer' ? COLORS.scenery.conifer : COLORS.scenery.leafy;
+    ctx.strokeStyle = COLORS.scenery.outline;
+    ctx.lineWidth = 1;
+    const front = headingVector(item.heading);
+    for (const tree of groveTrees(item)) {
+      const p = view.toScreen({
+        x: item.x + front.x * tree.v - front.z * tree.u,
+        z: item.z + front.z * tree.v + front.x * tree.u,
+      });
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, Math.max(2, (tree.crown / 2) * scale), 0, Math.PI * 2);
+      ctx.fill();
+      ctx.stroke();
+    }
+    return;
+  }
+  if (item.kind === 'light') {
+    const p = view.toScreen(item);
+    ctx.fillStyle = COLORS.scenery.glow;
     ctx.beginPath();
-    ctx.arc(p.x, p.y, 10, 0, Math.PI * 2);
-    ctx.strokeStyle = color;
-    ctx.lineWidth = 1.5;
+    ctx.arc(p.x, p.y, Math.max(6, item.height * 1.2 * scale), 0, Math.PI * 2);
+    ctx.fill();
+    const front = headingVector(item.heading);
+    ctx.strokeStyle = COLORS.scenery.light;
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    for (const sign of item.variant === 'double' ? [1, -1] : [1]) {
+      const end = view.toScreen({
+        x: item.x + front.x * item.width * sign,
+        z: item.z + front.z * item.width * sign,
+      });
+      ctx.moveTo(p.x, p.y);
+      ctx.lineTo(end.x, end.y);
+    }
     ctx.stroke();
-  };
-  if (target) ring(target.pointId, COLORS.point.haloOutline);
-  if (draft) ring(draft.from, COLORS.accent);
+    ctx.fillStyle = COLORS.scenery.light;
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, 3, 0, Math.PI * 2);
+    ctx.fill();
+    return;
+  }
+  sceneryOutline(ctx, view, item);
+  ctx.fillStyle = COLORS.scenery[item.kind];
+  ctx.fill();
+  ctx.strokeStyle = COLORS.scenery.outline;
+  ctx.lineWidth = item.kind === 'sign' ? 3 : 1;
+  ctx.stroke();
+  if (item.kind === 'building') return;
+  // The front, the side that faces the track.
+  const [, , c, d] = sceneryFootprint(item).map((corner) => view.toScreen(corner));
+  ctx.strokeStyle = COLORS.scenery.front;
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.moveTo(c.x, c.y);
+  ctx.lineTo(d.x, d.y);
+  ctx.stroke();
+}
+
+/** The scenery items, the selected ones highlighted, and the one the active tool would place. */
+function drawScenery(ctx: Context, view: PlanProjection, scene: PlanScene) {
+  for (const item of scene.project.scenery) {
+    const selected = isSelected(scene, 'scenery', item.id);
+    if (selected || item.id === scene.hoveredSceneryId) {
+      sceneryOutline(ctx, view, item);
+      ctx.strokeStyle = selected ? COLORS.accent : COLORS.point.hover;
+      ctx.lineWidth = selected ? 5 : 2;
+      ctx.stroke();
+    }
+    drawItem(ctx, view, item);
+    // A solid item stops cars: a dashed line runs round it.
+    if (item.solid) {
+      sceneryOutline(ctx, view, item);
+      ctx.strokeStyle = COLORS.danger;
+      ctx.lineWidth = 1;
+      dashed(ctx, [3, 3], () => ctx.stroke());
+    }
+  }
+  const ghost = scene.sceneryGhost;
+  if (!ghost) return;
+  ctx.save();
+  ctx.globalAlpha = 0.5;
+  drawItem(ctx, view, ghost);
+  ctx.restore();
+  sceneryOutline(ctx, view, ghost);
+  ctx.strokeStyle = COLORS.accent;
+  ctx.lineWidth = 1.5;
+  dashed(ctx, [5, 4], () => ctx.stroke());
 }
 
 /** Control points, numbered, with the selected and the problematic ones highlighted. */
 function drawPoints(ctx: Context, view: PlanProjection, scene: PlanScene) {
   const affected = new Set(scene.tightTurns.flatMap((turn) => turn.pointIds));
   ctx.font = '9px Consolas, monospace';
+  // Off the track layer, points are only landmarks for track positions.
+  if (scene.editing.layer !== 'track') {
+    ctx.save();
+    ctx.globalAlpha = INACTIVE_LAYER_ALPHA;
+    ctx.fillStyle = COLORS.point.outline;
+    ctx.textBaseline = 'middle';
+    scene.project.points.forEach((point, i) => {
+      const p = view.toScreen(point);
+      ctx.fillRect(p.x - 1.5, p.y - 1.5, 3, 3);
+      ctx.fillText(String(i + 1).padStart(2, '0'), p.x + 6, p.y - 6);
+    });
+    ctx.restore();
+    return;
+  }
   scene.project.points.forEach((point, i) => {
     const p = view.toScreen(point),
-      selected = point.id === scene.selectedPointId,
+      selected = isSelected(scene, 'points', point.id),
       invalid = affected.has(point.id);
     if (selected) {
       ctx.fillStyle = COLORS.point.halo;
@@ -377,16 +818,175 @@ function drawPoints(ctx: Context, view: PlanProjection, scene: PlanScene) {
   });
 }
 
+/** Rounded points: the sides from the arc to the point, dashed, and the radius. */
+function drawCorners(ctx: Context, view: PlanProjection, scene: PlanScene) {
+  ctx.font = '10px "Segoe UI", sans-serif';
+  ctx.textBaseline = 'middle';
+  for (const corner of corners(scene.project).values()) {
+    const point = scene.project.points[corner.index];
+    const enter = view.toScreen(corner.enter),
+      vertex = view.toScreen(point),
+      exit = view.toScreen(corner.exit);
+    ctx.strokeStyle = COLORS.point.label;
+    ctx.lineWidth = 1;
+    dashed(ctx, [3, 4], () => {
+      ctx.beginPath();
+      ctx.moveTo(enter.x, enter.y);
+      ctx.lineTo(vertex.x, vertex.y);
+      ctx.lineTo(exit.x, exit.y);
+      ctx.stroke();
+    });
+    for (const end of [enter, exit]) ctx.fillRect(end.x - 2, end.y - 2, 4, 4);
+    const reduced = corner.radius < corner.requested * (1 - 1e-6);
+    ctx.fillStyle = reduced ? COLORS.danger : COLORS.point.label;
+    // The radius sits outside the bend, beyond the point.
+    const middle = view.toScreen(corner.middle);
+    const dx = vertex.x - middle.x,
+      dy = vertex.y - middle.y,
+      l = Math.hypot(dx, dy) || 1;
+    ctx.textAlign = dx >= 0 ? 'left' : 'right';
+    ctx.fillText(
+      scene.labels.radius(Math.round(corner.radius)),
+      vertex.x + (dx / l) * 14,
+      vertex.y + (dy / l) * 14,
+    );
+  }
+}
+
+/** The points of an arc drawn from `from`, every few degrees. */
+function arcPath(from: Vec3 | { x: number; z: number }, shape: ArcShape) {
+  const { heading, radius, angle, sign } = shape;
+  const center = { x: from.x - heading.z * radius * sign, z: from.z + heading.x * radius * sign };
+  const ex = (from.x - center.x) / radius,
+    ez = (from.z - center.z) / radius;
+  const steps = Math.max(8, Math.ceil(angle / 0.05));
+  return Array.from({ length: steps + 1 }, (_, i) => {
+    const turn = (angle * i) / steps;
+    return {
+      x: center.x + radius * (Math.cos(turn) * ex + Math.sin(turn) * heading.x),
+      y: 0,
+      z: center.z + radius * (Math.cos(turn) * ez + Math.sin(turn) * heading.z),
+    };
+  });
+}
+
+/** The straight or the arc the next click would draw, with its measures. */
+function drawDraft(ctx: Context, view: PlanProjection, scene: PlanScene) {
+  const draft = scene.drawDraft;
+  if (!draft) return;
+  const path =
+    draft.kind === 'straight'
+      ? [
+          { ...draft.from, y: 0 },
+          { ...draft.to, y: 0 },
+        ]
+      : arcPath(draft.from, draft.shape);
+  ctx.strokeStyle = COLORS.accent;
+  ctx.lineWidth = 2;
+  dashed(ctx, [7, 5], () => {
+    trace(ctx, view, path);
+    ctx.stroke();
+  });
+  if (draft.kind === 'arc') {
+    ctx.fillStyle = COLORS.point.outline;
+    for (const vertex of arcLayout(draft.from, draft.shape).vertices) {
+      const p = view.toScreen(vertex);
+      ctx.fillRect(p.x - 2, p.y - 2, 4, 4);
+    }
+  }
+  const end = view.toScreen(draft.to);
+  ctx.beginPath();
+  ctx.arc(end.x, end.y, 4.5, 0, Math.PI * 2);
+  ctx.fillStyle = COLORS.accent;
+  ctx.fill();
+  ctx.font = '11px "Segoe UI", sans-serif';
+  ctx.textAlign = 'left';
+  ctx.textBaseline = 'middle';
+  ctx.fillText(
+    draft.kind === 'straight'
+      ? scene.labels.straight(draft.length, Math.round(draft.turn))
+      : scene.labels.arc(Math.round(draft.shape.radius), arcDegrees(draft.shape)),
+    end.x + 10,
+    end.y - 10,
+  );
+}
+
+/** The stretch picked in the band, its roadway edges dashed. */
+function drawRange(ctx: Context, view: PlanProjection, scene: PlanScene) {
+  if (!scene.editing.range) return;
+  const path = rangeSamples(scene.samples, scene.editing.range);
+  ctx.beginPath();
+  for (const side of [-1, 1])
+    path.forEach((sample, i) => {
+      const lateral = side * (sample.half + 1);
+      const p = view.toScreen({
+        x: sample.x + sample.nx * lateral,
+        z: sample.z + sample.nz * lateral,
+      });
+      if (i === 0) ctx.moveTo(p.x, p.y);
+      else ctx.lineTo(p.x, p.y);
+    });
+  ctx.strokeStyle = COLORS.accent;
+  ctx.lineWidth = 2.5;
+  dashed(ctx, [7, 5], () => ctx.stroke());
+}
+
+/** A line across the road where the pointer is, here or in the band, with its track distance. */
+function drawCursor(ctx: Context, view: PlanProjection, scene: PlanScene) {
+  const { hoverS } = scene.editing;
+  if (hoverS === null) return;
+  const sample = sampleAt(scene.samples, hoverS)!;
+  const reach = sample.half + 6;
+  const a = view.toScreen({ x: sample.x - sample.nx * reach, z: sample.z - sample.nz * reach });
+  const b = view.toScreen({ x: sample.x + sample.nx * reach, z: sample.z + sample.nz * reach });
+  ctx.strokeStyle = COLORS.accent;
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.moveTo(a.x, a.y);
+  ctx.lineTo(b.x, b.y);
+  ctx.stroke();
+  ctx.font = '10px "Segoe UI", sans-serif';
+  ctx.textAlign = 'left';
+  ctx.textBaseline = 'middle';
+  ctx.fillStyle = COLORS.accent;
+  ctx.fillText(scene.labels.distance(hoverS), b.x + 6, b.y);
+}
+
+/** Draws what belongs to a layer: in full on the active layer, dimmed otherwise, not at all when hidden. */
+function inLayer(ctx: Context, scene: PlanScene, layer: LayerId, draw: () => void) {
+  if (scene.editing.hiddenLayers.includes(layer)) return;
+  ctx.save();
+  if (layer !== scene.editing.layer) ctx.globalAlpha = INACTIVE_LAYER_ALPHA;
+  draw();
+  ctx.restore();
+}
+
 /** Draws the whole plan. `dpr` is the canvas pixel ratio. */
 export function drawPlan(ctx: Context, view: PlanProjection, scene: PlanScene, dpr: number) {
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
   drawBackground(ctx, view);
   if (scene.samples.length > 1) {
     drawTrack(ctx, view, scene);
-    drawPits(ctx, view, scene);
+    inLayer(ctx, scene, 'pits', () => drawPits(ctx, view, scene));
+    inLayer(ctx, scene, 'road', () => drawRoadZones(ctx, view, scene));
     drawStart(ctx, view, scene);
     drawTightTurns(ctx, view, scene);
-    drawBarriers(ctx, view, scene);
+    inLayer(ctx, scene, 'edges', () => drawBarriers(ctx, view, scene));
+    drawRange(ctx, view, scene);
   }
+  inLayer(ctx, scene, 'scenery', () => drawScenery(ctx, view, scene));
+  if (scene.editing.layer === 'track') drawCorners(ctx, view, scene);
   drawPoints(ctx, view, scene);
+  drawDraft(ctx, view, scene);
+  if (scene.samples.length > 1) drawCursor(ctx, view, scene);
+  const box = scene.marquee;
+  if (box) {
+    const x = Math.min(box.x0, box.x1),
+      y = Math.min(box.y0, box.y1);
+    ctx.fillStyle = COLORS.band.range;
+    ctx.fillRect(x, y, Math.abs(box.x1 - box.x0), Math.abs(box.y1 - box.y0));
+    ctx.strokeStyle = COLORS.accent;
+    ctx.lineWidth = 1;
+    ctx.strokeRect(x + 0.5, y + 0.5, Math.abs(box.x1 - box.x0), Math.abs(box.y1 - box.y0));
+  }
 }

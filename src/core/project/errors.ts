@@ -5,6 +5,12 @@ export type ProjectErrorDetail =
   | { code: 'not-a-project' }
   | { code: 'points-limit'; max: number }
   | { code: 'barriers-limit'; max: number }
+  | { code: 'width-zones-limit'; max: number }
+  | { code: 'bank-zones-limit'; max: number }
+  | { code: 'scenery-limit'; max: number }
+  | { code: 'earthworks-limit'; max: number }
+  | { code: 'hills-limit'; max: number }
+  | { code: 'sculpt-limit'; max: number }
   | { code: 'duplicate-id' }
   | { code: 'barrier-endpoint' }
   | { code: 'barrier-span' }

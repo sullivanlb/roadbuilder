@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { RULES } from '../../core/project/rules';
+import { TOOL_KEYS } from '../../editor/tools';
 import { t } from '../../i18n';
 import type { MessageKey } from '../../i18n';
 import { useUiStore } from '../../stores/ui';
@@ -9,16 +10,16 @@ const ui = useUiStore();
 
 /** Letter keys are shown as is; combinations are spelled in the interface language. */
 const shortcuts: { label: MessageKey; key: () => string }[] = [
-  { label: 'help.shortcutSelect', key: () => 'V' },
-  { label: 'help.shortcutAdd', key: () => 'A' },
-  { label: 'help.shortcutBarrier', key: () => 'B' },
-  { label: 'help.shortcutPits', key: () => 'P' },
-  { label: 'help.shortcutPan', key: () => 'H' },
+  { label: 'help.shortcutLayers', key: () => '1 – 6' },
+  { label: 'help.shortcutView', key: () => 'C' },
+  ...TOOL_KEYS.map(({ key, help }) => ({ label: help, key: () => key.toUpperCase() })),
   { label: 'help.shortcutFit', key: () => 'F' },
   { label: 'help.shortcutUndo', key: () => t('help.keyCtrlZ') },
   { label: 'help.shortcutRedo', key: () => t('help.keyCtrlShiftZ') },
   { label: 'topbar.save', key: () => t('help.keyCtrlS') },
   { label: 'help.shortcutDelete', key: () => t('help.keyDelete') },
+  { label: 'help.shortcutTurn', key: () => t('help.keyTurn') },
+  { label: 'help.shortcutDuplicate', key: () => t('help.keyCtrlD') },
 ];
 </script>
 
@@ -45,7 +46,7 @@ const shortcuts: { label: MessageKey; key: () => string }[] = [
       </li>
       <li>
         <strong>{{ t('help.step4Title') }}</strong
-        >{{ t('help.step4Before') }}<em>{{ t('barriers.title') }}</em
+        >{{ t('help.step4Before') }}<em>{{ t('layers.edges') }}</em
         >{{ t('help.step4After') }}
       </li>
       <li>

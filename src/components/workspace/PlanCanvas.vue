@@ -23,15 +23,25 @@ const { cursor, hint, listeners, end } = usePlanInteraction(canvas);
 const scene = computed<PlanScene>(() => ({
   project: store.project,
   samples: store.samples,
+  editing: editor.editing,
   tightTurns: store.issues.tightTurns,
-  selectedPointId: editor.selectedPointId,
+  marquee: editor.marquee,
   hoveredPointId: editor.hoveredPointId,
-  selectedBarrierId: editor.selectedBarrierId,
-  barrierDraft: editor.barrierDraft,
-  roadTarget: editor.tool === 'barrier' ? editor.roadTarget : null,
-  pitDraft: editor.pitDraft && { entry: editor.pitDraft.s, side: editor.pitDraft.side },
-  pitTarget: editor.pitDraft ? editor.pitTarget : null,
-  labels: { start: t('canvas.start'), finish: t('canvas.finish') },
+  drawDraft: editor.drawDraft,
+  hoveredSceneryId: editor.hoveredSceneryId,
+  sceneryGhost: editor.sceneryGhost,
+  hillGhost: editor.hillGhost,
+  sculpt: editor.relief.field,
+  labels: {
+    start: t('canvas.start'),
+    finish: t('canvas.finish'),
+    distance: (metres: number) => `${formatNumber(metres)} m`,
+    straight: (length: number, turn: number) =>
+      t('canvas.straightLabel', { length: formatNumber(length, 1), turn }),
+    arc: (radius: number, angle: number) =>
+      t('canvas.arcLabel', { radius: formatNumber(radius), angle }),
+    radius: (radius: number) => t('canvas.radius', { radius: formatNumber(radius) }),
+  },
 }));
 
 let frame: number | null = null;

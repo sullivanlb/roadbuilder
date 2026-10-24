@@ -29,9 +29,33 @@ export const COLORS = {
     haloOutline: '#d3f47d66',
   },
   selection: '#d3f47d44',
+  widthZone: '#e4e9d6aa',
+  bankZone: '#e0a85aaa',
+  band: {
+    row: '#141d20',
+    range: '#d3f47d24',
+    label: '#8c9a9c',
+    base: '#5f7377',
+    tick: '#5f7377',
+    blockText: '#1b2714',
+    corner: '#a0bc6c14',
+  },
   pits: { lane: '#596264', wall: '#ddd9c9', box: '#d3f47d99', grid: '#e4e9d6aa' },
   profile: { grid: '#39504355', line: '#bddb86', fillTop: '#a7cb5e40', fillBottom: '#a7cb5e03' },
   preview: { sky: '#17251f' },
+  earthwork: { embankment: '#b59a6acc', ditch: '#6f9fb0cc', runoff: '#c9cfa9cc' },
+  hill: { rise: '#b59a6a', hollow: '#6f9fb0', fill: '#b59a6a1c', hollowFill: '#6f9fb01c' },
+  scenery: {
+    leafy: '#5d8a46cc',
+    conifer: '#3e6b4ecc',
+    building: '#c6bea9b3',
+    grandstand: '#5c86b8b3',
+    sign: '#e2ac2e',
+    light: '#fff1ce',
+    glow: '#fff1ce30',
+    outline: '#101814aa',
+    front: '#e4e9d6',
+  },
 } as const;
 
 /** How each barrier type is drawn on the plan and in the sidebar. */

@@ -4,13 +4,18 @@ import type { Vec3 } from '../../core/math';
 import type { Project, Side } from '../../core/project/schema';
 import { barrierPath } from '../../core/scene/barriers';
 import type { Sample } from '../../core/track/centerline';
+import { widestHalf } from '../../core/track/layout';
+import { lazyHit, sceneryAt, terrainHit } from '../hits';
+import type { TrackHit } from '../hits';
 import type { PlanProjection, ScreenPoint } from './projection';
 
+export type { TrackHit };
+
 /** Pick distances, in pixels. */
-const PICK = { point: 15, road: 20, barrier: 8 };
+const PICK = { point: 15, road: 20, barrier: 8, scenery: 6 };
 
 /** A position on the centerline under the cursor. */
-export interface RoadHit extends Vec3 {
+interface RoadHit extends Vec3 {
   segment: number;
   /** Track distance of the hit. */
   s: number;
@@ -33,7 +38,7 @@ function sideOf(view: PlanProjection, road: RoadHit, at: ScreenPoint): Side {
 }
 
 /** The control point under the cursor, or null. */
-export function findPoint(view: PlanProjection, project: Project, at: ScreenPoint): Id | null {
+function findPoint(view: PlanProjection, project: Project, at: ScreenPoint): Id | null {
   let best: Id | null = null,
     threshold = PICK.point;
   for (const point of project.points) {
@@ -48,14 +53,14 @@ export function findPoint(view: PlanProjection, project: Project, at: ScreenPoin
 }
 
 /** The centerline position nearest the cursor, when the cursor is on or near the road. */
-export function findRoad(
+function findRoad(
   view: PlanProjection,
   project: Project,
   samples: readonly Sample[],
   at: ScreenPoint,
 ): RoadHit | null {
   let best: RoadHit | null = null,
-    threshold = Math.max(PICK.road, project.road.width * view.camera.scale);
+    threshold = Math.max(PICK.road, 2 * widestHalf(project.road, samples) * view.camera.scale);
   for (let i = 1; i < samples.length; i++) {
     const p = samples[i - 1],
       q = samples[i];
@@ -75,28 +80,8 @@ export function findRoad(
   return best;
 }
 
-/** The control point nearest the cursor along the road, with the side of the road it points at. */
-export function findRoadSide(
-  view: PlanProjection,
-  project: Project,
-  samples: readonly Sample[],
-  at: ScreenPoint,
-): { pointId: Id; side: Side } | null {
-  const road = findRoad(view, project, samples, at);
-  const points = project.points;
-  if (!road || !points.length) return null;
-  const a = points[road.segment],
-    b = points[(road.segment + 1) % points.length];
-  const distanceTo = (point: Vec3) => {
-    const p = view.toScreen(point);
-    return Math.hypot(p.x - at.x, p.y - at.y);
-  };
-  const side = sideOf(view, road, at);
-  return { pointId: distanceTo(a) <= distanceTo(b) ? a.id : b.id, side };
-}
-
 /** The track distance under the cursor, with the side of the road it points at. */
-export function findRoadPosition(
+function findRoadPosition(
   view: PlanProjection,
   project: Project,
   samples: readonly Sample[],
@@ -108,7 +93,7 @@ export function findRoadPosition(
 }
 
 /** The barrier under the cursor, or null. */
-export function findBarrier(
+function findBarrier(
   view: PlanProjection,
   project: Project,
   samples: readonly Sample[],
@@ -127,4 +112,26 @@ export function findBarrier(
     }
   }
   return best;
+}
+
+/** The scenery item under the cursor, or null. */
+const findScenery = (view: PlanProjection, project: Project, at: ScreenPoint) =>
+  sceneryAt(project, view.toWorld(at), PICK.scenery / view.camera.scale);
+
+/** Everything under the cursor on the plan that a click could pick, with the plan's reach in pixels. */
+export function trackHitAt(
+  view: PlanProjection,
+  project: Project,
+  samples: readonly Sample[],
+  at: ScreenPoint,
+): TrackHit {
+  const ground = view.toWorld(at);
+  return lazyHit({
+    ground: () => ground,
+    road: () => findRoadPosition(view, project, samples, at),
+    pointId: () => findPoint(view, project, at),
+    barrierId: () => findBarrier(view, project, samples, at),
+    sceneryId: () => findScenery(view, project, at),
+    ...terrainHit(project, samples, ground),
+  });
 }

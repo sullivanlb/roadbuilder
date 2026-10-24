@@ -4,8 +4,8 @@ import type { Sample } from '../track/centerline';
 import { clampToBend } from '../track/layout';
 import { pitLaneLayout, sideEdge } from '../track/pitLane';
 import type { PitLaneLayout } from '../track/pitLane';
-import { spanSamples } from '../track/spans';
-import { addQuad, createMesh } from './mesh';
+import { positionRange, rangeSamples } from '../track/ranges';
+import { addQuad, bankLift, createMesh, offsetPoint } from './mesh';
 import type { Mesh, Pair, Triple } from './mesh';
 
 /**
@@ -33,7 +33,10 @@ export const SOLID_COLLIDER_DEPTH = 1;
 const COLLIDER_BOTTOM = -0.4;
 
 /** Position, local frame and curvature of a point along a barrier. */
-export type Frame = Pick<Sample, 'x' | 'y' | 'z' | 'nx' | 'nz' | 's' | 'curvature'>;
+export type Frame = Pick<
+  Sample,
+  'x' | 'y' | 'z' | 'nx' | 'nz' | 's' | 'curvature' | 'half' | 'bank' | 'edge'
+>;
 
 const sideSign = (side: Side): 1 | -1 => (side === 'right' ? 1 : -1);
 
@@ -44,7 +47,7 @@ const sideSign = (side: Side): 1 | -1 => (side === 'right' ? 1 : -1);
 export function barrierLateral(
   project: Project,
   lane: PitLaneLayout | null,
-  point: Pick<Sample, 'curvature' | 's'>,
+  point: Pick<Sample, 'curvature' | 's' | 'half'>,
   side: Side,
   offset: number,
 ): number {
@@ -54,18 +57,37 @@ export function barrierLateral(
   );
 }
 
-/** The barrier line on the ground, for the plan, the map and hit tests. */
-export function barrierPath(
+/** The centerline along a barrier, in driving order; empty when an end is unknown. */
+export function barrierSamples(
+  project: Project,
+  samples: readonly Sample[],
+  barrier: Pick<Barrier, 'from' | 'to'>,
+): Sample[] {
+  const range = positionRange(project, samples, barrier.from, barrier.to);
+  return range ? rangeSamples(samples, range) : [];
+}
+
+/** A barrier line on the ground along some samples, for the plan, the map and hit tests. */
+export function barrierLine(
+  project: Project,
+  samples: readonly Sample[],
+  along: readonly Sample[],
+  barrier: Pick<Barrier, 'side' | 'offset'>,
+): Vec3[] {
+  const lane = pitLaneLayout(project, samples);
+  return along.map((sample) => {
+    const lateral = barrierLateral(project, lane, sample, barrier.side, barrier.offset);
+    const [x, y, z] = offsetPoint(sample, lateral);
+    return { x, y, z };
+  });
+}
+
+/** The line of a barrier of the project on the ground. */
+export const barrierPath = (
   project: Project,
   samples: readonly Sample[],
   barrier: Pick<Barrier, 'from' | 'to' | 'side' | 'offset'>,
-): Vec3[] {
-  const lane = pitLaneLayout(project, samples);
-  return spanSamples(project, samples, barrier).map((sample) => {
-    const lateral = barrierLateral(project, lane, sample, barrier.side, barrier.offset);
-    return { x: sample.x + sample.nx * lateral, y: sample.y, z: sample.z + sample.nz * lateral };
-  });
-}
+): Vec3[] => barrierLine(project, samples, barrierSamples(project, samples, barrier), barrier);
 
 /** Frame moved along the local tangent, for posts. */
 const along = (p: Frame, distance: number): Frame => ({
@@ -73,11 +95,8 @@ const along = (p: Frame, distance: number): Frame => ({
   x: p.x + p.nz * distance,
   z: p.z - p.nx * distance,
 });
-export const at = (p: Frame, lateral: number, height: number): Triple => [
-  p.x + p.nx * lateral,
-  p.y + height,
-  p.z + p.nz * lateral,
-];
+export const at = (p: Frame, lateral: number, height: number): Triple =>
+  offsetPoint(p, lateral, height);
 const edgeUvs = (a: number, b: number, low: number, high: number): Pair[] => [
   [a / 4, low / 4],
   [a / 4, high / 4],
@@ -109,6 +128,9 @@ export function walk(path: readonly Frame[], spacing: number, phase = 0): Frame[
         nz: a.nz,
         s: a.s + (sb - a.s) * t,
         curvature: a.curvature,
+        half: a.half + (b.half - a.half) * t,
+        bank: a.bank + (b.bank - a.bank) * t,
+        edge: a.edge + (b.edge - a.edge) * t,
       });
     }
   }
@@ -232,7 +254,7 @@ function tire(
     cz = base.z + base.nz * lateral,
     tx = base.nz,
     tz = -base.nx,
-    y0 = base.y + bottom,
+    y0 = base.y + bankLift(base, lateral) + bottom,
     y1 = y0 + height;
   const rim = (angle: number, y: number): Triple => [
     cx + (base.nx * Math.cos(angle) + tx * Math.sin(angle)) * radius,
@@ -262,7 +284,7 @@ export function buildBarriers(project: Project, samples: readonly Sample[]): Mes
   const lane = pitLaneLayout(project, samples);
   const meshes: Mesh[] = [];
   project.barriers.forEach((barrier, index) => {
-    const path = spanSamples(project, samples, barrier);
+    const path = barrierSamples(project, samples, barrier);
     if (path.length < 2) return;
     const sign = sideSign(barrier.side);
     const lateral = (p: Frame) => barrierLateral(project, lane, p, barrier.side, barrier.offset);

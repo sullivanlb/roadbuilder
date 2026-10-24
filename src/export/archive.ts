@@ -4,7 +4,14 @@ import type { Project } from '../core/project/schema';
 import { buildScene, findFoldedSurface } from '../core/scene/scene';
 import { sampleTrack, trackStats } from '../core/track/centerline';
 import { trackIssues } from '../core/track/issues';
-import { grooveIni, lightingIni, modelsIni, surfacesIni, uiTrackJson } from './assetto/files';
+import {
+  extConfigIni,
+  grooveIni,
+  lightingIni,
+  modelsIni,
+  surfacesIni,
+  uiTrackJson,
+} from './assetto/files';
 import { encodeKn5 } from './assetto/kn5';
 import { makeMap } from './assetto/map';
 import { zipFiles } from './binary/zip';
@@ -13,6 +20,7 @@ import type { DocumentTexts } from './documents';
 import { ExportError } from './errors';
 import { encodeObj } from './obj/obj';
 import { texture, textureFile, usedMaterials } from './textures';
+import type { SceneryImages } from './textures';
 
 export const EXPORT_FORMATS = ['assetto', 'obj'] as const;
 export type ExportFormat = (typeof EXPORT_FORMATS)[number];
@@ -26,8 +34,14 @@ export interface Archive {
 /**
  * Checks the project and packs the archive of one export format. Throws an
  * ExportError when the track has blocking issues or a surface folds over itself.
+ * `images` holds the scenery textures the scene needs (docs/adr/0014).
  */
-export function buildArchive(input: Project, format: ExportFormat, texts: DocumentTexts): Archive {
+export function buildArchive(
+  input: Project,
+  format: ExportFormat,
+  texts: DocumentTexts,
+  images: SceneryImages = {},
+): Archive {
   const project = parseProject(input);
   const samples = sampleTrack(project),
     issues = trackIssues(project, samples);
@@ -43,18 +57,20 @@ export function buildArchive(input: Project, format: ExportFormat, texts: Docume
     files['track.mtl'] = mtl;
     files['markers.json'] = JSON.stringify(scene.markers, null, 2);
     for (const material of usedMaterials(scene))
-      files[`texture/${textureFile(material)}`] = texture(material);
-    files['README.txt'] = texts.objReadme(project.barriers.length);
+      files[`texture/${textureFile(material)}`] = texture(material, images);
+    const colliders = project.barriers.length + project.scenery.filter((item) => item.solid).length;
+    files['README.txt'] = texts.objReadme(colliders);
   } else {
     const root = `content/tracks/${slug}/`;
     const map = makeMap(project, samples),
       preview = makeMap(project, samples, true);
-    files[`${root}${slug}.kn5`] = encodeKn5(scene);
+    files[`${root}${slug}.kn5`] = encodeKn5(scene, images);
     files[`${root}models.ini`] = modelsIni(`${slug}.kn5`);
     files[`${root}data/surfaces.ini`] = surfacesIni();
     files[`${root}data/map.ini`] = map.ini;
     files[`${root}data/lighting.ini`] = lightingIni();
     files[`${root}data/groove.ini`] = grooveIni();
+    if (scene.lights.length) files[`${root}extension/ext_config.ini`] = extConfigIni(scene.lights);
     files[`${root}map.png`] = map.png;
     files[`${root}ui/outline.png`] = map.png;
     files[`${root}ui/preview.png`] = preview.png;
@@ -65,6 +81,8 @@ export function buildArchive(input: Project, format: ExportFormat, texts: Docume
       projectFile,
       terrainMargin: project.terrain.margin,
       barrierCount: project.barriers.length,
+      sceneryCount: project.scenery.length,
+      lights: scene.lights.length > 0,
       pitBoxes: project.pitLane ? project.cars : null,
       warnings: issues.warnings,
     });

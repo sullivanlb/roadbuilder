@@ -1,0 +1,128 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`corners > are found along the club template 1`] = `
+[
+  [
+    1,
+    "left",
+    530,
+    61,
+    32,
+  ],
+  [
+    2,
+    "left",
+    759,
+    50,
+    26,
+  ],
+  [
+    3,
+    "left",
+    906,
+    74,
+    60,
+  ],
+  [
+    4,
+    "right",
+    1070,
+    76,
+    81,
+  ],
+  [
+    5,
+    "left",
+    1201,
+    50,
+    37,
+  ],
+  [
+    6,
+    "left",
+    1775,
+    75,
+    41,
+  ],
+]
+`;
+
+exports[`corners > are found along the kart template 1`] = `
+[
+  [
+    1,
+    "left",
+    236,
+    242,
+    246,
+  ],
+  [
+    2,
+    "right",
+    503,
+    105,
+    176,
+  ],
+  [
+    3,
+    "left",
+    641,
+    148,
+    166,
+  ],
+  [
+    4,
+    "left",
+    847,
+    77,
+    70,
+  ],
+]
+`;
+
+exports[`corners > are found along the mountain template 1`] = `
+[
+  [
+    1,
+    "left",
+    472,
+    55,
+    28,
+  ],
+  [
+    2,
+    "left",
+    547,
+    108,
+    110,
+  ],
+  [
+    3,
+    "right",
+    955,
+    53,
+    33,
+  ],
+  [
+    4,
+    "right",
+    1061,
+    95,
+    113,
+  ],
+  [
+    5,
+    "left",
+    1442,
+    32,
+    21,
+  ],
+  [
+    6,
+    "left",
+    1528,
+    97,
+    107,
+  ],
+]
+`;

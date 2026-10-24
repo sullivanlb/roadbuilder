@@ -1,15 +1,17 @@
 import { clamp } from '../math';
 import { isCircuit } from '../project/schema';
 import type { Project, Side } from '../project/schema';
-import { trackLength } from './centerline';
+import { sampleAt, trackLength } from './centerline';
 import type { Sample } from './centerline';
-import { LAYOUT, roadEdge } from './layout';
+import { clampToBend, LAYOUT, roadEdge } from './layout';
 import { positionDistance } from './positions';
 
 /** How far the lane reaches at one place along it, in metres from the centerline (unsigned). */
 export interface PitLaneProfile {
   /** 0 at the entry and exit, 1 along the parallel part. */
   t: number;
+  /** Outer edge of the kerb, where the lane surface starts. */
+  edge: number;
   /** Lane surface: from the kerb edge out to `outer`. */
   outer: number;
   /** Middle of the driven part of the lane. */
@@ -46,8 +48,7 @@ export function pitLaneLayout(project: Project, samples: readonly Sample[]): Pit
   // Entry and exit on the same spot: nothing to build.
   if (length < 1) return null;
   const taper = Math.min(LAYOUT.pitLane.taper, length / 2);
-  const edge = roadEdge(project.road),
-    gap = LAYOUT.pitLane.wallGap;
+  const gap = LAYOUT.pitLane.wallGap;
   const along = (s: number) => {
     const offset = (((s - entry) % total) + total) % total;
     return offset <= length ? offset : null;
@@ -65,8 +66,11 @@ export function pitLaneLayout(project: Project, samples: readonly Sample[]): Pit
       const offset = along(s);
       if (offset === null) return null;
       const t = clamp(Math.min(offset, length - offset) / taper, 0, 1);
+      // The lane follows the kerb, wherever a width zone moves it.
+      const edge = roadEdge(project.road, sampleAt(samples, ((s % total) + total) % total)!);
       return {
         t,
+        edge,
         // A sliver of lane even at the very entry, so no surface triangle is flat.
         outer: edge + Math.max(0.05, (gap + lane.width) * t),
         center: edge + (gap + lane.width / 2) * t,
@@ -83,12 +87,30 @@ export function pitLaneLayout(project: Project, samples: readonly Sample[]): Pit
 export function sideEdge(
   project: Project,
   lane: PitLaneLayout | null,
-  sample: Pick<Sample, 's'>,
+  sample: Pick<Sample, 's' | 'half'>,
   side: Side,
 ): number {
-  const edge = roadEdge(project.road);
+  const edge = roadEdge(project.road, sample);
   if (!lane || lane.side !== side) return edge;
   return Math.max(edge, lane.profile(sample.s)?.outer ?? edge);
+}
+
+/**
+ * Lateral distance from the centerline to the outer edge of the shoulders on one
+ * side. On the inside of a bend they narrow before the centre of curvature, so
+ * they never fold over themselves on tight karting corners.
+ */
+export function shoulderEdge(
+  project: Project,
+  lane: PitLaneLayout | null,
+  sample: Pick<Sample, 's' | 'half' | 'curvature'>,
+  side: Side,
+): number {
+  const inner = sideEdge(project, lane, sample, side);
+  return Math.max(
+    inner,
+    clampToBend(project.road, sample, side === 'right' ? 1 : -1, inner + project.road.shoulder),
+  );
 }
 
 /** How many pit boxes fit along the parallel part of the lane. */

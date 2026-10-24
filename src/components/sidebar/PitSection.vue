@@ -13,14 +13,13 @@ import RangeField from '../ui/RangeField.vue';
 import SidebarSection from '../ui/SidebarSection.vue';
 import TrackPositionField from './TrackPositionField.vue';
 
-defineProps<{ index: number }>();
 const store = useProjectStore();
 const editor = useEditorStore();
 
 const circuit = computed(() => isCircuit(store.project));
 const lane = computed(() => store.project.pitLane);
 const status = computed(() => {
-  if (editor.pitDraft) return t('pits.statusDraft');
+  if (editor.laying?.kind === 'pitLane') return t('pits.statusDraft');
   if (editor.tool === 'pits') return t('pits.statusTool');
   return null;
 });
@@ -30,7 +29,7 @@ const preview = (patch: Partial<PitLane>) =>
 </script>
 
 <template>
-  <SidebarSection :index="index" :title="t('pits.title')">
+  <SidebarSection :title="t('pits.title')">
     <template v-if="lane" #badge>
       <span id="pit-cars">{{ store.project.cars }} {{ t('pits.carsUnit').toUpperCase() }}</span>
     </template>

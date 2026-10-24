@@ -1,11 +1,28 @@
+import { clamp } from '../math';
 import type { Vec3 } from '../math';
 import type { MaterialId } from './materials';
 
 /**
  * What a mesh is for. `surface` and `terrain` are driven on and face up;
- * `barrier` meshes are vertical and excluded from the fold-back check.
+ * `barrier` and `scenery` meshes stand on them and are excluded from the
+ * fold-back check.
  */
-export type MeshKind = 'surface' | 'terrain' | 'barrier';
+export type MeshKind = 'surface' | 'terrain' | 'barrier' | 'scenery';
+
+/**
+ * What of the track a mesh shows: the editor dims or hides it with that layer,
+ * and shows the roadway on every one. Names stay what the game reads
+ * (docs/adr/0005): the part is told beside them, not read from them.
+ */
+export type MeshPart = 'roadway' | 'pits' | 'edges' | 'terrain' | 'scenery';
+
+/** The part a mesh of a kind shows, unless it is told otherwise. */
+const KIND_PART: Record<MeshKind, MeshPart> = {
+  surface: 'roadway',
+  terrain: 'terrain',
+  barrier: 'edges',
+  scenery: 'scenery',
+};
 
 /**
  * Triangle mesh with flat attribute arrays: 3 numbers per position and normal,
@@ -16,6 +33,7 @@ export interface Mesh {
   name: string;
   material: MaterialId;
   kind: MeshKind;
+  part: MeshPart;
   /** False for colliders: kept for collisions, never drawn. */
   visible: boolean;
   positions: number[];
@@ -32,8 +50,9 @@ export function createMesh(
   material: MaterialId,
   kind: MeshKind,
   visible = true,
+  part = KIND_PART[kind],
 ): Mesh {
-  return { name, material, kind, visible, positions: [], normals: [], uvs: [], indices: [] };
+  return { name, material, kind, part, visible, positions: [], normals: [], uvs: [], indices: [] };
 }
 
 export const vertexCount = (mesh: Mesh) => mesh.positions.length / 3;
@@ -73,17 +92,70 @@ export function addQuad(mesh: Mesh, corners: Triple[], uvs: Pair[] = DEFAULT_UVS
   mesh.indices.push(first, first + 1, first + 2, first, first + 2, first + 3);
 }
 
-/** A point beside the centerline: `lateral` metres to the right (negative: left), lifted by `height`. */
-export function offsetPoint(
-  sample: Vec3 & { nx: number; nz: number },
-  lateral: number,
-  height = 0,
-): Triple {
-  return [sample.x + sample.nx * lateral, sample.y + height, sample.z + sample.nz * lateral];
+/** A place on the centerline with what is needed to step across the track. */
+export type CrossFrame = Vec3 & { nx: number; nz: number; bank: number; edge: number };
+
+/**
+ * Height of the ground `lateral` metres to the right of the centerline (negative:
+ * left), above the centerline. A bank zone tilts the roadway and kerbs about their
+ * low edge, which keeps the altitude of the track, so the raised side climbs and
+ * nothing sinks into the ground; beyond the kerbs the ground stays flat at the
+ * height of their edge.
+ */
+export const bankLift = (frame: Pick<CrossFrame, 'bank' | 'edge'>, lateral: number) =>
+  (clamp(lateral, -frame.edge, frame.edge) + Math.sign(frame.bank) * frame.edge) * frame.bank;
+
+/** A point beside the centerline: `lateral` metres to the right (negative: left), lifted by `height` above the ground. */
+export function offsetPoint(frame: CrossFrame, lateral: number, height = 0): Triple {
+  return [
+    frame.x + frame.nx * lateral,
+    frame.y + bankLift(frame, lateral) + height,
+    frame.z + frame.nz * lateral,
+  ];
 }
 
 /** KN5 indexes vertices with 16 bits: larger meshes are split. */
 export const MAX_MESH_VERTICES = 60000;
+
+/**
+ * Splits a triangle mesh into pieces small enough for 16-bit indices, keeping
+ * whole triangles and the vertices they use; an empty mesh yields none.
+ */
+export function splitTriangles(mesh: Mesh): Mesh[] {
+  const pieces: Mesh[] = [];
+  let piece: Mesh | null = null,
+    remap = new Map<number, number>();
+  for (let i = 0; i < mesh.indices.length; i += 3) {
+    const corners = mesh.indices.slice(i, i + 3);
+    const fresh = corners.filter((index) => !remap.has(index)).length;
+    if (!piece || vertexCount(piece) + fresh > MAX_MESH_VERTICES) {
+      piece = {
+        ...mesh,
+        name: `${mesh.name}_${pieces.length}`,
+        positions: [],
+        normals: [],
+        uvs: [],
+        indices: [],
+      };
+      pieces.push(piece);
+      remap = new Map();
+    }
+    for (const index of corners) {
+      let mapped = remap.get(index);
+      if (mapped === undefined) {
+        mapped = addVertex(
+          piece,
+          vertexPosition(mesh, index),
+          [mesh.normals[index * 3], mesh.normals[index * 3 + 1], mesh.normals[index * 3 + 2]],
+          [mesh.uvs[index * 2], mesh.uvs[index * 2 + 1]],
+        );
+        remap.set(index, mapped);
+      }
+      piece.indices.push(mapped);
+    }
+  }
+  return pieces;
+}
 
 /** Splits a quad-based mesh into pieces small enough for 16-bit indices; an empty mesh yields none. */
 export function splitMesh(mesh: Mesh): Mesh[] {
