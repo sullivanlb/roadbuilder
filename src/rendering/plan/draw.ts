@@ -1,5 +1,5 @@
 import type { Id } from '../../core/ids';
-import type { Vec3 } from '../../core/math';
+import type { PlanPoint, Vec3 } from '../../core/math';
 import { DEFAULTS } from '../../core/project/rules';
 import type {
   Earthwork,
@@ -9,7 +9,7 @@ import type {
   SceneryItem,
   Side,
 } from '../../core/project/schema';
-import { EARTHWORK_DEFAULTS } from '../../core/project/terrain';
+import { EARTHWORK_DEFAULTS, hillOutline } from '../../core/project/terrain';
 import { SCULPT } from '../../core/project/sculpt';
 import type { SculptField } from '../../core/project/sculpt';
 import { barrierLine, barrierPath } from '../../core/scene/barriers';
@@ -24,8 +24,13 @@ import { arcLayout, corners } from '../../core/track/geometry';
 import type { ArcShape } from '../../core/track/geometry';
 import type { TightTurn } from '../../core/track/issues';
 import { kerbWidth, LAYOUT, roadEdge, terrainBounds } from '../../core/track/layout';
-import { earthworkRanges } from '../../core/track/earthworks';
-import { pitLaneLayout, shoulderEdge } from '../../core/track/pitLane';
+import {
+  earthworkOutline,
+  earthworkRanges,
+  pointBesideShoulders,
+} from '../../core/track/earthworks';
+import type { EarthworkRange } from '../../core/track/earthworks';
+import { pitLaneLayout } from '../../core/track/pitLane';
 import type { PitLaneLayout } from '../../core/track/pitLane';
 import { rangeBetween, rangeSamples } from '../../core/track/ranges';
 import { bankZoneRanges } from '../../core/track/bank';
@@ -106,7 +111,7 @@ export interface PlanScene {
 
 type Context = CanvasRenderingContext2D;
 
-function trace(ctx: Context, view: PlanProjection, points: readonly Vec3[]) {
+function trace(ctx: Context, view: PlanProjection, points: readonly PlanPoint[]) {
   ctx.beginPath();
   points.forEach((point, i) => {
     const p = view.toScreen(point);
@@ -261,19 +266,7 @@ function drawTrack(ctx: Context, view: PlanProjection, scene: PlanScene) {
 
 /** The outline of a hill on the plan, at a share `r` of its size: 1 for its foot. */
 function hillRing(ctx: Context, view: PlanProjection, hill: Hill, r = 1) {
-  const front = headingVector(hill.heading);
-  ctx.beginPath();
-  for (let k = 0; k <= 48; k++) {
-    const angle = (k / 48) * Math.PI * 2,
-      u = (Math.cos(angle) * hill.width * r) / 2,
-      v = (Math.sin(angle) * hill.depth * r) / 2;
-    const p = view.toScreen({
-      x: hill.x + front.x * v - front.z * u,
-      z: hill.z + front.z * v + front.x * u,
-    });
-    if (k) ctx.lineTo(p.x, p.y);
-    else ctx.moveTo(p.x, p.y);
-  }
+  trace(ctx, view, hillOutline(hill, r));
   ctx.closePath();
 }
 
@@ -291,33 +284,15 @@ function drawHill(ctx: Context, view: PlanProjection, hill: Hill) {
   }
 }
 
-/** A point beside the track, `beyond` metres past the outer edge of its shoulders on a side. */
-function besideShoulder(
-  project: Project,
-  lane: PitLaneLayout | null,
-  sample: Sample,
-  side: Side,
-  beyond: number,
-) {
-  const lateral =
-    (side === 'right' ? 1 : -1) * (shoulderEdge(project, lane, sample, side) + beyond);
-  return { x: sample.x + sample.nx * lateral, z: sample.z + sample.nz * lateral, y: 0 };
-}
-
-/** The ground an earthwork covers along `path`, from the shoulders out to `reach`. */
+/** The ground an earthwork covers along a range, from the shoulders out to its far edge. */
 function earthworkArea(
   ctx: Context,
   view: PlanProjection,
-  project: Project,
-  lane: PitLaneLayout | null,
-  path: readonly Sample[],
-  side: Side,
-  reach: number,
+  scene: PlanScene,
+  earthwork: Pick<Earthwork, 'side' | 'offset' | 'width'>,
+  range: TrackRange,
 ) {
-  trace(ctx, view, [
-    ...path.map((sample) => besideShoulder(project, lane, sample, side, 0)),
-    ...[...path].reverse().map((sample) => besideShoulder(project, lane, sample, side, reach)),
-  ]);
+  trace(ctx, view, earthworkOutline(scene.project, scene.samples, earthwork, range));
   ctx.closePath();
 }
 
@@ -325,14 +300,17 @@ function earthworkArea(
 function drawEarthwork(
   ctx: Context,
   view: PlanProjection,
-  project: Project,
+  scene: PlanScene,
   lane: PitLaneLayout | null,
-  path: readonly Sample[],
-  earthwork: Earthwork,
+  { earthwork, ...range }: EarthworkRange,
 ) {
+  const { project, samples } = scene;
   const { side, offset, width } = earthwork;
+  const path = rangeSamples(samples, range);
+  const beside = (sample: Sample, beyond: number) =>
+    pointBesideShoulders(project, lane, sample, side, beyond);
   const color = COLORS.earthwork[earthwork.type];
-  earthworkArea(ctx, view, project, lane, path, side, offset + width);
+  earthworkArea(ctx, view, scene, earthwork, range);
   ctx.save();
   ctx.globalAlpha *= 0.3;
   ctx.fillStyle = color;
@@ -344,7 +322,7 @@ function drawEarthwork(
     trace(
       ctx,
       view,
-      path.map((sample) => besideShoulder(project, lane, sample, side, offset + width / 2)),
+      path.map((sample) => beside(sample, offset + width / 2)),
     );
     ctx.stroke();
   } else if (earthwork.type === 'embankment') {
@@ -355,8 +333,8 @@ function drawEarthwork(
     for (const sample of path) {
       if (sample.s < next) continue;
       next = sample.s + 4;
-      const a = view.toScreen(besideShoulder(project, lane, sample, side, top)),
-        b = view.toScreen(besideShoulder(project, lane, sample, side, top + (foot - top) * 0.6));
+      const a = view.toScreen(beside(sample, top)),
+        b = view.toScreen(beside(sample, top + (foot - top) * 0.6));
       ctx.moveTo(a.x, a.y);
       ctx.lineTo(b.x, b.y);
     }
@@ -421,19 +399,10 @@ function drawTerrainShapes(ctx: Context, view: PlanProjection, scene: PlanScene)
     ctx.stroke();
   }
   const lane = pitLaneLayout(project, samples);
-  for (const { earthwork, ...range } of earthworkRanges(project, samples)) {
-    const path = rangeSamples(samples, range);
-    drawEarthwork(ctx, view, project, lane, path, earthwork);
-    if (earthwork.id !== scene.selectedEarthworkId) continue;
-    earthworkArea(
-      ctx,
-      view,
-      project,
-      lane,
-      path,
-      earthwork.side,
-      earthwork.offset + earthwork.width,
-    );
+  for (const laid of earthworkRanges(project, samples)) {
+    drawEarthwork(ctx, view, scene, lane, laid);
+    if (laid.earthwork.id !== scene.selectedEarthworkId) continue;
+    earthworkArea(ctx, view, scene, laid.earthwork, laid);
     ctx.strokeStyle = COLORS.accent;
     ctx.lineWidth = 2.5;
     ctx.stroke();
@@ -447,18 +416,16 @@ function drawTerrainShapes(ctx: Context, view: PlanProjection, scene: PlanScene)
   }
   const draft = scene.earthworkDraft;
   if (!draft) return;
-  const { offset, width } = EARTHWORK_DEFAULTS[draft.type];
   if (scene.earthworkTarget !== null) {
     const range = rangeBetween(project, samples, draft.s, scene.earthworkTarget);
-    const path = rangeSamples(samples, range);
-    earthworkArea(ctx, view, project, lane, path, draft.side, offset + width);
+    earthworkArea(ctx, view, scene, { side: draft.side, ...EARTHWORK_DEFAULTS[draft.type] }, range);
     ctx.strokeStyle = COLORS.accent;
     ctx.lineWidth = 2;
     dashed(ctx, [6, 5], () => ctx.stroke());
   }
   // The first click, on its side of the track.
   const start = sampleAt(samples, draft.s)!;
-  const p = view.toScreen(besideShoulder(project, lane, start, draft.side, 0));
+  const p = view.toScreen(pointBesideShoulders(project, lane, start, draft.side, 0));
   ctx.beginPath();
   ctx.arc(p.x, p.y, 6, 0, Math.PI * 2);
   ctx.strokeStyle = COLORS.accent;

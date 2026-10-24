@@ -19,6 +19,7 @@ import { buildScene, findFoldedSurface } from '../../src/core/scene/scene';
 import { sampleAt, sampleTrack, trackLength } from '../../src/core/track/centerline';
 import { trackIssues } from '../../src/core/track/issues';
 import { LAYOUT, terrainBounds } from '../../src/core/track/layout';
+import { besideShoulders, earthworkAt, earthworkOutline } from '../../src/core/track/earthworks';
 import { pitLaneLayout, sideEdge } from '../../src/core/track/pitLane';
 import { pointDistance, positionAt } from '../../src/core/track/positions';
 import { positionRange } from '../../src/core/track/ranges';
@@ -217,6 +218,68 @@ describe('earthworks on the ground', () => {
   it('builds the same scene as before without earthworks', () => {
     const scene = buildScene(club);
     expect(scene.meshes.some((mesh) => mesh.name.startsWith('1GRASS_earthwork'))).toBe(false);
+  });
+});
+
+describe('the ground an earthwork covers', () => {
+  it('is the same on the plan, when picking and in its mesh, even inside a tight bend', () => {
+    // A road turning on an arc of 25 m, an embankment laid on its inside.
+    const plain = parseProject({
+      format: 'roadbuilder',
+      version: 2,
+      id: 'bend',
+      name: 'Bend',
+      author: '',
+      road: { closed: false, width: 8, shoulder: 6, kerbs: false },
+      terrain: { margin: 150 },
+      points: [
+        { id: 'a', x: 0, y: 0, z: 0 },
+        { id: 'b', x: 200, y: 0, z: 0, radius: 25 },
+        { id: 'c', x: 200, y: 0, z: 200 },
+      ],
+      barriers: [],
+    });
+    const samples = sampleTrack(plain);
+    const lane = pitLaneLayout(plain, samples);
+    const reach = 30;
+    // A place in the bend where its centre stops the embankment short of its width.
+    const clamped = (sample: (typeof samples)[number]) => {
+      const side: Side = sample.curvature > 0 ? 'right' : 'left';
+      const shoulders = besideShoulders(plain, lane, sample, side, 0);
+      const across = besideShoulders(plain, lane, sample, side, reach);
+      return across > shoulders + 2 && across < shoulders + reach - 2;
+    };
+    const bend = samples.filter(clamped);
+    const tightest = bend[Math.floor(bend.length / 2)];
+    const inside: Side = tightest.curvature > 0 ? 'right' : 'left';
+    const project = withEarthwork(plain, 'embankment', tightest.s - 20, tightest.s + 20, inside, {
+      offset: 0,
+      width: reach,
+    });
+    const [earthwork] = project.earthworks;
+    const sign = inside === 'right' ? 1 : -1;
+    const across = besideShoulders(project, lane, tightest, inside, reach);
+    const at = (lateral: number) => ({
+      x: tightest.x + tightest.nx * sign * lateral,
+      z: tightest.z + tightest.nz * sign * lateral,
+    });
+    expect(earthworkAt(project, samples, at(across - 0.3))?.id).toBe(earthwork.id);
+    expect(earthworkAt(project, samples, at(across + 0.3))).toBeNull();
+
+    const range = positionRange(project, samples, earthwork.from, earthwork.to)!;
+    const outline = earthworkOutline(project, samples, earthwork, range);
+    expect(outline).toContainEqual(at(across));
+    const strip = buildScene(project).meshes.find((mesh) =>
+      mesh.name.startsWith('1GRASS_earthwork'),
+    )!;
+    const vertices = Array.from({ length: strip.positions.length / 3 }, (_, i) => ({
+      x: strip.positions[i * 3],
+      z: strip.positions[i * 3 + 2],
+    }));
+    const far = at(across);
+    expect(Math.min(...vertices.map((v) => Math.hypot(v.x - far.x, v.z - far.z)))).toBeLessThan(
+      1e-6,
+    );
   });
 });
 

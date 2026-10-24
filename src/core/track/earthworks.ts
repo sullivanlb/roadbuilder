@@ -4,9 +4,10 @@ import { SIDES } from '../project/schema';
 import type { Earthwork, Project, Side } from '../project/schema';
 import { trackLength } from './centerline';
 import type { Sample } from './centerline';
-import { LAYOUT } from './layout';
+import { clampToBend, LAYOUT } from './layout';
 import { pitLaneLayout, shoulderEdge } from './pitLane';
-import { positionRange, rangeContains, rangeEase } from './ranges';
+import type { PitLaneLayout } from './pitLane';
+import { positionRange, rangeContains, rangeEase, rangeSamples } from './ranges';
 import type { TrackRange } from './ranges';
 
 /** An earthwork resolved on the current track. */
@@ -139,6 +140,58 @@ export function sideProfiles(
 }
 
 /**
+ * Distance from the centerline to a place `beyond` metres past the outer edge of
+ * the shoulders on a side, stopping short of the centre of a bend like the
+ * shoulders. The ground an earthwork covers is measured with it everywhere: its
+ * mesh, its outline on the plan and in the preview, picking and its warning.
+ */
+export function besideShoulders(
+  project: Project,
+  lane: PitLaneLayout | null,
+  sample: Pick<Sample, 's' | 'half' | 'curvature'>,
+  side: Side,
+  beyond: number,
+): number {
+  const edge = shoulderEdge(project, lane, sample, side);
+  return beyond
+    ? clampToBend(project.road, sample, side === 'right' ? 1 : -1, edge + beyond)
+    : edge;
+}
+
+/** The place on the plan `beyond` metres past the shoulders of a sample (see besideShoulders). */
+export function pointBesideShoulders(
+  project: Project,
+  lane: PitLaneLayout | null,
+  sample: Sample,
+  side: Side,
+  beyond: number,
+): PlanPoint {
+  const lateral =
+    (side === 'right' ? 1 : -1) * besideShoulders(project, lane, sample, side, beyond);
+  return { x: sample.x + sample.nx * lateral, z: sample.z + sample.nz * lateral };
+}
+
+/**
+ * The ground an earthwork covers along a range, as a closed ring on the plan:
+ * along the outer edge of the shoulders, then back along its far edge.
+ */
+export function earthworkOutline(
+  project: Project,
+  samples: readonly Sample[],
+  earthwork: Pick<Earthwork, 'side' | 'offset' | 'width'>,
+  range: TrackRange,
+): PlanPoint[] {
+  const lane = pitLaneLayout(project, samples);
+  const path = rangeSamples(samples, range);
+  const beside = (sample: Sample, beyond: number) =>
+    pointBesideShoulders(project, lane, sample, earthwork.side, beyond);
+  return [
+    ...path.map((sample) => beside(sample, 0)),
+    ...[...path].reverse().map((sample) => beside(sample, earthwork.offset + earthwork.width)),
+  ];
+}
+
+/**
  * The earthwork covering a place on the plan, between the shoulders and its far
  * edge, or null: the later one where several cover it, as drawn on top.
  */
@@ -161,14 +214,14 @@ export function earthworkAt(
   const sample = samples[nearest];
   const lateral = (at.x - sample.x) * sample.nx + (at.z - sample.z) * sample.nz;
   const side: Side = lateral < 0 ? 'left' : 'right';
-  const beyond =
-    Math.abs(lateral) - shoulderEdge(project, pitLaneLayout(project, samples), sample, side);
+  const lane = pitLaneLayout(project, samples);
+  const across = (beyond: number) => besideShoulders(project, lane, sample, side, beyond);
   const total = trackLength(samples);
   const found = ranges.filter(
     ({ earthwork, ...range }) =>
       earthwork.side === side &&
-      beyond >= 0 &&
-      beyond <= earthwork.offset + earthwork.width &&
+      Math.abs(lateral) >= across(0) &&
+      Math.abs(lateral) <= across(earthwork.offset + earthwork.width) &&
       rangeContains(range, total, sample.s),
   );
   return found.at(-1)?.earthwork ?? null;

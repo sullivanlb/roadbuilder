@@ -4,13 +4,14 @@ import type { Project, SceneryItem } from '../../core/project/schema';
 import type { MeshKind } from '../../core/scene/mesh';
 import { barrierLateral, barrierSamples } from '../../core/scene/barriers';
 import { offsetPoint } from '../../core/scene/mesh';
-import { headingVector, sceneryFootprint } from '../../core/project/scenery';
+import { sceneryFootprint } from '../../core/project/scenery';
+import { hillOutline } from '../../core/project/terrain';
 import { groundHeight } from '../../core/scene/ground';
 import { sampleAt } from '../../core/track/centerline';
 import type { Sample } from '../../core/track/centerline';
 import { kerbWidth } from '../../core/track/layout';
-import { earthworkRanges } from '../../core/track/earthworks';
-import { pitLaneLayout, shoulderEdge } from '../../core/track/pitLane';
+import { earthworkOutline, earthworkRanges } from '../../core/track/earthworks';
+import { pitLaneLayout } from '../../core/track/pitLane';
 import { positionRange, rangeSamples } from '../../core/track/ranges';
 import type { TrackRange } from '../../core/track/ranges';
 import type { LayerId } from '../layers';
@@ -148,30 +149,12 @@ function terrainOutline(
 ): PlanPoint[] {
   if (selection.kind === 'hill') {
     const hill = project.hills.find((candidate) => candidate.id === selection.id);
-    if (!hill) return [];
-    const front = headingVector(hill.heading);
-    return Array.from({ length: 48 }, (_, k) => {
-      const u = (Math.cos((k * Math.PI) / 24) * hill.width) / 2,
-        v = (Math.sin((k * Math.PI) / 24) * hill.depth) / 2;
-      return { x: hill.x + front.x * v - front.z * u, z: hill.z + front.z * v + front.x * u };
-    });
+    return hill ? hillOutline(hill) : [];
   }
   const found = earthworkRanges(project, samples).find(
     (range) => range.earthwork.id === selection.id,
   );
-  if (!found) return [];
-  const { earthwork, ...range } = found;
-  const lane = pitLaneLayout(project, samples);
-  const sign = earthwork.side === 'right' ? 1 : -1;
-  const beside = (sample: Sample, beyond: number) => {
-    const lateral = sign * (shoulderEdge(project, lane, sample, earthwork.side) + beyond);
-    return { x: sample.x + sample.nx * lateral, z: sample.z + sample.nz * lateral };
-  };
-  const path = rangeSamples(samples, range);
-  return [
-    ...path.map((sample) => beside(sample, 0)),
-    ...[...path].reverse().map((sample) => beside(sample, earthwork.offset + earthwork.width)),
-  ];
+  return found ? earthworkOutline(project, samples, found.earthwork, found) : [];
 }
 
 export function buildOverlay(

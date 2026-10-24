@@ -2,9 +2,8 @@ import type { PlanPoint } from '../math';
 import { SIDES } from '../project/schema';
 import type { Project, Side } from '../project/schema';
 import type { Sample } from '../track/centerline';
-import { earthworkStations, sideProfiles } from '../track/earthworks';
-import { clampToBend } from '../track/layout';
-import { pitLaneLayout, shoulderEdge } from '../track/pitLane';
+import { besideShoulders, earthworkStations, sideProfiles } from '../track/earthworks';
+import { pitLaneLayout } from '../track/pitLane';
 import { SHOULDER_DROP } from './ground';
 import { addVertex, createMesh, offsetPoint } from './mesh';
 import type { Mesh } from './mesh';
@@ -67,16 +66,13 @@ function strip(
   mesh: Mesh,
 ) {
   const sign = side === 'right' ? 1 : -1;
-  const points = rows.map((sample) => {
-    const edge = shoulderEdge(project, lane, sample, side);
-    return across.map((beyond) => {
-      // Short of the centre of a bend, like the shoulders.
-      const lateral =
-        sign * (beyond ? clampToBend(project.road, sample, sign, edge + beyond) : edge);
+  const points = rows.map((sample) =>
+    across.map((beyond) => {
+      const lateral = sign * besideShoulders(project, lane, sample, side, beyond);
       const [x, y, z] = offsetPoint(sample, lateral, -SHOULDER_DROP);
       return { x, z, y: beyond ? height({ x, z }) : y };
-    });
-  });
+    }),
+  );
   // Faces wind so they face up; those squeezed flat inside a tight bend are left
   // out, and the terrain fills their place.
   const faces: [number, number, number][] = [];

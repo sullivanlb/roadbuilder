@@ -9,8 +9,7 @@ import { controlPointSample, sampleTrack, trackStats } from './centerline';
 import { corners, straightSide } from './geometry';
 import type { Sample } from './centerline';
 import { LAYOUT } from './layout';
-import { earthworkRanges } from './earthworks';
-import { clampToBend } from './layout';
+import { besideShoulders, earthworkRanges, pointBesideShoulders } from './earthworks';
 import { pitBoxCapacity, pitLaneLayout, shoulderEdge, sideEdge } from './pitLane';
 import { overlapStart, rangeSamples } from './ranges';
 import type { TrackRange } from './ranges';
@@ -258,19 +257,15 @@ function earthworksOnTrack(project: Project, samples: readonly Sample[]): IssueL
   const ids: Id[] = [];
   let first = -1;
   for (const { earthwork, ...range } of ranges) {
-    const sign = earthwork.side === 'right' ? 1 : -1;
-    const side = earthwork.side === 'right' ? 1 : 0;
-    const crossing = rangeSamples(samples, range).find((sample) => {
-      const index = Math.max(0, samples.findIndex((other) => other.s >= sample.s) - 1);
-      const edge = shoulders[index][side];
-      return [0, 0.5, 1].some((share) => {
+    const crossing = rangeSamples(samples, range).find((sample) =>
+      [0, 0.5, 1].some((share) => {
         const beyond = earthwork.offset + earthwork.width * share;
-        const lateral = sign * clampToBend(project.road, sample, sign, edge + beyond);
-        const p = { x: sample.x + sample.nx * lateral, z: sample.z + sample.nz * lateral };
+        const across = besideShoulders(project, lane, sample, earthwork.side, beyond);
+        const p = pointBesideShoulders(project, lane, sample, earthwork.side, beyond);
         // Parts of the track nearer along it than across belong to the same pass.
-        return onTrack(p, sample.s, 3 * (edge + beyond));
-      });
-    });
+        return onTrack(p, sample.s, 3 * across);
+      }),
+    );
     if (!crossing) continue;
     ids.push(earthwork.id);
     if (first < 0)

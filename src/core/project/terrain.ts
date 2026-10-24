@@ -63,6 +63,20 @@ export function hillRadius(hill: Hill, p: PlanPoint): number {
   return Math.hypot(u / (hill.width / 2), v / (hill.depth / 2));
 }
 
+/**
+ * The outline of a hill on the plan at a share of its size, 1 for its foot, as a
+ * closed ring of `count` places: where hillRadius() is that share.
+ */
+export function hillOutline(hill: Hill, share = 1, count = 48): PlanPoint[] {
+  const front = headingVector(hill.heading);
+  return Array.from({ length: count }, (_, k) => {
+    const angle = (k / count) * Math.PI * 2,
+      u = (Math.cos(angle) * hill.width * share) / 2,
+      v = (Math.sin(angle) * hill.depth * share) / 2;
+    return { x: hill.x + front.x * v - front.z * u, z: hill.z + front.z * v + front.x * u };
+  });
+}
+
 /** Height a hill adds to the ground at a place: its full height on top, easing to nothing at its outline. */
 export function hillLift(hill: Hill, p: PlanPoint): number {
   const r = hillRadius(hill, p);
